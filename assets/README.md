@@ -32,6 +32,14 @@ baked backgrounds from the supporting character sources, trims empty space,
 normalizes opacity, and scales poses together to preserve their relative size.
 Gates are visual concepts; this kit does not introduce gate mechanics.
 
+Walls and platforms use size-aware metal panels from
+[`platformPanels.ts`](../src/game/art/platformPanels.ts), shared by gameplay and
+the editor. Bevels, seams, and status lights retain consistent proportions as
+platforms resize; the solid backing matches the collision rectangle exactly.
+The original `wall` and `platform` atlas frames remain source-kit references,
+but are no longer stretched over gameplay geometry. Panel geometry is built once
+per room, with no per-tick texture generation or additional image downloads.
+
 ## Runtime format
 
 Character poses use RGBA PNG atlases (384 × 128), with three poses in padded

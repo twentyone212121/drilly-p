@@ -20,6 +20,7 @@ import {
 } from "../game/editor";
 import type { Session } from "../game/session";
 import propsAtlas from "../../public/assets/environment/computer-props.json";
+import { platformPanels } from "../game/art/platformPanels";
 import escAtlas from "../../public/assets/characters/esc.json";
 
 type Tool = "select" | ObjectKind;
@@ -374,14 +375,16 @@ function AtlasFrame({
 function ObjectShape({ object }: { object: EditorObject }) {
   if (object.kind === "obstacle") return <ObstacleShape obstacle={object.value} />;
   const bounds = objectBounds(object);
-  const frame =
-    object.kind === "saw"
-      ? "saw"
-      : object.kind === "treasure"
-        ? "data"
-        : bounds.height > bounds.width
-          ? "wall"
-          : "platform";
+  if (object.kind === "platform") {
+    return (
+      <g pointerEvents="none" aria-hidden="true">
+        {platformPanels(bounds).map(({ color, ...rect }, index) => (
+          <rect key={index} {...rect} fill={`#${color.toString(16).padStart(6, "0")}`} />
+        ))}
+      </g>
+    );
+  }
+  const frame = object.kind === "saw" ? "saw" : "data";
 
   return (
     <AtlasFrame

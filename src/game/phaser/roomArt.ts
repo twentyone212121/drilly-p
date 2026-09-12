@@ -2,6 +2,7 @@ import { createObstacleArt } from "./obstacleArt";
 import type Phaser from "phaser";
 import type { GameEvent, Level, State } from "../../../shared/game/types";
 import { RULES } from "../../../shared/game/rules";
+import { platformPanels } from "../art/platformPanels";
 
 export function createRoomArt(scene: Phaser.Scene, level: Level) {
   const objects: Phaser.GameObjects.Image[] = [];
@@ -12,14 +13,12 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
     return image;
   };
 
+  const platforms = scene.add.graphics();
   for (const platform of level.platforms) {
-    props(
-      platform.height > platform.width ? "wall" : "platform",
-      platform.x,
-      platform.y,
-      platform.width,
-      platform.height,
-    );
+    for (const panel of platformPanels(platform)) {
+      platforms.fillStyle(panel.color);
+      platforms.fillRect(panel.x, panel.y, panel.width, panel.height);
+    }
   }
   const saws = level.traps.map((trap) => {
     const image = props("saw", trap.x, trap.y, trap.radius * 2, trap.radius * 2);
@@ -127,6 +126,7 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
       );
     },
     destroy() {
+      platforms.destroy();
       obstacleArt.destroy();
       fragments.destroy();
       objects.forEach((image) => image.destroy());
