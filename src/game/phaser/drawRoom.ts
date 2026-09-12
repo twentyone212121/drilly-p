@@ -9,7 +9,9 @@ export function drawRoom(graphics: Graphics, level: Level, state: State): void {
   drawBackground(graphics, level);
   drawPlatforms(graphics, level.platforms);
   drawTraps(graphics, level.traps, state.tick);
-  drawTreasure(graphics, level.treasure);
+  for (const treasure of level.treasures) {
+    if (!state.collectedTreasureIds.includes(treasure.id)) drawTreasure(graphics, treasure);
+  }
   drawPlayer(graphics, state);
 }
 
@@ -62,7 +64,7 @@ function drawTraps(graphics: Graphics, traps: Level["traps"], tick: number): voi
   }
 }
 
-function drawTreasure(graphics: Graphics, chest: Level["treasure"]): void {
+function drawTreasure(graphics: Graphics, chest: Level["treasures"][number]): void {
   graphics.fillStyle(COLORS.gold);
   graphics.fillRoundedRect(chest.x, chest.y, chest.width, chest.height, 4);
   graphics.fillStyle(0x9e753d);

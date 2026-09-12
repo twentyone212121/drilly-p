@@ -74,17 +74,82 @@ describe("checkpoint mechanics", () => {
   });
   it("gives lethal collision priority over treasure on the same tick", () => {
     const both = structuredClone(level);
-    both.treasure = { x: 276, y: 392, width: 24, height: 28 };
+    both.treasures = [{ id: "tie", x: 276, y: 392, width: 24, height: 28 }];
     const state = initialState(both);
     state.player.x = 272;
     const result = step(both, state, { jump: false });
     expect(result.state.status).toBe("dead");
     expect(result.events.some((e) => e.type === "won")).toBe(false);
+    expect(result.state.collectedTreasureIds).toEqual([]);
+    expect(result.events.some((e) => e.type === "treasure-collected")).toBe(false);
   });
   it("resets all gameplay state by rebuilding from the unchanged level", () => {
     const before = initialState(level);
     runAttempt(level, [44, 193]);
     expect(initialState(level)).toEqual(before);
+  });
+});
+
+describe("multiple treasures", () => {
+  const dungeon = parseLevel({
+    ...level,
+    traps: [],
+    treasures: [
+      { id: "first", x: 120, y: 392, width: 16, height: 28 },
+      { id: "last", x: 240, y: 392, width: 16, height: 28 },
+    ],
+  });
+
+  it("collects each treasure once and only wins after collecting all of them", () => {
+    const before = structuredClone(dungeon);
+    const first = runAttempt(dungeon, [], 20);
+    expect(first.state).toMatchObject({
+      status: "running",
+      collectedTreasureIds: ["first"],
+    });
+    expect(first.events.filter((event) => event.type === "treasure-collected")).toEqual([
+      { type: "treasure-collected", tick: 7, treasureId: "first" },
+    ]);
+    expect(first.trajectory[6].collectedTreasureIds).toEqual([]);
+
+    const complete = runAttempt(dungeon, []);
+    expect(complete.state).toMatchObject({
+      status: "won",
+      tick: 37,
+      collectedTreasureIds: ["first", "last"],
+    });
+    expect(complete.events.slice(-2)).toEqual([
+      { type: "treasure-collected", tick: 37, treasureId: "last" },
+      { type: "won", tick: 37 },
+    ]);
+    expect(dungeon).toEqual(before);
+    expect(initialState(dungeon).collectedTreasureIds).toEqual([]);
+  });
+
+  it("collects overlapping treasures in level order on the same tick", () => {
+    const together = {
+      ...dungeon,
+      treasures: dungeon.treasures.map((treasure) => ({ ...treasure, x: 120 })),
+    };
+    const result = runAttempt(together, []);
+    expect(result.state).toMatchObject({
+      status: "won",
+      tick: 7,
+      collectedTreasureIds: ["first", "last"],
+    });
+    expect(result.events.map((event) => event.type)).toEqual([
+      "treasure-collected",
+      "treasure-collected",
+      "won",
+    ]);
+  });
+
+  it("does not automatically win an incomplete editor draft", () => {
+    expect(
+      step({ ...dungeon, treasures: [] }, initialState(dungeon), {
+        jump: false,
+      }).state.status,
+    ).toBe("running");
   });
 });
 describe("collision boundaries", () => {

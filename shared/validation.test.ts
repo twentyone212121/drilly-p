@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { ValiError } from "valibot";
 import checkpoint from "../public/levels/checkpoint.json";
 import { RULES } from "./game/rules";
-import { parseJumpTicks, parseLevel, parseReplay } from "./validation";
+import { parseEditorLevel, parseJumpTicks, parseLevel, parseReplay } from "./validation";
 
 const level = parseLevel(checkpoint);
 
 const replay = {
-  version: 1,
+  version: 2,
   rulesVersion: RULES.version,
   level,
   jumpTicks: [],
@@ -27,20 +27,21 @@ describe("schema validation boundaries", () => {
     },
     {
       name: "negative treasure coordinate",
-      value: { ...level, treasure: { ...level.treasure, x: -1 } },
+      value: { ...level, treasures: [{ ...level.treasures[0], x: -1 }] },
     },
     {
       name: "platform outside room",
       value: {
         ...level,
-        platforms: [
-          { id: "outside", x: level.width, y: 0, width: 1, height: 1 },
-        ],
+        platforms: [{ id: "outside", x: level.width, y: 0, width: 8, height: 8 }],
       },
     },
     {
       name: "treasure outside room",
-      value: { ...level, treasure: { ...level.treasure, x: level.width } },
+      value: {
+        ...level,
+        treasures: [{ ...level.treasures[0], x: level.width }],
+      },
     },
     {
       name: "spawn outside room",
@@ -50,9 +51,62 @@ describe("schema validation boundaries", () => {
       name: "trap center outside room",
       value: { ...level, traps: [{ ...level.traps[0], y: level.height + 1 }] },
     },
+    {
+      name: "saw radius outside room",
+      value: { ...level, traps: [{ ...level.traps[0], x: 10 }] },
+    },
+    {
+      name: "saw touching spawn",
+      value: {
+        ...level,
+        traps: [{ id: "blocked", x: 120, y: 406, radius: 24 }],
+      },
+    },
+    {
+      name: "treasure overlapping spawn",
+      value: {
+        ...level,
+        treasures: [{ ...level.treasures[0], x: level.spawn.x, y: level.spawn.y }],
+      },
+    },
+    {
+      name: "treasure id shared with platform",
+      value: { ...level, treasures: [{ ...level.treasures[0], id: "floor" }] },
+    },
+    {
+      name: "duplicate treasure ids",
+      value: { ...level, treasures: [level.treasures[0], level.treasures[0]] },
+    },
+    { name: "old level version", value: { ...level, version: 1 } },
   ])("rejects $name through the validation library", ({ value }) => {
     expect(() => parseLevel(value)).toThrow(ValiError);
     expect(() => parseReplay({ ...replay, level: value })).toThrow(ValiError);
+  });
+
+  it("allows incomplete drafts but requires a treasure for attempts and replays", () => {
+    const empty = { ...level, treasures: [] };
+    expect(parseEditorLevel(empty, level).treasures).toEqual([]);
+    expect(() => parseLevel(empty)).toThrow("Add at least one treasure");
+    expect(() => parseReplay({ ...replay, level: empty })).toThrow();
+  });
+
+  it.each([
+    { width: level.width + 8 },
+    { height: level.height + 8 },
+    { spawn: { ...level.spawn, x: level.spawn.x + 8 } },
+    { spawn: { ...level.spawn, direction: -1 } },
+  ])("keeps the draft room and spawn fixed: %j", (change) => {
+    expect(() => parseEditorLevel({ ...level, ...change }, level)).toThrow("fixed");
+  });
+
+  it("allows platform support at the spawn edge and saws exactly inside the room", () => {
+    expect(parseLevel(level)).toEqual(level);
+    expect(
+      parseLevel({
+        ...level,
+        traps: [{ id: "edge", x: 24, y: 24, radius: 24 }],
+      }).traps,
+    ).toHaveLength(1);
   });
 
   it("keeps parsing non-coercing and returns independent plain data", () => {

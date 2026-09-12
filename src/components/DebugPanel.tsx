@@ -80,6 +80,8 @@ export function DebugPanel({ session, audio }: { session: Session; audio: AudioS
         <p className="hint">
           Paused Jump queues an input; Step consumes it. Tick N is applied before advancing to N+1.
           All tools use the same simulation.
+          {view.phase === "testing" &&
+            " Replay and schedule playback do not unlock submission. Restart restores your test dungeon."}
         </p>
         <div className="debug-grid">
           <section>

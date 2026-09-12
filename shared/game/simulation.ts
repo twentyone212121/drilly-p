@@ -13,6 +13,7 @@ export function initialState(level: Level): State {
   return {
     tick: 0,
     status: "running",
+    collectedTreasureIds: [],
     player: {
       x,
       y,
@@ -36,14 +37,15 @@ export function step(
   // Helpers update this tick's private copy, never the caller's state.
   const player = { ...state.player };
   const events: GameEvent[] = [];
+  const collectedTreasureIds = [...state.collectedTreasureIds];
   const tick = state.tick + 1;
 
   if (input.jump) applyJump(player, state.tick, events);
   applyForces(player);
   movePlayer(player, level.platforms, tick, events);
-  const status = resolveOutcome(player, level, tick, events);
+  const status = resolveOutcome(player, level, collectedTreasureIds, tick, events);
 
-  return { state: { tick, status, player }, events };
+  return { state: { tick, status, player, collectedTreasureIds }, events };
 }
 
 function applyJump(player: Player, tick: number, events: GameEvent[]): void {
@@ -101,6 +103,7 @@ function movePlayer(
 function resolveOutcome(
   player: Player,
   level: Level,
+  collectedTreasureIds: string[],
   tick: number,
   events: GameEvent[],
 ): State["status"] {
@@ -115,7 +118,14 @@ function resolveOutcome(
     return "dead";
   }
 
-  if (overlaps(body, level.treasure)) {
+  for (const treasure of level.treasures) {
+    if (collectedTreasureIds.includes(treasure.id) || !overlaps(body, treasure)) continue;
+
+    collectedTreasureIds.push(treasure.id);
+    events.push({ type: "treasure-collected", tick, treasureId: treasure.id });
+  }
+
+  if (level.treasures.length > 0 && collectedTreasureIds.length === level.treasures.length) {
     events.push({ type: "won", tick });
     return "won";
   }

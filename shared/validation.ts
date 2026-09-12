@@ -1,5 +1,5 @@
 import * as v from "valibot";
-import { overlaps } from "./game/collision";
+import { overlaps, touchesCircle } from "./game/collision";
 import { RULES } from "./game/rules";
 import type { Level, Rect, Replay } from "./game/types";
 
@@ -15,7 +15,14 @@ const RectSchema = v.object({
   height: SizeSchema,
 });
 
-const PlatformSchema = v.object({ ...RectSchema.entries, id: NameSchema });
+const PlatformSizeSchema = v.pipe(SizeSchema, v.minValue(RULES.editor.minPlatformSize));
+const PlatformSchema = v.object({
+  ...RectSchema.entries,
+  id: NameSchema,
+  width: PlatformSizeSchema,
+  height: PlatformSizeSchema,
+});
+const TreasureSchema = v.object({ ...RectSchema.entries, id: NameSchema });
 
 const TrapSchema = v.object({
   id: NameSchema,
@@ -30,21 +37,32 @@ const SpawnSchema = v.object({
   direction: v.union([v.literal(-1), v.literal(1)]),
 });
 
-const LevelSchema = v.pipe(
+const EditorLevelSchema = v.pipe(
   v.object({
-    version: v.literal(1),
+    version: v.literal(2),
     id: NameSchema,
     name: NameSchema,
     width: RoomSizeSchema,
     height: RoomSizeSchema,
     spawn: SpawnSchema,
-    platforms: v.pipe(v.array(PlatformSchema), v.maxLength(64)),
-    traps: v.pipe(v.array(TrapSchema), v.maxLength(16)),
-    treasure: RectSchema,
+    platforms: v.pipe(
+      v.array(PlatformSchema),
+      v.maxLength(RULES.editor.maxPlatforms, "Platform limit reached."),
+    ),
+    traps: v.pipe(v.array(TrapSchema), v.maxLength(RULES.editor.maxSaws, "Saw limit reached.")),
+    treasures: v.pipe(
+      v.array(TreasureSchema),
+      v.maxLength(RULES.editor.maxTreasures, "Treasure limit reached."),
+    ),
   }),
-  v.check(objectsFitRoom, "Platforms, treasure, spawn, and trap centers must fit inside the room."),
+  v.check(objectsFitRoom, "Every object, including the full saw radius, must fit inside the room."),
   v.check(hasUniqueIds, "Object ids must be unique."),
-  v.check(hasClearSpawn, "Spawn overlaps a platform."),
+  v.check(hasClearSpawn, "Keep the fixed spawn clear of platforms, saws, and treasures."),
+);
+
+const LevelSchema = v.pipe(
+  EditorLevelSchema,
+  v.check((level) => level.treasures.length > 0, "Add at least one treasure before testing."),
 );
 
 const TickLimitSchema = v.pipe(
@@ -68,7 +86,7 @@ const JumpTicksSchema = v.pipe(
 
 const ReplaySchema = v.pipe(
   v.object({
-    version: v.literal(1),
+    version: v.literal(2),
     rulesVersion: v.literal(RULES.version),
     level: LevelSchema,
     jumpTicks: JumpTicksSchema,
@@ -82,6 +100,25 @@ const ReplaySchema = v.pipe(
 
 export function parseLevel(value: unknown): Level {
   return v.parse(LevelSchema, value);
+}
+
+// Drafts may have no treasure; room dimensions and spawn belong to the fixed template.
+export function parseEditorLevel(value: unknown, template: Level): Level {
+  return v.parse(
+    v.pipe(
+      EditorLevelSchema,
+      v.check(
+        (level) =>
+          level.width === template.width &&
+          level.height === template.height &&
+          level.spawn.x === template.spawn.x &&
+          level.spawn.y === template.spawn.y &&
+          level.spawn.direction === template.spawn.direction,
+        "Room dimensions and player spawn are fixed.",
+      ),
+    ),
+    value,
+  );
 }
 
 export function parseReplay(value: unknown): Replay {
@@ -113,14 +150,20 @@ function spawnBounds(level: Level): Rect {
 function objectsFitRoom(level: Level): boolean {
   return (
     level.platforms.every((platform) => fitsRoom(platform, level)) &&
-    fitsRoom(level.treasure, level) &&
+    level.treasures.every((treasure) => fitsRoom(treasure, level)) &&
     fitsRoom(spawnBounds(level), level) &&
-    level.traps.every((trap) => trap.x <= level.width && trap.y <= level.height)
+    level.traps.every(
+      (trap) =>
+        trap.x - trap.radius >= 0 &&
+        trap.y - trap.radius >= 0 &&
+        trap.x + trap.radius <= level.width &&
+        trap.y + trap.radius <= level.height,
+    )
   );
 }
 
 function hasUniqueIds(level: Level): boolean {
-  const ids = [...level.platforms, ...level.traps].map((item) => item.id);
+  const ids = [...level.platforms, ...level.traps, ...level.treasures].map((item) => item.id);
 
   return new Set(ids).size === ids.length;
 }
@@ -128,5 +171,9 @@ function hasUniqueIds(level: Level): boolean {
 function hasClearSpawn(level: Level): boolean {
   const spawn = spawnBounds(level);
 
-  return level.platforms.every((platform) => !overlaps(spawn, platform));
+  return (
+    level.platforms.every((platform) => !overlaps(spawn, platform)) &&
+    level.traps.every((trap) => !touchesCircle(spawn, trap)) &&
+    level.treasures.every((treasure) => !overlaps(spawn, treasure))
+  );
 }

@@ -2,13 +2,20 @@ import { RULES } from "../../shared/game/rules";
 import { initialState, step } from "../../shared/game/simulation";
 import { parseLevel, parseJumpTicks, parseReplay } from "../../shared/validation";
 import type { GameEvent, Level, Replay, State } from "../../shared/game/types";
+import { applyEdit, type Edit } from "./editor";
 
 const TICK_DURATION_MS = 1000 / RULES.tickRate;
 const MAX_FRAME_DELTA_MS = 100;
 const SNAPSHOT_INTERVAL_TICKS = 6;
 
-export function createSession(initialLevel: Level) {
-  let level = parseLevel(initialLevel);
+export function createSession(initialLevel: Level, options?: { editorLevel: Level }) {
+  const opponent = parseLevel(initialLevel);
+  let editorLevel = options ? parseLevel(options.editorLevel) : null;
+  let phase: "editing" | "testing" | "raiding" = editorLevel ? "editing" : "raiding";
+  let layoutRevision = 0;
+  let clearedRevision: number | null = null;
+  let attemptRevision: number | null = null;
+  let level = structuredClone(editorLevel ?? opponent);
   let state = initialState(level);
   let levelRevision = 0;
   let paused = true;
@@ -35,6 +42,11 @@ export function createSession(initialLevel: Level) {
       events: [...events],
       endTick,
       finished: isFinished(),
+      phase,
+      editorLevel: editorLevel ? structuredClone(editorLevel) : null,
+      layoutRevision,
+      clearedRevision,
+      canSubmit: canSubmit(),
     };
   }
 
@@ -54,7 +66,11 @@ export function createSession(initialLevel: Level) {
   }
 
   function resetToHuman() {
+    // Leaving a debug replay always restores the real test/raid dungeon.
+    if (editorLevel) setLevel(phase === "raiding" ? opponent : editorLevel);
+
     mode = "human";
+    attemptRevision = phase === "testing" ? layoutRevision : null;
     endTick = RULES.maxTicks;
     schedule = new Set();
     resetAttempt();
@@ -64,8 +80,22 @@ export function createSession(initialLevel: Level) {
     return state.status !== "running" || state.tick >= endTick;
   }
 
+  function setLevel(next: Level) {
+    level = structuredClone(next);
+    levelRevision++;
+  }
+
+  function canSubmit() {
+    return editorLevel !== null && phase !== "raiding" && clearedRevision === layoutRevision;
+  }
+
+  function requireEditor() {
+    if (!editorLevel) throw new Error("This session has no editor dungeon.");
+    return editorLevel;
+  }
+
   function advanceTick() {
-    if (isFinished()) {
+    if (phase === "editing" || isFinished()) {
       paused = true;
       return;
     }
@@ -78,6 +108,15 @@ export function createSession(initialLevel: Level) {
     state = result.state;
     events.push(...result.events);
     trajectory.push(state);
+
+    if (
+      phase === "testing" &&
+      mode === "human" &&
+      attemptRevision === layoutRevision &&
+      state.status === "won"
+    ) {
+      clearedRevision = layoutRevision;
+    }
 
     eventListeners.forEach((fn) => fn(result.events));
     if (isFinished()) paused = true;
@@ -97,7 +136,7 @@ export function createSession(initialLevel: Level) {
     observe: () => structuredClone(makeSnapshot()),
     trajectory: () => structuredClone(trajectory),
     exportReplay: (): Replay => ({
-      version: 1,
+      version: 2,
       rulesVersion: RULES.version,
       level: structuredClone(level),
       jumpTicks: [...jumps],
@@ -118,7 +157,45 @@ export function createSession(initialLevel: Level) {
       };
     },
 
+    edit(change: Edit) {
+      const draft = requireEditor();
+      if (phase !== "editing") throw new Error("Return to editing before changing the dungeon.");
+
+      // Validation and no-op detection happen before revision or attempt state changes.
+      const candidate = applyEdit(draft, change);
+      if (JSON.stringify(candidate) === JSON.stringify(draft)) return;
+
+      editorLevel = candidate;
+      layoutRevision++;
+      clearedRevision = null;
+      resetToHuman();
+      notify();
+    },
+
+    testDungeon() {
+      parseLevel(requireEditor());
+      phase = "testing";
+      resetToHuman();
+      notify();
+    },
+
+    editDungeon() {
+      requireEditor();
+      phase = "editing";
+      resetToHuman();
+      notify();
+    },
+
+    submitDungeon() {
+      if (!canSubmit()) throw new Error("Clear the current dungeon version before submitting.");
+
+      phase = "raiding";
+      resetToHuman();
+      notify();
+    },
+
     primaryAction() {
+      if (phase === "editing") return;
       if (isFinished()) resetToHuman();
 
       if (paused) {
@@ -134,14 +211,14 @@ export function createSession(initialLevel: Level) {
     },
 
     jump() {
-      if (isFinished() || mode !== "human") return;
+      if (phase === "editing" || isFinished() || mode !== "human") return;
 
       pendingJump = true;
       notify();
     },
 
     play() {
-      if (isFinished()) return;
+      if (phase === "editing" || isFinished()) return;
 
       paused = false;
       accumulator = 0;
@@ -155,6 +232,7 @@ export function createSession(initialLevel: Level) {
     },
 
     step(ticks = 1) {
+      if (phase === "editing") return;
       if (!Number.isInteger(ticks) || ticks < 1 || ticks > RULES.maxTicks)
         throw new Error("Step count must be 1–1800.");
 
@@ -170,9 +248,11 @@ export function createSession(initialLevel: Level) {
     },
 
     loadSchedule(ticks: unknown) {
+      if (phase === "editing") throw new Error("Start a test or raid before loading a schedule.");
       const validated = parseJumpTicks(ticks);
 
       mode = "replay";
+      attemptRevision = null;
       endTick = RULES.maxTicks;
       schedule = new Set(validated);
       resetAttempt();
@@ -180,12 +260,14 @@ export function createSession(initialLevel: Level) {
     },
 
     loadReplay(value: unknown) {
+      if (phase === "editing") throw new Error("Start a test or raid before loading a replay.");
       // Validate completely before modifying the live session.
       const replay = parseReplay(value);
 
       level = replay.level;
       levelRevision++;
       mode = "replay";
+      attemptRevision = null;
       endTick = replay.endTick;
       schedule = new Set(replay.jumpTicks);
       resetAttempt();
@@ -193,7 +275,7 @@ export function createSession(initialLevel: Level) {
     },
 
     update(deltaMs: number) {
-      if (paused || !Number.isFinite(deltaMs) || deltaMs < 0) return;
+      if (phase === "editing" || paused || !Number.isFinite(deltaMs) || deltaMs < 0) return;
 
       // Cap catch-up after a stall; simulation never skips ticks. Hidden tabs pause separately.
       accumulator += Math.min(deltaMs, MAX_FRAME_DELTA_MS);
