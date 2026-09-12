@@ -20,7 +20,8 @@ Opponent layouts are authored first; AI dungeon generation can follow later.
 Begin with a prison escape tutorial. It teaches automatic movement, jump timing,
 wall-jump reversal, and collecting all treasures through play, with unlimited retries.
 It should challenge new players; failing a few times while learning is expected.
-After the first successful escape, enter the main loop without repeating the prison:
+After the first successful escape, enter the main loop without repeating the prison
+within that session. Repeating it on reload is fine for prototype testing:
 
 **Build/revise → clear your own dungeon → submit → raid Drilly's dungeon → watch
 Drilly's attempts on yours → results → revise and repeat.**
@@ -112,15 +113,19 @@ Keep placeholder art and ordinary audio.
 
 - Each side gets three scored raid attempts, stopping early on a clear. Own-dungeon
   tests and prison retries remain unlimited.
+- Interruptions do not force a loss. A paused or interrupted raid can still finish
+  successfully. Unfinished play may restart after a reload; enforcing spent attempts
+  across reloads and restoring active rounds are outside the hackathon scope.
 - Clearing on the first, second, or third attempt earns three, two, or one attack
   medals respectively. Failing all attempts earns none.
 - Defense medals equal three minus Drilly's attack medals. The round total is out
   of six: four or more wins, three draws, and fewer loses.
-- Preserve the best total for each authored dungeon; repeating rounds cannot farm
-  cumulative medals. Wins unlock the next dungeon when that content is available.
-  Three finished dungeons would give a best-score campaign total out of eighteen.
+- Preserve the best total for the first dungeon using a maximum; repeating rounds
+  cannot farm cumulative medals. Keep the other dungeon slots locked. Revisit
+  unlocks and broader progression when later rooms are authored.
 - Drilly's review uses a visually distinct ghost replay. Show where it failed or
   how it broke through. Ghost playback uses recorded inputs and ordinary simulation.
+  Start with attempts played in order and a simple replay button.
 - Results return the player to their existing draft to revise and try again.
 - Do not introduce mastery ranks. A growing stash is deferred until it buys
   something meaningful. Infinite content and new mechanics are not required now.
@@ -156,17 +161,21 @@ metadata. Dungeon reads and writes use ordinary queries and mutations.
   option. A local game never automatically uploads when connectivity returns.
   With no Convex URL configured, play locally with saving visibly disabled.
 
-## Durable progression — accepted subsequent scope
+## Completed-round saves — accepted subsequent hackathon scope
 
-Convex will save tutorial completion, versioned drafts and clear proofs, immutable
-submissions, active rounds, attempt history, and best medals. Save accepted edits
-with a short debounce and durable round transitions immediately. Authenticate
-ownership on the server rather than trusting a client-supplied profile ID.
+Build the local round loop, then connect real Drilly AI, then add completed-round
+saves. Full round persistence is not a prerequisite for trying the actual rivalry.
 
-An interrupted scored human raid counts as a failure. Reserve its attempt before
-starting play; refreshing must not restore a spent attempt. Exact acknowledgement,
-failed-save, recovery, and conflict behavior needs a concrete contract before the
-durable-round implementation. Finishing a round must award medals at most once.
+Save completed rounds with submitted/opponent snapshots, input recordings, outcomes,
+and results. Keep them separate from editable drafts and retain the best first-room
+medal total. Derive ownership from authentication, validate data, and use a stable
+round ID to avoid duplicate saves. Report failed saves and offer retry without
+blocking ordinary play. Show a small recent-history list with bounded indexed reads.
+
+Use reported outcomes and the shared medal calculation. Tutorial completion,
+persisted clear proofs, server verification of human runs, active-round recovery,
+strict interruption penalties, cross-tab round locks, and elaborate history
+management are deferred. No durable reservation is required before a raid starts.
 Do not persist simulation frames every tick; retain reproducible recordings.
 
 ## Drilly control — accepted subsequent scope
@@ -178,8 +187,15 @@ Do not reveal the player's successful clear inputs to Drilly.
 
 Enforce the fixed attempt budget and preserve inputs and outcomes for ghost review.
 AI service errors are retryable technical failures, not successful dungeon defense.
-Provider choice, cost limits, waiting time, and resumability need agreement before
-connecting runtime AI. AI dungeon building and adaptation across rounds come later.
+Begin with a simple authenticated backend request that runs Drilly's attempts and
+returns recordings to the local round. Show a waiting state and bounded error/retry
+behavior. Disable duplicate launches while a request is pending and ignore results
+for an old local round. A technical retry may repeat the request; durable jobs,
+per-call checkpoints, and seamless resumption are not required. Ghost playback
+reuses recordings and never calls the model again.
+
+Agree on the provider, request limits, and expected waiting experience before
+connecting it. AI dungeon building and adaptation across rounds come later.
 
 ## Open decisions
 
@@ -187,7 +203,6 @@ connecting runtime AI. AI dungeon building and adaptation across rounds come lat
 - New mechanics, trap types, and the designs of the two later dungeons.
 - Final editor budgets, grid spacing, default object sizes, and overlap policy.
 - Whether collecting all treasures remains the final win condition.
-- Concrete persistence acknowledgement, interruption, and recovery behavior.
 - Optional account linking and AI provider/operational limits.
 
 ## Local flow acceptance checks
