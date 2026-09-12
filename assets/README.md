@@ -71,3 +71,17 @@ directional lean without reversing the ESC lettering. Death fades and tints ESC
 while six small fragments disperse; Drilly ghosts use their defeated pose.
 Movement feedback follows simulation ticks. The brief death effect uses render
 time so it can finish after the attempt stops. Restart clears transient effects.
+
+
+## Obstacle artwork
+
+`public/assets/obstacles/` contains small hand-authored SVG sprites for spikes,
+firewall turrets, patrol drones, and pursuers. The sliding saw reuses the saw atlas.
+These are code-native vector sources: the editor displays them directly and Phaser
+rasterizes them when loading. They need no Python export and introduce no duplicate
+raster files. Cyan marks routes, magenta marks danger, and amber marks attack warnings.
+The renderer draws barrels, projectiles, flames, rotor accents, and pursuit trails
+from simulation state. Pausing freezes those effects with the mechanics.
+
+The obstacle lab is accessible from **Try the obstacle lab** above the game room.
+Use its room selector to inspect each behavior before building with it.
