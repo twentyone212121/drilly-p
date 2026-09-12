@@ -55,6 +55,11 @@ def export_atlas(name, sprites, labels, cell, columns, directory):
 
 
 def main():
+    run = Image.open(SOURCE / 'characters/esc-run.png')
+    run_sprites = [clean(run.crop((x * 512, y * 512, (x + 1) * 512, y * 512 + 480)))
+                   for y in range(2) for x in range(3)]
+    export_atlas('esc-run', run_sprites, [f'run-{i}' for i in range(6)],
+                 128, 3, OUTPUT / 'characters')
     for name in ['esc', 'drilly', 'chip', 'fan', 'byte']:
         image = Image.open(SOURCE / 'characters' / f'{name}.png')
         sprites = [clean(image.crop((round(i * image.width / 3), 0,

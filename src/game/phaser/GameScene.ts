@@ -28,7 +28,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    for (const name of ["esc", "drilly"]) {
+    for (const name of ["esc", "esc-run", "drilly"]) {
       this.load.atlas(
         name,
         `/assets/characters/${name}.png`,

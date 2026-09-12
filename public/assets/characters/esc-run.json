@@ -1,0 +1,157 @@
+{
+  "frames": {
+    "run-0": {
+      "frame": {
+        "x": 12,
+        "y": 26,
+        "w": 103,
+        "h": 90
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 103,
+        "h": 90
+      },
+      "sourceSize": {
+        "w": 103,
+        "h": 90
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 1
+      }
+    },
+    "run-1": {
+      "frame": {
+        "x": 140,
+        "y": 31,
+        "w": 103,
+        "h": 85
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 103,
+        "h": 85
+      },
+      "sourceSize": {
+        "w": 103,
+        "h": 85
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 1
+      }
+    },
+    "run-2": {
+      "frame": {
+        "x": 268,
+        "y": 24,
+        "w": 104,
+        "h": 92
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 104,
+        "h": 92
+      },
+      "sourceSize": {
+        "w": 104,
+        "h": 92
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 1
+      }
+    },
+    "run-3": {
+      "frame": {
+        "x": 12,
+        "y": 155,
+        "w": 103,
+        "h": 89
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 103,
+        "h": 89
+      },
+      "sourceSize": {
+        "w": 103,
+        "h": 89
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 1
+      }
+    },
+    "run-4": {
+      "frame": {
+        "x": 140,
+        "y": 160,
+        "w": 103,
+        "h": 84
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 103,
+        "h": 84
+      },
+      "sourceSize": {
+        "w": 103,
+        "h": 84
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 1
+      }
+    },
+    "run-5": {
+      "frame": {
+        "x": 268,
+        "y": 154,
+        "w": 104,
+        "h": 90
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 104,
+        "h": 90
+      },
+      "sourceSize": {
+        "w": 104,
+        "h": 90
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 1
+      }
+    }
+  },
+  "meta": {
+    "image": "esc-run.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 384,
+      "h": 256
+    },
+    "scale": "1"
+  }
+}

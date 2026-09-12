@@ -54,6 +54,13 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
         lastTick = state.tick;
       }
       const landed = state.tick - landingTick < 6;
+      const running =
+        !ghost &&
+        state.status === "running" &&
+        state.tick > 0 &&
+        state.player.grounded &&
+        !landed &&
+        Math.abs(state.player.vx) > 0;
       const frame = ghost
         ? state.status === "dead"
           ? "defeated"
@@ -65,11 +72,12 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
           : landed
             ? "land"
             : "idle";
-      const texture = ghost ? "drilly" : "esc";
-      player.setTexture(texture, frame).setOrigin(0.5, 1);
+      const texture = ghost ? "drilly" : running ? "esc-run" : "esc";
+      const runFrame = `run-${Math.floor(state.tick / 5) % 6}`;
+      player.setTexture(texture, running ? runFrame : frame).setOrigin(0.5, 1);
       const reference = scene.textures.getFrame(
         texture,
-        ghost ? "hover" : "idle",
+        ghost ? "hover" : running ? "run-0" : "idle",
       );
       const scale = RULES.playerHeight / reference.height;
       player.setScale(scale);

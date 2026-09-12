@@ -59,3 +59,8 @@ With Python 3 and the packages in `../scripts/art/requirements.txt` installed,
 run `python3 scripts/art/export.py` from the repository root. The script can
 also be invoked by absolute path. It overwrites only this kit's runtime files.
 Retain originals in `source/`; do not edit generated exports by hand.
+
+ESC also has a six-frame run atlas (`esc-run`, frames `run-0` through `run-5`).
+It plays one frame per five simulation ticks during grounded movement, after
+the landing pose finishes. Pauses freeze the cycle. Source and prompt are retained
+for refinement; collision rules are unchanged. This is a first animation pass.
