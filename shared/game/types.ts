@@ -1,21 +1,24 @@
 export type Rect = { x: number; y: number; width: number; height: number };
 export type Platform = Rect & { id: string };
+export type Saw = { id: string; x: number; y: number; radius: number };
+export type Treasure = Rect & { id: string };
 
 export type Level = {
-  version: 1;
+  version: 2;
   id: string;
   name: string;
   width: number;
   height: number;
   spawn: { x: number; y: number; direction: -1 | 1 };
   platforms: Platform[];
-  traps: { id: string; x: number; y: number; radius: number }[];
-  treasure: Rect;
+  traps: Saw[];
+  treasures: Treasure[];
 };
 
 export type State = {
   tick: number;
   status: "running" | "dead" | "won";
+  collectedTreasureIds: string[];
   player: {
     x: number;
     y: number;
@@ -35,10 +38,11 @@ export type GameEvent =
   | { type: "landed"; tick: number; platformId: string }
   | { type: "wall-contact"; tick: number; side: -1 | 1 }
   | { type: "died"; tick: number; trapId: string }
+  | { type: "treasure-collected"; tick: number; treasureId: string }
   | { type: "won"; tick: number };
 
 export type Replay = {
-  version: 1;
+  version: 2;
   rulesVersion: string;
   level: Level;
   jumpTicks: number[];

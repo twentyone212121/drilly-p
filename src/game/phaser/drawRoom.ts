@@ -9,7 +9,9 @@ export function drawRoom(graphics: Graphics, level: Level, state: State): void {
   drawBackground(graphics, level);
   drawPlatforms(graphics, level.platforms);
   drawTraps(graphics, level.traps, state.tick);
-  drawTreasure(graphics, level.treasure);
+  for (const treasure of level.treasures) {
+    if (!state.collectedTreasureIds.includes(treasure.id)) drawTreasure(graphics, treasure);
+  }
   drawPlayer(graphics, state);
 }
 
@@ -22,9 +24,25 @@ function drawBackground(graphics: Graphics, level: Level): void {
   for (let x = 48; x < level.width; x += 48) graphics.lineBetween(x, 24, x, level.height - 24);
   for (let y = 36; y < level.height; y += 48) graphics.lineBetween(24, y, level.width - 24, y);
 
+  if (level.id === "prison") drawPrisonWindows(graphics);
+
   // A quiet entrance silhouette and floor markers make the route readable.
   graphics.lineStyle(2, 0x547078);
   graphics.strokeRoundedRect(level.spawn.x - 10, level.spawn.y - 30, 44, 58, 18);
+}
+
+// Background dressing only; prison attempts use the ordinary collision geometry.
+function drawPrisonWindows(graphics: Graphics): void {
+  for (const x of [168, 408, 648]) {
+    graphics.fillStyle(0x0f1720);
+    graphics.fillRect(x, 144, 84, 112);
+    graphics.lineStyle(3, 0x344853);
+    graphics.strokeRect(x, 144, 84, 112);
+    for (let bar = x + 21; bar < x + 84; bar += 21) {
+      graphics.lineBetween(bar, 144, bar, 256);
+    }
+    graphics.lineBetween(x, 200, x + 84, 200);
+  }
 }
 
 function drawPlatforms(graphics: Graphics, platforms: Level["platforms"]): void {
@@ -62,7 +80,7 @@ function drawTraps(graphics: Graphics, traps: Level["traps"], tick: number): voi
   }
 }
 
-function drawTreasure(graphics: Graphics, chest: Level["treasure"]): void {
+function drawTreasure(graphics: Graphics, chest: Level["treasures"][number]): void {
   graphics.fillStyle(COLORS.gold);
   graphics.fillRoundedRect(chest.x, chest.y, chest.width, chest.height, 4);
   graphics.fillStyle(0x9e753d);

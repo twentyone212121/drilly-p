@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "id": "first-vault",
+  "name": "The double lock",
+  "width": 900,
+  "height": 480,
+  "spawn": { "x": 72, "y": 392, "direction": 1 },
+  "platforms": [
+    { "id": "floor", "x": 24, "y": 420, "width": 852, "height": 36 },
+    { "id": "left-wall", "x": 12, "y": 24, "width": 24, "height": 432 },
+    { "id": "right-wall", "x": 864, "y": 24, "width": 24, "height": 432 }
+  ],
+  "traps": [
+    { "id": "saw-1", "x": 280, "y": 398, "radius": 22 },
+    { "id": "saw-2", "x": 568, "y": 398, "radius": 22 }
+  ],
+  "treasures": [
+    { "id": "treasure-1", "x": 760, "y": 392, "width": 32, "height": 28 }
+  ]
+}

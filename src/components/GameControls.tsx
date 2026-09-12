@@ -1,4 +1,5 @@
 import type { Session, SessionSnapshot } from "../game/session";
+import { sessionView } from "../game/sessionView";
 import type { AudioSettings } from "../game/phaser/audio";
 
 export function GameControls({
@@ -12,25 +13,28 @@ export function GameControls({
   audio: AudioSettings;
   onAudioChange: (settings: AudioSettings) => void;
 }) {
-  function togglePlayback() {
-    if (view.paused) session.play();
-    else session.pause();
-  }
+  const copy = sessionView(view);
+  const canRestart = ["prison", "testing", "cleared", "raiding", "replay"].includes(view.phase);
 
   return (
     <div className="controls">
-      <button className="primary" disabled={view.finished} onClick={togglePlayback}>
-        {view.paused ? "Play" : "Pause"}
-        {view.paused && !view.finished && <kbd>SPACE</kbd>}
+      <button
+        className="primary"
+        disabled={view.phase === "replay" && !view.paused}
+        onClick={() => session.primaryAction()}
+      >
+        {copy.action} <kbd>SPACE</kbd>
       </button>
-      <button disabled={view.finished || view.mode === "replay"} onClick={() => session.jump()}>
-        Jump {!view.paused && !view.finished && view.mode === "human" && <kbd>SPACE</kbd>}
-      </button>
-      <button onClick={() => session.reset()}>
-        Restart <span aria-hidden="true">↻</span>
-        {view.finished && <kbd>SPACE</kbd>}
-      </button>
-      <span className="queue-note">{view.pendingJump ? "Jump queued for next tick" : ""}</span>
+      {!view.paused && <button onClick={() => session.pause()}>Pause</button>}
+      {canRestart && (
+        <button onClick={() => session.reset()}>
+          {view.phase === "cleared"
+            ? "Test again"
+            : view.phase === "replay"
+              ? "Exit replay"
+              : "Restart"}
+        </button>
+      )}
       <div className="audio-controls">
         <button
           aria-pressed={audio.muted}

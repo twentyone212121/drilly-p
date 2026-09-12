@@ -33,7 +33,7 @@ export class GameScene extends Phaser.Scene {
     this.drawing = this.add.graphics();
     this.audio = createAudio(this, this.settings, this.reportAudio);
     this.connectAudio();
-    this.input.on("pointerdown", () => this.session.jump());
+    this.input.on("pointerdown", () => this.session.primaryAction());
   }
 
   update(_time: number, delta: number) {
@@ -55,7 +55,7 @@ export class GameScene extends Phaser.Scene {
     this.scale.resize(this.level.width, this.level.height);
 
     this.label?.destroy();
-    this.label = this.add.text(56, 52, "01 / " + this.level.name.toUpperCase(), {
+    this.label = this.add.text(56, 52, this.level.name.toUpperCase(), {
       fontFamily: "monospace",
       fontSize: "12px",
       color: "#7d929e",

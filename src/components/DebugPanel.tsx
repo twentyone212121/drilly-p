@@ -7,7 +7,7 @@ import type { AudioStatus } from "../game/phaser/audio";
 export function DebugPanel({ session, audio }: { session: Session; audio: AudioStatus }) {
   const view = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const [ticks, setTicks] = useState("1");
-  const [schedule, setSchedule] = useState("[44, 193]");
+  const [schedule, setSchedule] = useState("[]");
   const [json, setJson] = useState("");
   const [message, setMessage] = useState("");
   const [verification, setVerification] = useState("");
@@ -79,7 +79,8 @@ export function DebugPanel({ session, audio }: { session: Session; audio: AudioS
       <div className="debug-content">
         <p className="hint">
           Paused Jump queues an input; Step consumes it. Tick N is applied before advancing to N+1.
-          All tools use the same simulation.
+          All tools use the same simulation. Replay and schedule playback never advance progression.
+          Exit replay restores the original dungeon for human input.
         </p>
         <div className="debug-grid">
           <section>
@@ -96,6 +97,7 @@ export function DebugPanel({ session, audio }: { session: Session; audio: AudioS
                   onChange={(e) => setTicks(e.target.value)}
                 />
               </label>
+              <button onClick={() => session.jump()}>Queue jump</button>
               <button onClick={advanceTicks}>Step</button>
             </div>
             <label>

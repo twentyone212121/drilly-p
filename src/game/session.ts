@@ -1,40 +1,63 @@
+import { getDungeon, getPrison, newPlayerDungeon } from "../../shared/game/campaign";
 import { RULES } from "../../shared/game/rules";
-import { initialState, step } from "../../shared/game/simulation";
-import { parseLevel, parseJumpTicks, parseReplay } from "../../shared/validation";
-import type { GameEvent, Level, Replay, State } from "../../shared/game/types";
+import type { Level, Replay } from "../../shared/game/types";
+import { parseJumpTicks, parseLevel, parseReplay } from "../../shared/validation";
+import { createAttempt } from "./attempt";
+import { applyEdit, type Edit } from "./editor";
 
-const TICK_DURATION_MS = 1000 / RULES.tickRate;
-const MAX_FRAME_DELTA_MS = 100;
-const SNAPSHOT_INTERVAL_TICKS = 6;
+type Activity = "prison" | "testing" | "raiding";
+type Flow =
+  | { phase: "prison" }
+  | { phase: "escaped" }
+  | { phase: "building" }
+  | { phase: "testing"; revision: number }
+  | { phase: "cleared" }
+  | { phase: "raiding" }
+  | { phase: "raid-complete" }
+  | { phase: "replay"; returnTo: Activity };
 
-export function createSession(initialLevel: Level) {
-  let level = parseLevel(initialLevel);
-  let state = initialState(level);
+type Clear = { revision: number; replay: Replay };
+
+// The attempt owns the clock and input. The session owns progression and layout versions.
+export function createSession(
+  options: {
+    prisonLevel?: Level;
+    opponentLevel?: Level;
+    editorLevel?: Level;
+  } = {},
+) {
+  const prison = parseLevel(options.prisonLevel ?? getPrison());
+  const opponent = parseLevel(options.opponentLevel ?? getDungeon("first-vault"));
+  const attempt = createAttempt(prison);
+  let editorLevel = parseLevel(options.editorLevel ?? newPlayerDungeon());
+  let flow: Flow = { phase: "prison" };
+  let layoutRevision = 0;
   let levelRevision = 0;
-  let paused = true;
-  let accumulator = 0;
-  let pendingJump = false;
-  let jumps: number[] = [];
-  let events: GameEvent[] = [];
-  let trajectory: State[] = [state];
-  let mode: "human" | "replay" = "human";
-  let schedule = new Set<number>();
-  let endTick: number = RULES.maxTicks;
-
+  let prisonClear: Replay | null = null;
+  let clear: Clear | null = null;
+  let submission: Clear | null = null;
   const listeners = new Set<() => void>();
-  const eventListeners = new Set<(events: GameEvent[]) => void>();
   let snapshot = makeSnapshot();
+
+  function canSubmit() {
+    return (
+      (flow.phase === "building" || flow.phase === "testing" || flow.phase === "cleared") &&
+      clear !== null &&
+      clear.revision === layoutRevision
+    );
+  }
 
   function makeSnapshot() {
     return {
-      state,
-      paused,
-      mode,
-      pendingJump,
-      jumps: [...jumps],
-      events: [...events],
-      endTick,
-      finished: isFinished(),
+      ...attempt.getSnapshot(),
+      flow: { ...flow },
+      phase: flow.phase,
+      editorLevel: structuredClone(editorLevel),
+      layoutRevision,
+      clearedRevision: clear?.revision ?? null,
+      prisonEscaped: prisonClear !== null,
+      canSubmit: canSubmit(),
+      submission: structuredClone(submission),
     };
   }
 
@@ -43,67 +66,124 @@ export function createSession(initialLevel: Level) {
     listeners.forEach((fn) => fn());
   }
 
-  function resetAttempt() {
-    state = initialState(level);
-    paused = true;
-    accumulator = 0;
-    pendingJump = false;
-    jumps = [];
-    events = [];
-    trajectory = [state];
+  function isPlaying() {
+    return (
+      flow.phase === "prison" ||
+      flow.phase === "testing" ||
+      flow.phase === "raiding" ||
+      flow.phase === "replay"
+    );
   }
 
-  function resetToHuman() {
-    mode = "human";
-    endTick = RULES.maxTicks;
-    schedule = new Set();
-    resetAttempt();
+  function currentActivity(): Activity | null {
+    switch (flow.phase) {
+      case "prison":
+      case "escaped":
+        return "prison";
+      case "testing":
+      case "cleared":
+        return "testing";
+      case "raiding":
+      case "raid-complete":
+        return "raiding";
+      case "replay":
+        return flow.returnTo;
+      case "building":
+        return null;
+    }
   }
 
-  function isFinished() {
-    return state.status !== "running" || state.tick >= endTick;
+  function activityLevel(activity: Activity) {
+    switch (activity) {
+      case "prison":
+        return prison;
+      case "testing":
+        return editorLevel;
+      case "raiding":
+        return opponent;
+    }
   }
 
-  function advanceTick() {
-    if (isFinished()) {
-      paused = true;
-      return;
+  function startAttempt(activity: Activity) {
+    // Validate before changing flow; an unfinished draft may have no treasures.
+    const level = parseLevel(activityLevel(activity));
+    flow =
+      activity === "testing" ? { phase: activity, revision: layoutRevision } : { phase: activity };
+    levelRevision++;
+    attempt.loadLevel(level);
+  }
+
+  function editDungeon() {
+    if (!prisonClear) throw new Error("Escape the prison before building your dungeon.");
+
+    flow = { phase: "building" };
+    levelRevision++;
+    // The editor renders its own draft, which need not be a playable level yet.
+    attempt.reset();
+  }
+
+  function testDungeon() {
+    if (flow.phase !== "building" && flow.phase !== "testing" && flow.phase !== "cleared") {
+      throw new Error("Return to building before testing your dungeon.");
     }
 
-    const jump = mode === "replay" ? schedule.has(state.tick) : pendingJump;
-    if (jump) jumps.push(state.tick);
-
-    const result = step(level, state, { jump });
-    pendingJump = false;
-    state = result.state;
-    events.push(...result.events);
-    trajectory.push(state);
-
-    eventListeners.forEach((fn) => fn(result.events));
-    if (isFinished()) paused = true;
+    startAttempt("testing");
   }
+
+  function submitDungeon() {
+    if (!canSubmit() || !clear)
+      throw new Error("Clear the current dungeon version before submitting.");
+
+    // The proof includes the exact submitted geometry and cannot change with later edits.
+    submission = structuredClone(clear);
+    startAttempt("raiding");
+  }
+
+  function reset() {
+    if (flow.phase === "building" || flow.phase === "escaped") return;
+
+    const activity = currentActivity();
+    if (activity) startAttempt(activity);
+  }
+
+  attempt.subscribe(() => {
+    const view = attempt.getSnapshot();
+    if (view.mode === "human" && view.state.status === "won") {
+      switch (flow.phase) {
+        case "prison":
+          prisonClear = attempt.exportReplay();
+          flow = { phase: "escaped" };
+          break;
+        case "testing":
+          if (flow.revision === layoutRevision) {
+            clear = {
+              revision: layoutRevision,
+              replay: attempt.exportReplay(),
+            };
+            flow = { phase: "cleared" };
+          }
+          break;
+        case "raiding":
+          flow = { phase: "raid-complete" };
+          break;
+      }
+    }
+    notify();
+  });
 
   return {
     get level() {
-      return structuredClone(level);
+      return flow.phase === "building" ? structuredClone(editorLevel) : attempt.level;
     },
-
     get levelRevision() {
       return levelRevision;
     },
-
-    frameState: () => state,
+    frameState: attempt.frameState,
     getSnapshot: () => snapshot,
     observe: () => structuredClone(makeSnapshot()),
-    trajectory: () => structuredClone(trajectory),
-    exportReplay: (): Replay => ({
-      version: 1,
-      rulesVersion: RULES.version,
-      level: structuredClone(level),
-      jumpTicks: [...jumps],
-      endTick: state.tick,
-    }),
-
+    trajectory: attempt.trajectory,
+    exportReplay: attempt.exportReplay,
+    onEvents: attempt.onEvents,
     subscribe: (fn: () => void) => {
       listeners.add(fn);
       return () => {
@@ -111,111 +191,81 @@ export function createSession(initialLevel: Level) {
       };
     },
 
-    onEvents(fn: (events: GameEvent[]) => void) {
-      eventListeners.add(fn);
-      return () => {
-        eventListeners.delete(fn);
-      };
+    edit(change: Edit) {
+      if (flow.phase !== "building")
+        throw new Error("Return to editing before changing the dungeon.");
+
+      const candidate = applyEdit(editorLevel, change);
+      if (JSON.stringify(candidate) === JSON.stringify(editorLevel)) return;
+
+      editorLevel = candidate;
+      layoutRevision++;
+      levelRevision++;
+      clear = null;
+      notify();
     },
+    editDungeon,
+    testDungeon,
+    submitDungeon,
+    reset,
 
     primaryAction() {
-      if (isFinished()) resetToHuman();
-
-      if (paused) {
-        paused = false;
-        accumulator = 0;
-      } else if (mode === "human") {
-        pendingJump = true;
-      } else {
-        return;
+      switch (flow.phase) {
+        case "building":
+          return;
+        case "escaped":
+        case "raid-complete":
+          editDungeon();
+          return;
+        case "cleared":
+          submitDungeon();
+          return;
       }
 
-      notify();
+      if (attempt.getSnapshot().finished) reset();
+      attempt.primaryAction();
     },
-
     jump() {
-      if (isFinished() || mode !== "human") return;
-
-      pendingJump = true;
-      notify();
+      if (isPlaying()) attempt.jump();
     },
-
     play() {
-      if (isFinished()) return;
-
-      paused = false;
-      accumulator = 0;
-      notify();
+      if (isPlaying()) attempt.play();
     },
-
-    pause() {
-      paused = true;
-      accumulator = 0;
-      notify();
-    },
-
+    pause: attempt.pause,
     step(ticks = 1) {
-      if (!Number.isInteger(ticks) || ticks < 1 || ticks > RULES.maxTicks)
-        throw new Error("Step count must be 1–1800.");
-
-      paused = true;
-      accumulator = 0;
-      for (let i = 0; i < ticks && !isFinished(); i++) advanceTick();
-      notify();
+      if (isPlaying()) attempt.step(ticks);
     },
-
-    reset() {
-      resetToHuman();
-      notify();
+    update(deltaMs: number) {
+      if (isPlaying()) attempt.update(deltaMs);
     },
 
     loadSchedule(ticks: unknown) {
-      const validated = parseJumpTicks(ticks);
+      const jumpTicks = parseJumpTicks(ticks);
+      const activity = currentActivity();
+      if (!activity) throw new Error("Start an attempt before loading a schedule.");
 
-      mode = "replay";
-      endTick = RULES.maxTicks;
-      schedule = new Set(validated);
-      resetAttempt();
-      notify();
-    },
-
-    loadReplay(value: unknown) {
-      // Validate completely before modifying the live session.
-      const replay = parseReplay(value);
-
-      level = replay.level;
+      const replay = parseReplay({
+        version: 2,
+        rulesVersion: RULES.version,
+        level: activityLevel(activity),
+        jumpTicks,
+        endTick: RULES.maxTicks,
+      });
+      flow = { phase: "replay", returnTo: activity };
       levelRevision++;
-      mode = "replay";
-      endTick = replay.endTick;
-      schedule = new Set(replay.jumpTicks);
-      resetAttempt();
-      notify();
+      attempt.loadReplay(replay);
     },
+    loadReplay(value: unknown) {
+      const replay = parseReplay(value);
+      const activity = currentActivity();
+      if (!activity) throw new Error("Start an attempt before loading a replay.");
 
-    update(deltaMs: number) {
-      if (paused || !Number.isFinite(deltaMs) || deltaMs < 0) return;
-
-      // Cap catch-up after a stall; simulation never skips ticks. Hidden tabs pause separately.
-      accumulator += Math.min(deltaMs, MAX_FRAME_DELTA_MS);
-      const previousEventCount = events.length;
-      const previousTick = state.tick;
-
-      while (accumulator + 1e-8 >= TICK_DURATION_MS && !paused) {
-        accumulator -= TICK_DURATION_MS;
-        advanceTick();
-      }
-
-      if (
-        paused ||
-        events.length !== previousEventCount ||
-        Math.floor(previousTick / SNAPSHOT_INTERVAL_TICKS) !==
-          Math.floor(state.tick / SNAPSHOT_INTERVAL_TICKS)
-      )
-        notify();
+      flow = { phase: "replay", returnTo: activity };
+      levelRevision++;
+      attempt.loadReplay(replay);
     },
   };
 }
 
 export type Session = ReturnType<typeof createSession>;
-
 export type SessionSnapshot = ReturnType<Session["getSnapshot"]>;
