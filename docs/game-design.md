@@ -28,7 +28,7 @@ Drilly's attempts on yours → results → revise and repeat.**
 The submitted layout is the exact version the player cleared. Carry the editable
 draft forward between rounds, separately from that immutable submission.
 
-## Current implementation scope — accepted local game flow
+## Current implementation scope — local game flow and guest drafts
 
 Implement the prison and first opponent dungeon, with two unavailable dungeon
 placeholders. The current mechanics do not need to be stretched across three
@@ -40,9 +40,10 @@ building, testing, clear completion, raiding, and raid completion. A completed l
 raid leads back to the preserved draft. Give every stage a clear next action.
 Developer playback is separate from human progression.
 
-This slice stops at a local raid. It has unlimited retries, with no medal awards,
-Drilly counter-raids, persistence, authentication, or backend requests yet. Those
-belong to separately approved work below. Keep placeholder art and ordinary audio.
+Gameplay stops at a local raid with unlimited retries. The first Convex slice adds
+anonymous authentication and private draft save/load. Medal awards, Drilly
+counter-raids, and durable progression belong to separately approved work below.
+Keep placeholder art and ordinary audio.
 
 ## Dungeon gameplay — accepted
 
@@ -99,8 +100,10 @@ belong to separately approved work below. Keep placeholder art and ordinary audi
 - Schedule playback and imported replays never earn a prison escape, draft clear,
   or raid completion. Leaving playback starts a fresh human attempt in the original
   room, even when an imported replay used a different layout.
-- The layout and progress currently live in memory in this tab. Reloading starts
-  over; submission has no network or persistence side effect in the local slice.
+- The layout saves to the guest profile when Convex is configured. Tutorial
+  completion, clears, and submissions remain in memory in this slice. Reloading
+  restarts the prison and requires clearing the restored draft again. Submission
+  still has no network or persistence side effect.
 - Input recordings include the full geometry and treasure IDs. Older level and
   replay formats are rejected instead of silently changing their meaning. Geometry
   changes alone do not change physics; bump the rules version when mechanics change.
@@ -122,12 +125,38 @@ belong to separately approved work below. Keep placeholder art and ordinary audi
 - Do not introduce mastery ranks. A growing stash is deferred until it buys
   something meaningful. Infinite content and new mechanics are not required now.
 
-## Identity and persistence — accepted subsequent scope
+## Guest identity and draft saves — accepted first Convex slice
 
 Use anonymous authenticated sessions: no sign-in form before playing, and private
 saves per guest. Return to the same browser to continue. Account linking and recovery
 across browsers are later work; clearing browser storage can lose guest access.
-The concrete auth package and setup must be reviewed before installation.
+Use Convex Auth's anonymous provider. The browser retains its session credentials;
+server functions derive ownership from that authenticated session. Auth's library
+actions handle sign-in and renewal; its HTTP routes publish token verification
+metadata. Dungeon reads and writes use ordinary queries and mutations.
+
+- Store one draft per guest: full validated geometry, rules version, server
+  revision, update time, and the last save request ID. Drafts may have no treasures.
+- Finish auth and the initial draft read before starting a saved game. A first
+  read does not create a default draft. Incompatible saved rules or geometry stay
+  untouched; show an error instead of silently replacing them.
+- Autosave accepted layout edits only. **Provisional:** debounce edits for 500 ms.
+  Tests, simulation ticks, selection, previews, and unchanged/rejected edits do
+  not write. A successful server acknowledgement marks the captured version saved;
+  newer edits still need their own save.
+- Each write checks the expected server revision. Retrying an uncertain save uses
+  the same request ID and payload. A stale write cannot overwrite another tab.
+- On conflict, preserve the current layout and offer **Load saved draft** or
+  **Save this version**. The latter still checks the latest known server revision.
+  Loading requires returning from a test/raid to editing and invalidates any clear.
+- Offline or failed saves leave edits in this tab, visibly unsaved. Retry an error
+  explicitly; reconnecting resumes queued edits. Warn before closing with pending
+  changes. There is no durable offline queue in this slice.
+- If auth or initial loading fails, offer an explicit **Play without saving**
+  option. A local game never automatically uploads when connectivity returns.
+  With no Convex URL configured, play locally with saving visibly disabled.
+
+## Durable progression — accepted subsequent scope
 
 Convex will save tutorial completion, versioned drafts and clear proofs, immutable
 submissions, active rounds, attempt history, and best medals. Save accepted edits
@@ -159,7 +188,7 @@ connecting runtime AI. AI dungeon building and adaptation across rounds come lat
 - Final editor budgets, grid spacing, default object sizes, and overlap policy.
 - Whether collecting all treasures remains the final win condition.
 - Concrete persistence acknowledgement, interruption, and recovery behavior.
-- Auth implementation, optional account linking, and AI provider/operational limits.
+- Optional account linking and AI provider/operational limits.
 
 ## Local flow acceptance checks
 

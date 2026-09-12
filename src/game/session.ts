@@ -1,7 +1,7 @@
 import { getDungeon, getPrison, newPlayerDungeon } from "../../shared/game/campaign";
 import { RULES } from "../../shared/game/rules";
 import type { Level, Replay } from "../../shared/game/types";
-import { parseJumpTicks, parseLevel, parseReplay } from "../../shared/validation";
+import { parseEditorLevel, parseJumpTicks, parseLevel, parseReplay } from "../../shared/validation";
 import { createAttempt } from "./attempt";
 import { applyEdit, type Edit } from "./editor";
 
@@ -29,7 +29,7 @@ export function createSession(
   const prison = parseLevel(options.prisonLevel ?? getPrison());
   const opponent = parseLevel(options.opponentLevel ?? getDungeon("first-vault"));
   const attempt = createAttempt(prison);
-  let editorLevel = parseLevel(options.editorLevel ?? newPlayerDungeon());
+  let editorLevel = parseEditorLevel(options.editorLevel ?? newPlayerDungeon(), newPlayerDungeon());
   let flow: Flow = { phase: "prison" };
   let layoutRevision = 0;
   let levelRevision = 0;
@@ -205,6 +205,18 @@ export function createSession(
       notify();
     },
     editDungeon,
+    replaceDraft(value: unknown) {
+      if (flow.phase !== "building" && flow.phase !== "prison" && flow.phase !== "escaped") {
+        throw new Error("Return to editing before loading a saved draft.");
+      }
+
+      const level = parseEditorLevel(value, newPlayerDungeon());
+      editorLevel = level;
+      layoutRevision++;
+      levelRevision++;
+      clear = null;
+      notify();
+    },
     testDungeon,
     submitDungeon,
     reset,

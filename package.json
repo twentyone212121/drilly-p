@@ -15,6 +15,8 @@
     "audio:generate": "node --import tsx scripts/generate-audio.ts"
   },
   "dependencies": {
+    "@auth/core": "0.41.3",
+    "@convex-dev/auth": "0.0.95",
     "convex": "^1.44.0",
     "phaser": "^3.90.0",
     "react": "^19.2.8",
@@ -23,6 +25,7 @@
   },
   "devDependencies": {
     "@convex-dev/eslint-plugin": "^4.0.0",
+    "@edge-runtime/vm": "5.0.0",
     "@eslint/js": "^9.39.5",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.13.3",
@@ -30,6 +33,7 @@
     "@types/react-dom": "^19.2.4",
     "@typescript/native": "npm:typescript@^7.0.2",
     "@vitejs/plugin-react": "^6.0.5",
+    "convex-test": "0.0.58",
     "eslint": "^9.39.5",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",

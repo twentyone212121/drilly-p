@@ -609,3 +609,22 @@ footer {
     flex-direction: column;
   }
 }
+/* Draft saves stay visible during testing as well as editing. */
+.draft-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.8rem 0;
+  font-size: 0.85rem;
+}
+.draft-save p {
+  flex: 1 1 20rem;
+  margin: 0;
+}
+.guest-loading {
+  padding-top: 10vh;
+}
+.guest-loading button {
+  margin: 0.8rem 0.8rem 0.8rem 0;
+}

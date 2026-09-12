@@ -1,6 +1,6 @@
-import { useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { DUNGEONS } from "../shared/game/campaign";
-import { createSession } from "./game/session";
+import type { Session } from "./game/session";
 import { sessionView } from "./game/sessionView";
 import { GameControls } from "./components/GameControls";
 import { GameView } from "./components/GameView";
@@ -8,8 +8,7 @@ import { DebugPanel } from "./components/DebugPanel";
 import { DungeonEditor } from "./components/DungeonEditor";
 import type { AudioSettings, AudioStatus } from "./game/phaser/audio";
 
-export default function App() {
-  const [session] = useState(() => createSession());
+export default function App({ session, saving }: { session: Session; saving?: ReactNode }) {
   const view = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const [audio, setAudio] = useState<AudioSettings>({
     muted: false,
@@ -35,7 +34,7 @@ export default function App() {
           <span className="wordmark-dot" />
         </span>
         <span className="header-note">A LITTLE THIEF. A BIG RIVAL.</span>
-        <small>LOCAL PROTOTYPE</small>
+        <small>{saving ? "GUEST PROFILE" : "LOCAL PLAY · SAVING OFF"}</small>
       </header>
       <ol className="flow-steps" aria-label="Game progress">
         {["Escape", "Build", "Clear", "Raid"].map((step, index) => (
@@ -108,7 +107,7 @@ export default function App() {
           <span>
             <i /> {level.name}
           </span>
-          <span>{building ? "LOCAL DRAFT · GRID SNAPPING" : "COLLECT ALL TREASURES"}</span>
+          <span>{building ? "YOUR DRAFT · GRID SNAPPING" : "COLLECT ALL TREASURES"}</span>
         </div>
         {building ? (
           <DungeonEditor session={session} level={view.editorLevel} />
@@ -131,6 +130,7 @@ export default function App() {
           </span>
         </div>
       </div>
+      {saving}
       {!building && (
         <GameControls session={session} view={view} audio={audio} onAudioChange={setAudio} />
       )}
@@ -140,8 +140,9 @@ export default function App() {
           : "Space or a tap starts and resumes, jumps during play, and retries after a failed attempt. Wall jumps reverse direction."}
       </p>
       <p className="control-help">
-        Progress lives in this tab. Reloading starts over. This local slice has unlimited retries;
-        scored rounds and saves follow later.
+        {saving
+          ? "Your layout saves to this browser’s guest profile. Reloading restarts the prison and requires clearing your draft again. Keep browser storage to retain guest access."
+          : "Saving is off. Your layout and progress stay in this tab; reloading starts over."}
       </p>
       {!building && <DebugPanel session={session} audio={audioStatus} />}
       <footer>
