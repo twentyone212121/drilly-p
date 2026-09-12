@@ -34,7 +34,7 @@ export function sessionView(view: SessionSnapshot) {
         title: "Make it yours",
         hint: "Place platforms, saws, and treasure. You must clear every treasure yourself before raiding Drilly.",
         status: view.canSubmit
-          ? "This version is cleared and ready to submit."
+          ? "Your dungeon is beaten and ready to submit."
           : "Build something you can beat.",
         action: "Test dungeon",
       };
@@ -49,7 +49,7 @@ export function sessionView(view: SessionSnapshot) {
             ? state.tick === 0
               ? "Ready to test your dungeon."
               : "Test paused."
-            : "Collect every treasure to clear this version.",
+            : "Collect every treasure to beat your dungeon.",
         action: finished
           ? "Retry test"
           : paused
@@ -63,7 +63,7 @@ export function sessionView(view: SessionSnapshot) {
         step: 2,
         title: "Your vault is ready",
         hint: "You proved this layout can be beaten. Submit it to enter Drilly’s first dungeon.",
-        status: `Version ${view.layoutRevision + 1} cleared. Editing it requires a new clear.`,
+        status: "Dungeon beaten. If you change it, beat it again before submitting.",
         action: "Submit & raid",
       };
     case "raiding":

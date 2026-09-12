@@ -16,6 +16,8 @@ import {
   type Selection,
 } from "../game/editor";
 import type { Session } from "../game/session";
+import propsAtlas from "../../public/assets/environment/computer-props.json";
+import escAtlas from "../../public/assets/characters/esc.json";
 
 type Tool = "select" | ObjectKind;
 type Drag = {
@@ -224,23 +226,27 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
             />
           </pattern>
         </defs>
-        <rect width={level.width} height={level.height} fill="#151c27" />
+        <image
+          href="/assets/backgrounds/computer-interior.webp"
+          width={level.width}
+          height={level.height}
+          preserveAspectRatio="none"
+        />
+        <rect width={level.width} height={level.height} fill="#07111e" opacity="0.35" />
         <rect width={level.width} height={level.height} fill="url(#editor-grid)" />
         {objects.map((object) => (
           <ObjectShape key={object.value.id} object={object} />
         ))}
-        <rect
+        <AtlasFrame
+          atlas="characters/esc"
+          frame={escAtlas.frames.idle.frame}
           x={level.spawn.x}
           y={level.spawn.y}
           width={RULES.playerWidth}
           height={RULES.playerHeight}
-          rx="6"
-          fill="#b7e9aa"
-          stroke="#e7eee9"
-          strokeDasharray="3 2"
         />
         <text x={level.spawn.x} y={level.spawn.y - 10} className="spawn-label">
-          FIXED SPAWN →
+          ESC START →
         </text>
         {selected && <ObjectOutline object={selected} resize={tool === "select"} />}
         {preview && (
@@ -292,47 +298,60 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
   );
 }
 
-function ObjectShape({ object }: { object: EditorObject }) {
-  const value = object.value;
-  if (object.kind === "saw") {
-    return (
-      <g>
-        <circle
-          cx={value.x}
-          cy={value.y}
-          r={object.value.radius}
-          fill="#e58e76"
-          stroke="#ffc0a6"
-          strokeWidth="4"
-          strokeDasharray="5 5"
-        />
-        <circle cx={value.x} cy={value.y} r="5" fill="#442e2d" />
-      </g>
-    );
-  }
+type AtlasRect = { x: number; y: number; w: number; h: number };
 
-  const rect = object.value;
+// Crop the same atlas rectangles used by Phaser, keeping editor geometry intact.
+function AtlasFrame({
+  atlas,
+  frame,
+  x,
+  y,
+  width,
+  height,
+}: {
+  atlas: "characters/esc" | "environment/computer-props";
+  frame: AtlasRect;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}) {
+  const size = atlas === "characters/esc" ? escAtlas.meta.size : propsAtlas.meta.size;
+
   return (
-    <g>
-      <rect
-        x={rect.x}
-        y={rect.y}
-        width={rect.width}
-        height={rect.height}
-        rx="3"
-        fill={object.kind === "treasure" ? "#f1c76c" : "#34434f"}
-        stroke={object.kind === "treasure" ? "#ffe2a0" : "#687e8b"}
-      />
-      {object.kind === "treasure" && (
-        <rect
-          x={rect.x + rect.width / 2 - 3}
-          y={rect.y + rect.height / 2 - 5}
-          width="6"
-          height="10"
-          fill="#9e753d"
-        />
-      )}
-    </g>
+    <svg
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      viewBox={`${frame.x} ${frame.y} ${frame.w} ${frame.h}`}
+      preserveAspectRatio="none"
+      overflow="hidden"
+      pointerEvents="none"
+      aria-hidden="true"
+    >
+      <image href={`/assets/${atlas}.png`} width={size.w} height={size.h} />
+    </svg>
+  );
+}
+
+function ObjectShape({ object }: { object: EditorObject }) {
+  const bounds = objectBounds(object);
+  const frame =
+    object.kind === "saw"
+      ? "saw"
+      : object.kind === "treasure"
+        ? "data"
+        : bounds.height > bounds.width
+          ? "wall"
+          : "platform";
+
+  return (
+    <AtlasFrame
+      atlas="environment/computer-props"
+      frame={propsAtlas.frames[frame].frame}
+      {...bounds}
+    />
   );
 }
 
@@ -346,7 +365,7 @@ function ObjectOutline({
   resize?: boolean;
 }) {
   const bounds = objectBounds(object);
-  const color = invalid ? "#ff826e" : "#b7e9aa";
+  const color = invalid ? "#ff568e" : "#50dcf3";
   return (
     <g pointerEvents="none">
       <rect {...bounds} fill="none" stroke={color} strokeWidth="2" strokeDasharray="6 3" />
