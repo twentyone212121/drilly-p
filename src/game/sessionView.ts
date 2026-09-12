@@ -1,3 +1,4 @@
+import { RULES } from "../../shared/game/rules";
 import type { SessionSnapshot } from "./session";
 
 // Presentation only: transitions and outcomes belong to the session.
@@ -71,10 +72,10 @@ export function sessionView(view: SessionSnapshot) {
         title: "Into Drilly’s vault",
         hint: "Two saws guard the treasure. Leave time to land before your next jump.",
         status: finished
-          ? "Raid failed. Retry, or return to your draft."
+          ? `Raid failed. ${view.round?.human.length ?? 0}/${RULES.raidAttempts} attempts used. Retry, or return to your draft.`
           : paused
             ? state.tick === 0
-              ? "Ready to raid The double lock."
+              ? `Ready to raid · Attempt ${(view.round?.human.length ?? 0) + 1}/${RULES.raidAttempts}`
               : "Raid paused."
             : "Get past both saws and take the treasure.",
         action: finished
@@ -88,9 +89,46 @@ export function sessionView(view: SessionSnapshot) {
     case "raid-complete":
       return {
         step: 3,
-        title: "Treasure secured",
-        hint: "You cleared Drilly’s first dungeon. Return to your draft to try another design.",
-        status: "Local raid complete. Drilly’s counter-raid and round medals are coming later.",
+        title: "Raid finished",
+        hint: view.round?.fixture
+          ? "Development fixture · Watch the recorded attempts on your submitted vault."
+          : "Drilly is unavailable. No round medals have been awarded.",
+        status: view.round?.fixture
+          ? "Your raid is complete. Drilly’s review comes next."
+          : "Return to your draft to revise.",
+        action: view.round?.drilly.length
+          ? "Watch Drilly"
+          : view.round?.fixture
+            ? "Preparing Drilly…"
+            : "Revise your dungeon",
+      };
+    case "ghost": {
+      const index = view.flow.phase === "ghost" ? view.flow.index : 0;
+      return {
+        step: 4,
+        title: "Drilly’s attempts",
+        hint: "Development fixture · Recorded inputs on your submitted dungeon.",
+        status: `Attempt ${index + 1} of ${view.round?.drilly.length ?? 0}: ${finished ? (state.status === "won" ? "Cleared your vault" : state.status === "dead" ? "Died here" : "Time ran out here") : "Watching Drilly"}`,
+        action: finished
+          ? index + 1 < (view.round?.drilly.length ?? 0)
+            ? "Next attempt"
+            : "Show results"
+          : paused
+            ? "Play ghost"
+            : "Playing ghost",
+      };
+    }
+    case "results":
+      return {
+        step: 5,
+        title:
+          view.result?.outcome === "win"
+            ? "You win"
+            : view.result?.outcome === "draw"
+              ? "A draw"
+              : "Drilly wins",
+        hint: "Development fixture · Revise your vault and try another round.",
+        status: `${view.result?.total ?? 0}/6 medals · Best ${view.best ?? 0}/6`,
         action: "Revise your dungeon",
       };
     case "replay":

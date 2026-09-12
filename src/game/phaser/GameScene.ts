@@ -39,7 +39,12 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     this.session.update(delta);
     this.syncLevel();
-    drawRoom(this.drawing, this.level, this.session.frameState());
+    drawRoom(
+      this.drawing,
+      this.level,
+      this.session.frameState(),
+      this.session.getSnapshot().phase === "ghost",
+    );
   }
 
   setAudio(settings: AudioSettings) {

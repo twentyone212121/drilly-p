@@ -28,22 +28,33 @@ Drilly's attempts on yours → results → revise and repeat.**
 The submitted layout is the exact version the player cleared. Carry the editable
 draft forward between rounds, separately from that immutable submission.
 
-## Current implementation scope — local game flow and guest drafts
+## Current implementation scope — local rounds and guest drafts
 
-Implement the prison and first opponent dungeon, with two unavailable dungeon
-placeholders. The current mechanics do not need to be stretched across three
-progressively harder rooms. The later dungeons need their own design before they
-become playable; completing the first room does not unlock placeholder content.
+The prison leads into building, clearing the current draft, submitting an immutable
+snapshot, raiding the first opponent dungeon, reviewing Drilly’s attempts, and
+results. Results return to the same draft without repeating prison. Two other
+opponent slots remain unavailable placeholders.
 
-Use an explicit state machine in `src/game/session.ts` for prison, escape completion,
-building, testing, clear completion, raiding, and raid completion. A completed local
-raid leads back to the preserved draft. Give every stage a clear next action.
-Developer playback is separate from human progression.
+Each side gets three raid attempts, stopping at its first clear. Death, the tick
+limit, and explicit restart consume an attempt; pause/resume does not. Prison and
+own-dungeon retries remain unlimited. Editing may abandon an unfinished round,
+and reload may restart unfinished play without a loss or recovery system.
 
-Gameplay stops at a local raid with unlimited retries. The first Convex slice adds
-anonymous authentication and private draft save/load. Medal awards, Drilly
-counter-raids, and durable progression belong to separately approved work below.
-Keep placeholder art and ordinary audio.
+Keep round medals and the first dungeon’s best total in memory. Award only completed
+rounds; best totals use a maximum. Ghost viewing and imported developer replays do
+not award progression or repeat awards. Importing a developer replay abandons the
+active scored round.
+
+Use a clearly labeled development fixture until runtime Drilly AI is connected.
+**Provisional:** an opt-in development switch runs three fixed input schedules on
+the submitted geometry, stopping on success. These inputs do not use the player’s
+clear proof. Ordinary play without a source shows Drilly as unavailable and awards
+no round result. Ghost review holds each ending for inspection, with next-attempt
+and replay controls.
+
+Guest authentication and private draft save/load remain the only backend work.
+Round persistence and runtime AI are separate subsequent work. Keep placeholder
+art and ordinary audio.
 
 ## Dungeon gameplay — accepted
 
@@ -163,10 +174,10 @@ submissions, active rounds, attempt history, and best medals. Save accepted edit
 with a short debounce and durable round transitions immediately. Authenticate
 ownership on the server rather than trusting a client-supplied profile ID.
 
-An interrupted scored human raid counts as a failure. Reserve its attempt before
-starting play; refreshing must not restore a spent attempt. Exact acknowledgement,
-failed-save, recovery, and conflict behavior needs a concrete contract before the
-durable-round implementation. Finishing a round must award medals at most once.
+Interruption, acknowledgement, failed-save, recovery, and conflict behavior need
+a separately agreed contract before durable-round implementation. The current
+local scope permits abandoning unfinished rounds without awarding a result.
+Finishing a durable round must award medals at most once.
 Do not persist simulation frames every tick; retain reproducible recordings.
 
 ## Drilly control — accepted subsequent scope
@@ -202,4 +213,6 @@ connecting runtime AI. AI dungeon building and adaptation across rounds come lat
 - Testing, retrying, replay playback, and raiding preserve the editor layout.
 - Invalid placements leave both the saved layout and its clear status unchanged.
 - Submission freezes its proof and layout; subsequent editing cannot alter them.
-- Completing the local raid leads back to the draft. Later dungeons remain unavailable.
+- Completing a fixture round reviews Drilly’s ghosts and results before returning
+  to the draft. Without an AI source, show unavailability without awarding medals.
+  Later dungeons remain unavailable.
