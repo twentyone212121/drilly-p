@@ -72,7 +72,7 @@ export function GameView({
         aspectRatio: `${session.level.width} / ${session.level.height}`,
       }}
       role="region"
-      aria-label="Dungeon game. Tap to jump."
+      aria-label="Dungeon game. Tap to start, jump, retry, or continue."
       tabIndex={0}
     />
   );

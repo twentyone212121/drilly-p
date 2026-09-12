@@ -1,7 +1,7 @@
 import { useState, useSyncExternalStore } from "react";
-import checkpoint from "../public/levels/checkpoint.json";
-import { parseLevel } from "../shared/validation";
-import { createSession, type SessionSnapshot } from "./game/session";
+import { DUNGEONS } from "../shared/game/campaign";
+import { createSession } from "./game/session";
+import { sessionView } from "./game/sessionView";
 import { GameControls } from "./components/GameControls";
 import { GameView } from "./components/GameView";
 import { DebugPanel } from "./components/DebugPanel";
@@ -9,16 +9,7 @@ import { DungeonEditor } from "./components/DungeonEditor";
 import type { AudioSettings, AudioStatus } from "./game/phaser/audio";
 
 export default function App() {
-  const [session] = useState(() => {
-    const opponent = parseLevel(checkpoint);
-    return createSession(opponent, {
-      editorLevel: {
-        ...structuredClone(opponent),
-        id: "player-dungeon",
-        name: "Your vault",
-      },
-    });
-  });
+  const [session] = useState(() => createSession());
   const view = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const [audio, setAudio] = useState<AudioSettings>({
     muted: false,
@@ -32,146 +23,131 @@ export default function App() {
     last: "none",
     missing: [],
   });
-
-  const status = statusMessage(view);
-  const editing = view.phase === "editing";
-  const raiding = view.phase === "raiding";
+  const copy = sessionView(view);
+  const building = view.phase === "building";
+  const level = session.level;
 
   return (
     <main>
       <header>
-        <a className="wordmark" href="/" aria-label="Drilly P home">
+        <span className="wordmark" aria-label="Drilly P">
           DRILLY <b>P</b>
           <span className="wordmark-dot" />
-        </a>
+        </span>
         <span className="header-note">A LITTLE THIEF. A BIG RIVAL.</span>
         <small>LOCAL PROTOTYPE</small>
       </header>
+      <ol className="flow-steps" aria-label="Game progress">
+        {["Escape", "Build", "Clear", "Raid"].map((step, index) => (
+          <li key={step} aria-current={copy.step === index ? "step" : undefined}>
+            <span>{String(index).padStart(2, "0")}</span> {step}
+          </li>
+        ))}
+      </ol>
       <section className="intro">
         <div>
           <div className="eyebrow">
-            {raiding ? "RAID" : editing ? "BUILD" : "CLEAR YOUR VAULT"}{" "}
-            <span>/ DRILLY P</span>
+            DRILLY P <span>/ {view.prisonEscaped ? "YOUR FIRST RIVALRY" : "THE PRISON"}</span>
           </div>
           <h1>
-            {raiding ? "Into Drilly’s vault" : "Make it yours"}
+            {copy.title}
             <span>.</span>
           </h1>
         </div>
-        <p>
-          Build a dungeon. Prove it can be beaten.
-          <br />
-          Clear every treasure, then take on Drilly’s vault.
-        </p>
+        <p>{copy.hint}</p>
       </section>
+      {building && (
+        <ol className="dungeon-list" aria-label="Opponent dungeons">
+          {DUNGEONS.map((dungeon, index) => (
+            <li key={dungeon.id} aria-disabled={!dungeon.available}>
+              <span>
+                0{index + 1} / {dungeon.name}
+              </span>
+              <small>{dungeon.available ? "CURRENT OPPONENT" : "COMING LATER · UNAVAILABLE"}</small>
+            </li>
+          ))}
+        </ol>
+      )}
       <div className="flow-controls">
-        {!editing && (
-          <button onClick={() => session.editDungeon()}>Back to editor</button>
-        )}
-        {!raiding && (
-          <button
-            className={view.canSubmit ? "" : "primary"}
-            disabled={!view.editorLevel?.treasures.length}
-            onClick={() => session.testDungeon()}
-          >
-            {editing ? "Test dungeon" : "Restart test"}
-          </button>
-        )}
-        {!raiding && (
-          <button
-            className={view.canSubmit ? "primary" : ""}
-            disabled={!view.canSubmit}
-            onClick={() => session.submitDungeon()}
-          >
-            Submit & raid
-          </button>
-        )}
-        <p className="hint" role="status">
-          {raiding
-            ? "Predefined opponent · local raid"
-            : !view.editorLevel?.treasures.length
-              ? "Add at least one treasure to test."
-              : view.canSubmit
-                ? `Version ${view.layoutRevision + 1} cleared — ready to submit.`
-                : `Clear version ${view.layoutRevision + 1} to unlock submission.`}
-        </p>
+        {building ? (
+          <>
+            <button
+              className={view.canSubmit ? "" : "primary"}
+              disabled={!view.editorLevel.treasures.length}
+              onClick={() => session.testDungeon()}
+            >
+              Test dungeon
+            </button>
+            <button
+              className={view.canSubmit ? "primary" : ""}
+              disabled={!view.canSubmit}
+              onClick={() => session.submitDungeon()}
+            >
+              Submit & raid
+            </button>
+            <p className="hint" role="status">
+              {!view.editorLevel.treasures.length
+                ? "Add a treasure before testing."
+                : view.canSubmit
+                  ? `Version ${view.layoutRevision + 1} is cleared.`
+                  : `Clear version ${view.layoutRevision + 1} to unlock submission.`}
+            </p>
+          </>
+        ) : view.prisonEscaped && view.phase !== "escaped" && view.phase !== "raid-complete" ? (
+          <>
+            <button onClick={() => session.editDungeon()}>Edit dungeon</button>
+            {view.canSubmit && view.phase !== "cleared" && (
+              <button onClick={() => session.submitDungeon()}>Submit & raid</button>
+            )}
+            <p className="hint">Your draft stays intact while you play.</p>
+          </>
+        ) : null}
       </div>
       <div className="game-shell">
         <div className="room-bar">
           <span>
-            <i /> {session.level.name}
+            <i /> {level.name}
           </span>
-          <span>
-            {editing
-              ? "LOCAL DRAFT · GRID SNAPPING"
-              : "COLLECT ALL TREASURES · INSTANT RETRIES"}
-          </span>
+          <span>{building ? "LOCAL DRAFT · GRID SNAPPING" : "COLLECT ALL TREASURES"}</span>
         </div>
-        {editing && view.editorLevel ? (
+        {building ? (
           <DungeonEditor session={session} level={view.editorLevel} />
         ) : (
           <GameView session={session} audio={audio} onAudio={setAudioStatus} />
         )}
         <div className="room-footer">
-          <span className={"status " + view.state.status} role="status">
-            {status}
+          <span className={"status " + (building ? "" : view.state.status)} role="status">
+            {copy.status}
           </span>
           <span>
-            {editing ? (
+            {building ? (
               `DRAFT V${view.layoutRevision + 1}`
             ) : (
               <>
                 {view.mode === "replay" ? "REPLAY" : "PLAYER"} <b>·</b>{" "}
-                {view.state.collectedTreasureIds.length}/
-                {session.level.treasures.length} TREASURES
-                <b>·</b> {String(view.state.tick).padStart(4, "0")} TICKS
+                {view.state.collectedTreasureIds.length}/{level.treasures.length} TREASURES
               </>
             )}
           </span>
         </div>
       </div>
-      {!editing && (
-        <GameControls
-          session={session}
-          view={view}
-          audio={audio}
-          onAudioChange={setAudio}
-        />
+      {!building && (
+        <GameControls session={session} view={view} audio={audio} onAudioChange={setAudio} />
       )}
-      <div className="instructions">
-        <p>
-          <span>01</span> Shape your vault.
-        </p>
-        <p>
-          <span>02</span> Collect every treasure in a test.
-        </p>
-        <p>
-          <span>03</span> Submit, then raid Drilly’s vault.
-        </p>
-      </div>
       <p className="control-help">
-        {editing
-          ? "Your draft stays in this tab while testing and raiding. Reloading starts over. Every geometry change requires a new clear."
-          : "Space starts or resumes, jumps during play, and retries after finishing. Tap the room or click Jump to jump. Wall jumps reverse direction."}
+        {building
+          ? "Select and drag objects. Resize platforms by their corner. Arrow keys nudge; Delete removes the selection. Room size and spawn stay fixed."
+          : "Space or a tap starts and resumes, jumps during play, and retries after a failed attempt. Wall jumps reverse direction."}
       </p>
-      {!editing && <DebugPanel session={session} audio={audioStatus} />}
+      <p className="control-help">
+        Progress lives in this tab. Reloading starts over. This local slice has unlimited retries;
+        scored rounds and saves follow later.
+      </p>
+      {!building && <DebugPanel session={session} audio={audioStatus} />}
       <footer>
         <span>DRILLY = YOUR AI RIVAL · P = YOU</span>
-        <span>Local editor & raids · AI joins later</span>
+        <span>Prison + first dungeon · Local play</span>
       </footer>
     </main>
   );
-}
-
-function statusMessage(view: SessionSnapshot): string {
-  if (view.phase === "editing") return "Editing your vault";
-  if (view.state.status === "won")
-    return view.phase === "testing" && view.mode === "human"
-      ? "Your vault is clear — submit when ready"
-      : "All treasures secured";
-  if (view.state.status === "dead") return "Attempt failed — try again";
-  if (view.finished) return "Attempt complete";
-  if (!view.paused) return "In the vault";
-
-  return view.state.tick === 0 ? "Ready when you are" : "Paused";
 }

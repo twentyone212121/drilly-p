@@ -1,206 +1,286 @@
 import { describe, expect, it } from "vitest";
-import checkpoint from "../../public/levels/checkpoint.json";
-import { parseLevel } from "../../shared/validation";
-import { replayAttempt, runAttempt } from "../../shared/game/replay";
-import { createSession } from "./session";
-const level = parseLevel(checkpoint);
+import { getDungeon, getPrison } from "../../shared/game/campaign";
+import { replayAttempt } from "../../shared/game/replay";
+import { RULES } from "../../shared/game/rules";
+import { createSession, type Session } from "./session";
+import { sessionView } from "./sessionView";
 
-describe("browser session and headless parity", () => {
-  it.each([
-    { name: "death", jumps: [], endTick: 51 },
-    { name: "win", jumps: [44, 193], endTick: 246 },
-    { name: "recorded limit", jumps: [], endTick: 12 },
-    { name: "empty recording", jumps: [], endTick: 0 },
-  ])("marks $name complete for controls, then resets it", ({ jumps, endTick }) => {
-    const session = createSession(level);
-    const replay = { ...session.exportReplay(), jumpTicks: jumps, endTick };
-    session.loadReplay(replay);
-    session.step(Math.max(1, endTick));
+const PRISON_JUMPS = [44, 193, 228];
+const PRISON_END_TICK = 273;
 
-    expect(session.getSnapshot().finished).toBe(true);
-    const before = session.observe();
-    session.play();
+function finishHumanAttempt(session: Session, jumps: number[] = []) {
+  for (const tick of jumps) {
+    const advance = tick - session.frameState().tick;
+    if (advance) session.step(advance);
     session.jump();
-    expect(session.observe()).toEqual(before);
+    session.step();
+  }
+  session.step(RULES.maxTicks);
+}
 
-    session.reset();
+function escape(session: Session) {
+  finishHumanAttempt(session, PRISON_JUMPS);
+  expect(session.getSnapshot().phase).toBe("escaped");
+  session.primaryAction();
+}
+
+function submit(session: Session) {
+  escape(session);
+  session.testDungeon();
+  finishHumanAttempt(session);
+  session.submitDungeon();
+}
+
+describe("local game state machine", () => {
+  it("requires a human prison escape before building, testing, or submitting", () => {
+    const session = createSession();
     expect(session.getSnapshot()).toMatchObject({
-      finished: false,
+      phase: "prison",
       paused: true,
-      mode: "human",
+      prisonEscaped: false,
+    });
+    const before = session.observe();
+    expect(() => session.editDungeon()).toThrow("Escape the prison");
+    expect(() => session.testDungeon()).toThrow("Return to building");
+    expect(() => session.submitDungeon()).toThrow("Clear the current");
+    expect(() =>
+      session.edit({
+        type: "delete",
+        selection: { kind: "saw", id: "prison-saw" },
+      }),
+    ).toThrow();
+    expect(session.observe()).toEqual(before);
+  });
+
+  it("allows unlimited prison retries and uses one action to start, resume, jump, or retry", () => {
+    const session = createSession();
+    for (let retry = 0; retry < 5; retry++) {
+      session.primaryAction();
+      expect(session.getSnapshot()).toMatchObject({
+        paused: false,
+        pendingJump: false,
+        state: { tick: 0 },
+      });
+      session.update(1000 / 60);
+      session.pause();
+      session.primaryAction();
+      session.update(1000 / 60);
+      expect(session.exportReplay().jumpTicks).toEqual([]);
+      session.step(RULES.maxTicks);
+      expect(session.getSnapshot()).toMatchObject({
+        phase: "prison",
+        finished: true,
+        prisonEscaped: false,
+      });
+      expect(sessionView(session.getSnapshot()).action).toBe("Retry escape");
+    }
+    session.primaryAction();
+    session.update(1000 / 60);
+    session.primaryAction();
+    session.update(1000 / 60);
+    expect(session.exportReplay().jumpTicks).toEqual([1]);
+  });
+
+  it("keeps a tick-limit failure retryable without advancing progression", () => {
+    const prison = getPrison();
+    const session = createSession({
+      prisonLevel: {
+        ...prison,
+        traps: [],
+        treasures: [{ ...prison.treasures[0], y: 100 }],
+      },
+    });
+    finishHumanAttempt(session);
+    expect(session.getSnapshot()).toMatchObject({
+      phase: "prison",
+      finished: true,
+      prisonEscaped: false,
+      state: { status: "running" },
+    });
+    session.primaryAction();
+    expect(session.getSnapshot()).toMatchObject({
+      phase: "prison",
+      finished: false,
+      paused: false,
       state: { tick: 0 },
     });
   });
 
-  it("starts and resumes with the primary action without adding a jump", () => {
-    const session = createSession(level);
-    session.primaryAction();
-    expect(session.getSnapshot()).toMatchObject({ paused: false, pendingJump: false });
-
-    session.update(1000 / 60);
-    session.pause();
-    session.primaryAction();
-    session.update(1000 / 60);
-
-    expect(session.frameState().tick).toBe(2);
-    expect(session.exportReplay().jumpTicks).toEqual([]);
-    expect(session.frameState().player.grounded).toBe(true);
-  });
-
-  it("jumps with the primary action during active human play", () => {
-    const session = createSession(level);
-    session.primaryAction();
-    session.update(1000 / 60);
-    session.primaryAction();
-    session.update(1000 / 60);
-
-    expect(session.exportReplay().jumpTicks).toEqual([1]);
-    expect(session.frameState().player.vy).toBeLessThan(0);
-    expect(session.getSnapshot().paused).toBe(false);
-  });
-
-  it.each([
-    { name: "death", jumps: [], endTick: 51 },
-    { name: "win", jumps: [44, 193], endTick: 246 },
-    { name: "replay limit", jumps: [], endTick: 12 },
-    { name: "empty replay", jumps: [], endTick: 0 },
-  ])("starts a fresh attempt with one primary action after $name", ({ jumps, endTick }) => {
-    const session = createSession(level);
-    session.loadReplay({ ...session.exportReplay(), jumpTicks: jumps, endTick });
-    session.step(Math.max(1, endTick));
-    session.primaryAction();
-
-    expect(session.getSnapshot()).toMatchObject({
-      state: { tick: 0, status: "running" },
-      paused: false,
-      finished: false,
-      pendingJump: false,
-      mode: "human",
-      jumps: [],
-      events: [],
-    });
-    session.update(1000 / 60);
-    expect(session.frameState().tick).toBe(1);
-    expect(session.exportReplay().jumpTicks).toEqual([]);
-  });
-
-  it("resumes a replay without injecting human jumps", () => {
-    const session = createSession(level);
-    session.loadSchedule([44, 193]);
-    session.primaryAction();
-    session.primaryAction();
-    session.update(1000 / 60);
-
-    expect(session.getSnapshot()).toMatchObject({ paused: false, pendingJump: false, mode: "replay" });
-    expect(session.exportReplay().jumpTicks).toEqual([]);
-  });
-
-  it("exposes observations and levels as independent serializable data", () => {
-    const session = createSession(level);
-    session.step(1);
-    const observation = session.observe();
-    const observedLevel = session.level;
-
-    observation.state.player.x = 999;
-    observedLevel.traps.length = 0;
-
-    expect(session.frameState().player.x).toBe(76);
-    expect(session.level.traps).toHaveLength(1);
-  });
-
-  it.each([[1000 / 30], [1000 / 60], [1000 / 144], [10, 21, 40, 9]])(
-    "has identical trajectories at frame intervals %j",
-    (...intervals: number[]) => {
-      const session = createSession(level);
-      session.loadSchedule([44, 193]);
-      session.play();
-      for (let frame = 0; !session.observe().paused && frame < 5000; frame++)
-        session.update(intervals[frame % intervals.length]);
-      expect(session.frameState().status).toBe("won");
-      expect(session.trajectory()).toEqual(runAttempt(level, [44, 193]).trajectory);
-    },
-  );
-  it("records manual inputs and replays exactly, including ignored inputs", () => {
-    const session = createSession(level);
+  it("teaches wall reversal and landing before the upper jump without pausing play", () => {
+    const session = createSession();
     session.step(44);
     session.jump();
-    session.step(1);
+    session.step(149);
+    session.play();
+    expect(session.getSnapshot().state.player.wall).toBe(1);
+    expect(sessionView(session.getSnapshot()).status).toContain("Jump off the wall");
+
     session.jump();
-    session.step(148);
-    session.jump();
-    session.step(53);
-    expect(session.exportReplay().jumpTicks).toEqual([44, 45, 193]);
-    expect(replayAttempt(session.exportReplay()).trajectory).toEqual(session.trajectory());
-    expect(session.frameState().status).toBe("won");
+    session.step(31);
+    session.play();
+    expect(session.getSnapshot().state.player).toMatchObject({ direction: -1, grounded: true });
+    expect(sessionView(session.getSnapshot()).status).toContain("jump over the upper saw");
+    expect(session.getSnapshot().paused).toBe(false);
+
+    session.step(RULES.maxTicks);
+    expect(sessionView(session.getSnapshot()).status).toContain(
+      "Land on the ledge, then jump again",
+    );
+    expect(session.getSnapshot().prisonEscaped).toBe(false);
+    session.primaryAction();
+    expect(session.getSnapshot().state.collectedTreasureIds).toEqual([]);
   });
 
-  it("freezes while paused and discards partial frame time on resume", () => {
-    const session = createSession(level);
-    session.play();
-    session.update(10);
-    session.pause();
-    session.update(60000);
-    expect(session.frameState().tick).toBe(0);
-    session.play();
-    session.update(10);
-    expect(session.frameState().tick).toBe(0);
-    session.update(10);
-    expect(session.frameState().tick).toBe(1);
-  });
-
-  it("resets pending input, events, clock and terminal state", () => {
-    const session = createSession(level);
-    session.step(51);
-    session.reset();
-    session.jump();
-    session.reset();
-    expect(session.observe()).toMatchObject({
+  it("leads from prison to build, clear, raid, and revising the same draft", () => {
+    const session = createSession();
+    finishHumanAttempt(session, PRISON_JUMPS);
+    expect(session.getSnapshot()).toMatchObject({
+      phase: "escaped",
+      prisonEscaped: true,
       paused: true,
-      pendingJump: false,
-      events: [],
-      jumps: [],
-      state: { tick: 0, status: "running" },
     });
+    expect(sessionView(session.getSnapshot()).action).toBe("Build your dungeon");
+    const escaped = session.observe();
+    session.jump();
+    session.play();
     session.step();
-    expect(session.frameState().player.grounded).toBe(true);
+    session.update(100);
+    expect(session.observe()).toEqual(escaped);
+
+    session.primaryAction();
+    expect(session.getSnapshot()).toMatchObject({
+      phase: "building",
+      state: { tick: 0 },
+    });
+    const draft = session.level;
+    session.testDungeon();
+    finishHumanAttempt(session);
+    expect(session.getSnapshot()).toMatchObject({
+      phase: "cleared",
+      canSubmit: true,
+    });
+    expect(sessionView(session.getSnapshot()).action).toBe("Submit & raid");
+    session.primaryAction();
+    expect(session.getSnapshot()).toMatchObject({
+      phase: "raiding",
+      canSubmit: false,
+      paused: true,
+      state: { tick: 0 },
+    });
+    expect(session.level).toEqual(getDungeon("first-vault"));
+    expect(session.getSnapshot().submission?.replay.level).toEqual(draft);
+    expect(replayAttempt(session.getSnapshot().submission!.replay).state.status).toBe("won");
+
+    finishHumanAttempt(session, [34, 106]);
+    expect(session.getSnapshot().phase).toBe("raid-complete");
+    expect(sessionView(session.getSnapshot()).action).toBe("Revise your dungeon");
+    session.primaryAction();
+    expect(session.getSnapshot()).toMatchObject({
+      phase: "building",
+      canSubmit: true,
+      prisonEscaped: true,
+    });
+    expect(session.level).toEqual(draft);
   });
 
-  it("ignores human jumps during replay and stops at the recorded end tick", () => {
-    const session = createSession(level);
-    session.step(12);
-    const replay = session.exportReplay();
-    session.loadReplay(replay);
-    session.jump();
-    session.play();
-    session.update(100);
-    session.update(100);
-    session.update(100);
-    expect(session.observe()).toMatchObject({
-      jumps: [],
-      paused: true,
-      state: { tick: 12 },
+  it("freezes the submitted proof when the player later changes their draft", () => {
+    const session = createSession();
+    submit(session);
+    const submission = session.observe().submission!;
+    session.editDungeon();
+    session.edit({
+      type: "put",
+      object: {
+        kind: "saw",
+        value: { id: "new-saw", x: 400, y: 398, radius: 22 },
+      },
+    });
+    expect(session.observe().submission).toEqual(submission);
+    expect(session.getSnapshot()).toMatchObject({
+      layoutRevision: 1,
+      canSubmit: false,
+      clearedRevision: null,
+    });
+    submission.replay.level.treasures.length = 0;
+    expect(session.observe().submission!.replay.level.treasures).toHaveLength(1);
+  });
+
+  it("prevents importing a successful replay from advancing any human activity", () => {
+    const session = createSession();
+    session.loadSchedule(PRISON_JUMPS);
+    session.step(RULES.maxTicks);
+    expect(session.getSnapshot()).toMatchObject({
+      phase: "replay",
+      prisonEscaped: false,
+      state: { status: "won" },
+    });
+    expect(() => session.editDungeon()).toThrow();
+    session.reset();
+    expect(session.getSnapshot()).toMatchObject({
+      phase: "prison",
+      mode: "human",
+      state: { tick: 0 },
+    });
+    submit(session);
+
+    session.loadReplay({
+      version: 2,
+      rulesVersion: RULES.version,
+      level: getPrison(),
+      jumpTicks: PRISON_JUMPS,
+      endTick: PRISON_END_TICK,
+    });
+    session.step(RULES.maxTicks);
+    expect(session.getSnapshot()).toMatchObject({
+      phase: "replay",
+      flow: { returnTo: "raiding" },
+      canSubmit: false,
+      state: { status: "won" },
+    });
+    expect(() => session.testDungeon()).toThrow();
+    expect(() => session.submitDungeon()).toThrow();
+    session.primaryAction();
+    expect(session.level).toEqual(getDungeon("first-vault"));
+    expect(session.getSnapshot()).toMatchObject({
+      phase: "raiding",
+      mode: "human",
+      paused: false,
+      state: { tick: 0 },
     });
   });
 
-  it("invalid replay import leaves an existing attempt untouched", () => {
-    const session = createSession(level);
+  it("keeps failed imports atomic and starts schedules on the canonical room", () => {
+    const session = createSession();
     session.step(10);
     const before = session.observe();
-    expect(() => session.loadReplay({ version: 3 })).toThrow();
+    expect(() => session.loadReplay({ version: 1 })).toThrow();
+    expect(() => session.loadSchedule([1, 1])).toThrow();
     expect(session.observe()).toEqual(before);
+    session.loadReplay({
+      version: 2,
+      rulesVersion: RULES.version,
+      level: getDungeon("first-vault"),
+      jumpTicks: [],
+      endTick: 10,
+    });
+    session.loadSchedule(PRISON_JUMPS);
+    expect(session.level).toEqual(getPrison());
+    session.step(RULES.maxTicks);
+    expect(session.getSnapshot()).toMatchObject({
+      phase: "replay",
+      prisonEscaped: false,
+    });
   });
 
-  it("emits gameplay events once, never on render-only updates", () => {
-    const session = createSession(level);
-    const events: unknown[] = [];
-    const off = session.onEvents((next) => events.push(...next));
-    session.jump();
-    session.step();
+  it("does not duplicate transitions when paused or updated after a clear", () => {
+    const session = createSession();
+    submit(session);
+    const proof = session.observe().submission;
+    finishHumanAttempt(session, [34, 106]);
+    session.pause();
+    session.pause();
     session.update(1000);
-    session.update(0);
-    expect(events).toHaveLength(1);
-    off();
-    session.step();
-    expect(events).toHaveLength(1);
+    expect(session.getSnapshot().phase).toBe("raid-complete");
+    expect(session.observe().submission).toEqual(proof);
   });
 });

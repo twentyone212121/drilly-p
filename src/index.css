@@ -114,6 +114,7 @@ p {
 
 .intro p {
   text-align: right;
+  max-width: 350px;
   font-size: 12px;
 }
 
@@ -481,6 +482,55 @@ footer {
   color: #ffac96;
 }
 
+.flow-steps {
+  display: flex;
+  gap: 20px;
+  list-style: none;
+  padding: 0;
+  margin: 24px 0 0;
+  color: #8e9caa;
+  font-size: 12px;
+}
+
+.flow-steps span {
+  font-family: monospace;
+  font-size: 10px;
+}
+
+.flow-steps [aria-current="step"] {
+  color: #b7e9aa;
+  border-bottom: 2px solid #b7e9aa;
+  padding-bottom: 6px;
+}
+
+.dungeon-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0;
+  margin: 0 0 18px;
+}
+
+.dungeon-list li {
+  border: 1px solid #35434e;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 12px;
+}
+
+.dungeon-list small {
+  display: block;
+  margin-top: 8px;
+  font-size: 9px;
+  letter-spacing: 0;
+}
+
+.dungeon-list [aria-disabled="true"] {
+  color: #8e9caa;
+  border-style: dashed;
+}
+
 @media (max-width: 650px) {
   main {
     padding: 18px 12px;
@@ -498,8 +548,23 @@ footer {
     margin-top: 23px;
   }
 
+  .intro {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
   .intro p {
-    display: none;
+    text-align: left;
+    max-width: none;
+  }
+
+  .dungeon-list {
+    grid-template-columns: 1fr;
+  }
+
+  .room-footer {
+    flex-wrap: wrap;
   }
 
   .controls {

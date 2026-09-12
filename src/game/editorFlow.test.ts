@@ -18,8 +18,12 @@ const draft = parseLevel({
   ],
 });
 
-function editingSession() {
-  return createSession(opponent, { editorLevel: draft });
+function editingSession(editorLevel = draft) {
+  // Editor tests use a trivial tutorial; the real escape route is covered by session tests.
+  const session = createSession({ prisonLevel: draft, opponentLevel: opponent, editorLevel });
+  session.step(RULES.maxTicks);
+  session.primaryAction();
+  return session;
 }
 
 function clearDungeon(session: Session) {
@@ -52,12 +56,12 @@ describe("local editor / clear / submit flow", () => {
 
   it("isolates test state, observations, retries, and raids from the saved draft", () => {
     const source = structuredClone(draft);
-    const session = createSession(opponent, { editorLevel: source });
+    const session = editingSession(source);
     source.treasures.length = 0;
     clearDungeon(session);
     expect(session.observe().editorLevel).toEqual(draft);
     const observed = session.observe();
-    observed.editorLevel!.platforms.length = 0;
+    observed.editorLevel.platforms.length = 0;
     const active = session.level;
     active.treasures.length = 0;
     expect(session.observe().editorLevel).toEqual(draft);
@@ -78,7 +82,7 @@ describe("local editor / clear / submit flow", () => {
     session.editDungeon();
     expect(session.level).toEqual(draft);
     expect(session.getSnapshot()).toMatchObject({
-      phase: "editing",
+      phase: "building",
       canSubmit: true,
     });
   });
@@ -256,14 +260,15 @@ describe("local editor / clear / submit flow", () => {
     expect(session.frameState().tick).toBe(0);
     expect(session.getSnapshot().mode).toBe("human");
 
-    const lethal = createSession(opponent, { editorLevel: opponent });
+    const lethal = editingSession(opponent);
     lethal.testDungeon();
     lethal.step(RULES.maxTicks);
     expect(lethal.frameState().status).toBe("dead");
     expect(lethal.getSnapshot().canSubmit).toBe(false);
 
-    const unreachable = createSession(opponent, {
-      editorLevel: { ...draft, treasures: [{ ...draft.treasures[0], y: 100 }] },
+    const unreachable = editingSession({
+      ...draft,
+      treasures: [{ ...draft.treasures[0], y: 100 }],
     });
     unreachable.testDungeon();
     unreachable.step(RULES.maxTicks);
@@ -283,7 +288,7 @@ describe("edited dungeon replay determinism", () => {
         ...draft,
         treasures: [draft.treasures[0], { ...draft.treasures[1], x: 360 }],
       };
-      const session = createSession(opponent, { editorLevel: replayDraft });
+      const session = editingSession(replayDraft);
       const platform = newObject(replayDraft, "platform", { x: 176, y: 360 });
       session.edit({ type: "put", object: platform });
       session.testDungeon();
