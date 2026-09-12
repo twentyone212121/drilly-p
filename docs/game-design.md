@@ -54,8 +54,11 @@ no round result. Ghost review holds each ending for inspection, with next-attemp
 and replay controls.
 
 Guest authentication and private draft save/load remain the only backend work.
-Round persistence and runtime AI are separate subsequent work. Keep placeholder
-art and ordinary audio.
+Round persistence and runtime AI are separate subsequent work. Presentation uses
+the computer-interior art direction: ESC represents the human player and the drill
+virus represents Drilly in ghost review. Character animation and decorative lights
+and fans react to gameplay without changing simulation or collision rules. See
+[the art guide](../assets/README.md) for asset conventions and the setting.
 
 ## Dungeon gameplay — accepted
 

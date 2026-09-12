@@ -21,7 +21,7 @@ marks collectible concepts. These are art conventions, not new mechanics.
 - `../public/assets/environment/`: six named computer prop frames.
 - `prompts.json`: generation prompts and tool provenance.
 
-Each character has three key poses, not a finished animation cycle. Drilly's
+Each character has three key poses. ESC additionally has a six-frame run cycle. Drilly's
 poses are hover, active, and defeated; ESC's are idle, jump, and land.
 The renderer loads ESC, Drilly ghosts, platforms, saws, data pickups, and the
 background with ambient fan and light animation. Sprite size and collisions remain the
@@ -34,7 +34,8 @@ Gates are visual concepts; this kit does not introduce gate mechanics.
 
 ## Runtime format
 
-Characters use RGBA PNG atlases (384 × 128), with three poses in padded 128 × 128 cells.
+Character poses use RGBA PNG atlases (384 × 128), with three poses in padded
+128 × 128 cells. ESC's six-frame run atlas is 384 × 256.
 Props use a 768 × 512 atlas with six padded 256 × 256 cells. JSON files use Phaser's
 hash atlas format with tight frame rectangles and bottom-center pivots.
 Padding stays outside frame rectangles to avoid texture bleeding.
@@ -63,4 +64,10 @@ Retain originals in `source/`; do not edit generated exports by hand.
 ESC also has a six-frame run atlas (`esc-run`, frames `run-0` through `run-5`).
 It plays one frame per five simulation ticks during grounded movement, after
 the landing pose finishes. Pauses freeze the cycle. Source and prompt are retained
-for refinement; collision rules are unchanged. This is a first animation pass.
+for refinement; collision rules are unchanged.
+
+Jump and landing poses have brief stretch/squash feedback, and wall jumps add a
+directional lean without reversing the ESC lettering. Death fades and tints ESC
+while six small fragments disperse; Drilly ghosts use their defeated pose.
+Movement feedback follows simulation ticks. The brief death effect uses render
+time so it can finish after the attempt stops. Restart clears transient effects.
