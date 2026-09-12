@@ -21,6 +21,5 @@ npm run dev
 
 Open the Vite URL. Space starts/resumes, jumps during play, and starts a fresh
 attempt after finishing. Click/tap the room to jump during play.
-See [checkpoint development notes](docs/checkpoint.md) for controls, module boundaries,
-headless replay, and verification. Run `npm test`, `npm run lint`, and `npm run build`
-before handing off code.
+See [AGENTS.md](AGENTS.md) for development guidance and
+[game design](docs/game-design.md) for gameplay decisions.

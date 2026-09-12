@@ -78,9 +78,3 @@ configuration location and identify temporary choices until the team settles the
   the same trajectory and outcome, independent of rendering frame rate.
 - A dungeon cannot be submitted until its current version has been cleared.
 - Editing a cleared dungeon disables submission until it is cleared again.
-
-## Implementation reference
-
-The first playable checkpoint is described in [checkpoint.md](checkpoint.md),
-including provisional tuning, controls, module boundaries, and verification evidence.
-The editor and AI milestones above remain subsequent work.
