@@ -690,3 +690,39 @@ footer {
 input[type="checkbox"] {
   accent-color: #50dcf3;
 }
+
+.obstacle-inspector,
+.lab-controls {
+  padding: 14px;
+  background: #111d2e;
+  border-top: 1px solid #344b61;
+}
+.obstacle-inspector strong {
+  display: block;
+  margin-bottom: 12px;
+  text-transform: capitalize;
+  color: #f397d4;
+  font-size: 13px;
+}
+.obstacle-inspector select,
+.lab-controls select {
+  display: block;
+  margin-top: 5px;
+  padding: 8px;
+  background: #0b1422;
+  color: #eee9de;
+  border: 1px solid #4c6580;
+  border-radius: 5px;
+}
+.lab-entry,
+.lab-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.lab-controls {
+  border: 1px solid #725170;
+  border-radius: 8px;
+}

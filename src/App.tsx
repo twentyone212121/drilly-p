@@ -1,3 +1,4 @@
+import { LAB_ROOMS, type LabRoomId } from "../shared/game/obstacleLab";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { DUNGEONS } from "../shared/game/campaign";
 import type { Session } from "./game/session";
@@ -56,6 +57,31 @@ export default function App({ session, saving }: { session: Session; saving?: Re
         </div>
         <p>{copy.hint}</p>
       </section>
+      {(view.phase === "prison" || view.phase === "escaped" || building) && (
+        <div className="lab-entry">
+          <button onClick={() => session.openLab()}>Try the obstacle lab</button>
+          <p className="hint">Practice every trap. Your own dungeon stays untouched.</p>
+        </div>
+      )}
+      {view.inLab && (
+        <section className="lab-controls" aria-label="Obstacle lab">
+          <label>
+            Practice room{" "}
+            <select
+              value={view.labRoom}
+              onChange={(e) => session.openLab(e.target.value as LabRoomId)}
+            >
+              {LAB_ROOMS.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button onClick={() => session.exitLab()}>Leave obstacle lab</button>
+          <span className="hint">No medals · unlimited retries</span>
+        </section>
+      )}
       {building && (
         <ol className="dungeon-list" aria-label="Opponent dungeons">
           {DUNGEONS.map((dungeon, index) => (
@@ -134,7 +160,8 @@ export default function App({ session, saving }: { session: Session; saving?: Re
                   : "Beat your dungeon to unlock submission."}
             </p>
           </>
-        ) : view.prisonEscaped &&
+        ) : !view.inLab &&
+          view.prisonEscaped &&
           view.phase !== "escaped" &&
           view.phase !== "raid-complete" &&
           view.phase !== "results" ? (

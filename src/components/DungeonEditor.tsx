@@ -1,3 +1,6 @@
+import type { ObstacleKind } from "../../shared/game/obstacleTypes";
+import { ObstacleInspector } from "./ObstacleInspector";
+import { ObstacleShape, ObstacleGuides } from "./ObstacleShape";
 import { useRef, useState, type PointerEvent } from "react";
 import { RULES } from "../../shared/game/rules";
 import type { Level } from "../../shared/game/types";
@@ -27,14 +30,20 @@ type Drag = {
   operation: "place" | "move" | "resize";
 };
 
-const TOOLS: { tool: Tool; label: string }[] = [
+const TOOLS: { tool: Tool; label: string; obstacleKind?: ObstacleKind }[] = [
   { tool: "select", label: "Select / move" },
   { tool: "platform", label: "+ Platform" },
   { tool: "saw", label: "+ Saw" },
   { tool: "treasure", label: "+ Treasure" },
+  { tool: "obstacle", obstacleKind: "spikes", label: "+ Spikes" },
+  { tool: "obstacle", obstacleKind: "slider", label: "+ Sliding saw" },
+  { tool: "obstacle", obstacleKind: "turret", label: "+ Turret" },
+  { tool: "obstacle", obstacleKind: "drone", label: "+ Drone" },
+  { tool: "obstacle", obstacleKind: "pursuer", label: "+ Pursuer" },
 ];
 
 export function DungeonEditor({ session, level }: { session: Session; level: Level }) {
+  const [obstacleKind, setObstacleKind] = useState<ObstacleKind>("spikes");
   const [tool, setTool] = useState<Tool>("select");
   const [selection, setSelection] = useState<Selection | null>(null);
   const [preview, setPreview] = useState<EditorObject | null>(null);
@@ -79,7 +88,8 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
   }
 
   function dragObject(point: Point, gesture: Drag): EditorObject {
-    if (gesture.operation === "place") return newObject(level, gesture.object.kind, point);
+    if (gesture.operation === "place")
+      return newObject(level, gesture.object.kind, point, obstacleKind);
 
     const delta = {
       x: point.x - gesture.origin.x,
@@ -97,7 +107,7 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
     event.currentTarget.focus();
     const point = pointAt(event);
     if (tool !== "select") {
-      const object = newObject(level, tool, point);
+      const object = newObject(level, tool, point, obstacleKind);
       drag.current = {
         pointerId: event.pointerId,
         origin: point,
@@ -138,7 +148,7 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
     if (gesture && gesture.pointerId === event.pointerId) {
       setPreview(dragObject(point, gesture));
     } else if (!gesture && tool !== "select") {
-      setPreview(newObject(level, tool, point));
+      setPreview(newObject(level, tool, point, obstacleKind));
     }
   }
 
@@ -160,8 +170,15 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
   return (
     <div className="dungeon-editor">
       <div className="editor-toolbar" role="toolbar" aria-label="Dungeon objects">
-        {TOOLS.map(({ tool: next, label }) => (
-          <button key={next} aria-pressed={tool === next} onClick={() => chooseTool(next)}>
+        {TOOLS.map(({ tool: next, label, obstacleKind: variant }) => (
+          <button
+            key={label}
+            aria-pressed={tool === next && (!variant || obstacleKind === variant)}
+            onClick={() => {
+              if (variant) setObstacleKind(variant);
+              chooseTool(next);
+            }}
+          >
             {label}
           </button>
         ))}
@@ -248,6 +265,10 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
         <text x={level.spawn.x} y={level.spawn.y - 10} className="spawn-label">
           ESC START →
         </text>
+        {selected?.kind === "obstacle" && (
+          <ObstacleGuides obstacle={selected.value} level={level} />
+        )}
+        {preview?.kind === "obstacle" && <ObstacleGuides obstacle={preview.value} level={level} />}
         {selected && <ObjectOutline object={selected} resize={tool === "select"} />}
         {preview && (
           <g opacity="0.65" pointerEvents="none">
@@ -270,7 +291,7 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
             <option value="">None</option>
             {objects.map((object) => (
               <option key={object.value.id} value={object.value.id}>
-                {object.kind} · {object.value.id}
+                {object.kind === "obstacle" ? object.value.kind : object.kind} · {object.value.id}
               </option>
             ))}
           </select>
@@ -284,9 +305,24 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
         </p>
         <p className="hint object-counts">
           Platforms {level.platforms.length}/{RULES.editor.maxPlatforms} · Saws {level.traps.length}
-          /{RULES.editor.maxSaws} · Treasures {level.treasures.length}/{RULES.editor.maxTreasures}
+          /{RULES.editor.maxSaws} · Obstacles {(level.obstacles ?? []).length}/
+          {RULES.obstacles.maxCount} · Treasures {level.treasures.length}/
+          {RULES.editor.maxTreasures}
         </p>
       </div>
+      {selected?.kind === "obstacle" && (
+        <ObstacleInspector
+          key={JSON.stringify(selected.value)}
+          obstacle={selected.value}
+          onApply={(value) => {
+            const object: EditorObject = { kind: "obstacle", value };
+            const error = placementError(level, object);
+            if (error) return error;
+            commit(object);
+            return null;
+          }}
+        />
+      )}
       <p className={error || message ? "editor-feedback invalid" : "editor-feedback"} role="status">
         {error ??
           (message ||
@@ -336,6 +372,7 @@ function AtlasFrame({
 }
 
 function ObjectShape({ object }: { object: EditorObject }) {
+  if (object.kind === "obstacle") return <ObstacleShape obstacle={object.value} />;
   const bounds = objectBounds(object);
   const frame =
     object.kind === "saw"
