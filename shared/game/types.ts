@@ -1,3 +1,5 @@
+import type { Obstacle, ObstacleState, Projectile } from "./obstacleTypes";
+
 export type Rect = { x: number; y: number; width: number; height: number };
 export type Platform = Rect & { id: string };
 export type Saw = { id: string; x: number; y: number; radius: number };
@@ -12,6 +14,7 @@ export type Level = {
   spawn: { x: number; y: number; direction: -1 | 1 };
   platforms: Platform[];
   traps: Saw[];
+  obstacles?: Obstacle[];
   treasures: Treasure[];
 };
 
@@ -19,6 +22,8 @@ export type State = {
   tick: number;
   status: "running" | "dead" | "won";
   collectedTreasureIds: string[];
+  obstacles: ObstacleState[];
+  projectiles: Projectile[];
   player: {
     x: number;
     y: number;

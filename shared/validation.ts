@@ -1,3 +1,5 @@
+import { obstacleBounds } from "./game/obstacles";
+import { segmentRect, sweptCircle } from "./game/sweep";
 import * as v from "valibot";
 import { overlaps, touchesCircle } from "./game/collision";
 import { RULES } from "./game/rules";
@@ -31,6 +33,72 @@ const TrapSchema = v.object({
   radius: v.pipe(v.number(), v.finite(), v.minValue(4), v.maxValue(100)),
 });
 
+const ObstacleRadius = v.pipe(
+  v.number(),
+  v.finite(),
+  v.minValue(RULES.obstacles.minRadius),
+  v.maxValue(RULES.obstacles.maxRadius),
+);
+const SpeedSchema = v.pipe(
+  v.number(),
+  v.finite(),
+  v.minValue(RULES.obstacles.minSpeed),
+  v.maxValue(RULES.obstacles.maxSpeed),
+);
+const RangeSchema = v.pipe(
+  v.number(),
+  v.finite(),
+  v.minValue(RULES.obstacles.minRange),
+  v.maxValue(RULES.obstacles.maxRange),
+);
+const WarningSchema = v.pipe(
+  v.number(),
+  v.integer(),
+  v.minValue(RULES.obstacles.minWarning),
+  v.maxValue(RULES.obstacles.maxInterval),
+);
+const CenterFields = {
+  id: NameSchema,
+  x: CoordinateSchema,
+  y: CoordinateSchema,
+  radius: ObstacleRadius,
+};
+const PathFields = {
+  ...CenterFields,
+  endX: CoordinateSchema,
+  endY: CoordinateSchema,
+  speed: SpeedSchema,
+};
+const ObstacleSchema = v.variant("kind", [
+  v.object({ ...RectSchema.entries, id: NameSchema, kind: v.literal("spikes") }),
+  v.object({ ...PathFields, kind: v.literal("slider") }),
+  v.object({ ...PathFields, kind: v.literal("drone") }),
+  v.object({
+    ...CenterFields,
+    kind: v.literal("turret"),
+    mode: v.picklist(["fixed", "aimed", "flame"]),
+    direction: v.union([v.literal(-1), v.literal(1)]),
+    intervalTicks: v.pipe(
+      v.number(),
+      v.integer(),
+      v.minValue(RULES.obstacles.minInterval),
+      v.maxValue(RULES.obstacles.maxInterval),
+    ),
+    warmupTicks: WarningSchema,
+    activeTicks: WarningSchema,
+    range: RangeSchema,
+    projectileSpeed: SpeedSchema,
+  }),
+  v.object({
+    ...CenterFields,
+    kind: v.literal("pursuer"),
+    speed: SpeedSchema,
+    detectionRange: RangeSchema,
+    chaseRange: RangeSchema,
+    warningTicks: WarningSchema,
+  }),
+]);
+
 const SpawnSchema = v.object({
   x: CoordinateSchema,
   y: CoordinateSchema,
@@ -50,14 +118,19 @@ const EditorLevelSchema = v.pipe(
       v.maxLength(RULES.editor.maxPlatforms, "Platform limit reached."),
     ),
     traps: v.pipe(v.array(TrapSchema), v.maxLength(RULES.editor.maxSaws, "Saw limit reached.")),
+    obstacles: v.optional(v.pipe(v.array(ObstacleSchema), v.maxLength(RULES.obstacles.maxCount))),
     treasures: v.pipe(
       v.array(TreasureSchema),
       v.maxLength(RULES.editor.maxTreasures, "Treasure limit reached."),
     ),
   }),
-  v.check(objectsFitRoom, "Every object, including the full saw radius, must fit inside the room."),
+  v.check(validObstacles, "Check obstacle routes, timing, ranges, and per-kind limits."),
+  v.check(
+    objectsFitRoom,
+    "Every object, including the full hazard bounds, must fit inside the room.",
+  ),
   v.check(hasUniqueIds, "Object ids must be unique."),
-  v.check(hasClearSpawn, "Keep the fixed spawn clear of platforms, saws, and treasures."),
+  v.check(hasClearSpawn, "Keep the fixed spawn clear of platforms, hazards, and treasures."),
 );
 
 const LevelSchema = v.pipe(
@@ -149,6 +222,17 @@ function spawnBounds(level: Level): Rect {
 
 function objectsFitRoom(level: Level): boolean {
   return (
+    (level.obstacles ?? []).every(
+      (o) =>
+        fitsRoom(obstacleBounds(o), level) &&
+        obstacleBounds(o).x >= 0 &&
+        obstacleBounds(o).y >= 0 &&
+        (!(o.kind === "slider" || o.kind === "drone") ||
+          (o.endX >= o.radius &&
+            o.endY >= o.radius &&
+            o.endX + o.radius <= level.width &&
+            o.endY + o.radius <= level.height)),
+    ) &&
     level.platforms.every((platform) => fitsRoom(platform, level)) &&
     level.treasures.every((treasure) => fitsRoom(treasure, level)) &&
     fitsRoom(spawnBounds(level), level) &&
@@ -163,7 +247,12 @@ function objectsFitRoom(level: Level): boolean {
 }
 
 function hasUniqueIds(level: Level): boolean {
-  const ids = [...level.platforms, ...level.traps, ...level.treasures].map((item) => item.id);
+  const ids = [
+    ...level.platforms,
+    ...level.traps,
+    ...level.treasures,
+    ...(level.obstacles ?? []),
+  ].map((item) => item.id);
 
   return new Set(ids).size === ids.length;
 }
@@ -172,8 +261,34 @@ function hasClearSpawn(level: Level): boolean {
   const spawn = spawnBounds(level);
 
   return (
+    (level.obstacles ?? []).every((o) =>
+      o.kind === "spikes"
+        ? segmentRect(spawn, spawn, {
+            x: o.x - spawn.width,
+            y: o.y - spawn.height,
+            width: o.width + spawn.width,
+            height: o.height + spawn.height,
+          }) === null
+        : o.kind === "slider" || o.kind === "drone"
+          ? sweptCircle(o, { x: o.endX, y: o.endY }, o.radius, spawn) === null
+          : !touchesCircle(spawn, o),
+    ) &&
     level.platforms.every((platform) => !overlaps(spawn, platform)) &&
     level.traps.every((trap) => !touchesCircle(spawn, trap)) &&
     level.treasures.every((treasure) => !overlaps(spawn, treasure))
   );
+}
+
+function validObstacles(level: Level): boolean {
+  const obstacles = level.obstacles ?? [];
+  return obstacles.every((o) => {
+    if (obstacles.filter((other) => other.kind === o.kind).length > RULES.obstacles.maxPerKind)
+      return false;
+    if (o.kind === "slider" || o.kind === "drone")
+      return Math.hypot(o.endX - o.x, o.endY - o.y) >= RULES.editor.gridSize;
+    if (o.kind === "turret")
+      return o.warmupTicks + (o.mode === "flame" ? o.activeTicks : 1) < o.intervalTicks;
+    if (o.kind === "pursuer") return o.chaseRange >= o.detectionRange;
+    return true;
+  });
 }
