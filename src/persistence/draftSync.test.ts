@@ -261,3 +261,29 @@ describe("guest draft synchronization", () => {
     expect(() => readDraft(invalid)).toThrow("fixed");
   });
 });
+
+it("saves only draft edits across a fixture round and ghost replay", async () => {
+  const { session, save, move } = setup();
+  session.setDevelopmentFixture(true);
+  session.testDungeon();
+  session.step(RULES.maxTicks);
+  session.submitDungeon();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    session.step(RULES.maxTicks);
+    if (attempt < 2) session.reset();
+  }
+  await Promise.resolve();
+  session.primaryAction();
+  session.step(RULES.maxTicks);
+  session.primaryAction();
+  expect(session.observe().phase).toBe("results");
+  session.replayGhost();
+  session.step(RULES.maxTicks);
+  session.primaryAction();
+  await vi.advanceTimersByTimeAsync(DRAFT_SAVE_DELAY_MS);
+  expect(save).not.toHaveBeenCalled();
+  session.primaryAction();
+  move(160);
+  await vi.advanceTimersByTimeAsync(DRAFT_SAVE_DELAY_MS);
+  expect(save).toHaveBeenCalledTimes(1);
+});

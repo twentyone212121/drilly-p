@@ -14,13 +14,15 @@ export function GameControls({
   onAudioChange: (settings: AudioSettings) => void;
 }) {
   const copy = sessionView(view);
-  const canRestart = ["prison", "testing", "cleared", "raiding", "replay"].includes(view.phase);
+  const canRestart = ["prison", "testing", "cleared", "raiding", "replay", "ghost"].includes(
+    view.phase,
+  );
 
   return (
     <div className="controls">
       <button
         className="primary"
-        disabled={view.phase === "replay" && !view.paused}
+        disabled={(view.phase === "replay" || view.phase === "ghost") && !view.paused}
         onClick={() => session.primaryAction()}
       >
         {copy.action} <kbd>SPACE</kbd>
@@ -32,7 +34,9 @@ export function GameControls({
             ? "Test again"
             : view.phase === "replay"
               ? "Exit replay"
-              : "Restart"}
+              : view.phase === "ghost"
+                ? "Replay attempt"
+                : "Restart"}
         </button>
       )}
       <div className="audio-controls">

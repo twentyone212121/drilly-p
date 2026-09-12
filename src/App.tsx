@@ -37,7 +37,7 @@ export default function App({ session, saving }: { session: Session; saving?: Re
         <small>{saving ? "GUEST PROFILE" : "LOCAL PLAY · SAVING OFF"}</small>
       </header>
       <ol className="flow-steps" aria-label="Game progress">
-        {["Escape", "Build", "Clear", "Raid"].map((step, index) => (
+        {["Escape", "Build", "Clear", "Raid", "Watch", "Results"].map((step, index) => (
           <li key={step} aria-current={copy.step === index ? "step" : undefined}>
             <span>{String(index).padStart(2, "0")}</span> {step}
           </li>
@@ -67,6 +67,47 @@ export default function App({ session, saving }: { session: Session; saving?: Re
           ))}
         </ol>
       )}
+      {building && import.meta.env.DEV && (
+        <label className="control-help">
+          <input
+            type="checkbox"
+            checked={view.developmentFixture}
+            onChange={(event) => session.setDevelopmentFixture(event.target.checked)}
+          />
+          Development fixture · Use scripted Drilly attempts for local testing
+        </label>
+      )}
+      {view.round?.fixture && (
+        <p role="status">Development fixture · Scripted Drilly, not live AI</p>
+      )}
+      {view.phase === "results" && view.result && view.round && (
+        <section className="round-results" aria-label="Round results">
+          <p>
+            <strong>
+              {view.result.total}/6 medals · {view.result.outcome}
+            </strong>
+          </p>
+          <p>
+            Attack: {view.result.attack}/3 · Defense: {view.result.defense}/3
+          </p>
+          <p>
+            {view.result.improved ? "New best" : "Best unchanged"}: {view.result.best}/6
+          </p>
+          <p>
+            Your attempts:{" "}
+            {view.round.human
+              .map((attempt, index) => `${index + 1}: ${attempt.outcome}`)
+              .join(" · ")}
+          </p>
+          <p>
+            Drilly’s attempts:{" "}
+            {view.round.drilly
+              .map((attempt, index) => `${index + 1}: ${attempt.outcome}`)
+              .join(" · ")}
+          </p>
+          <button onClick={() => session.replayGhost()}>Replay Drilly’s attempts</button>
+        </section>
+      )}
       <div className="flow-controls">
         {building ? (
           <>
@@ -92,7 +133,10 @@ export default function App({ session, saving }: { session: Session; saving?: Re
                   : `Clear version ${view.layoutRevision + 1} to unlock submission.`}
             </p>
           </>
-        ) : view.prisonEscaped && view.phase !== "escaped" && view.phase !== "raid-complete" ? (
+        ) : view.prisonEscaped &&
+          view.phase !== "escaped" &&
+          view.phase !== "raid-complete" &&
+          view.phase !== "results" ? (
           <>
             <button onClick={() => session.editDungeon()}>Edit dungeon</button>
             {view.canSubmit && view.phase !== "cleared" && (
@@ -123,8 +167,12 @@ export default function App({ session, saving }: { session: Session; saving?: Re
               `DRAFT V${view.layoutRevision + 1}`
             ) : (
               <>
-                {view.mode === "replay" ? "REPLAY" : "PLAYER"} <b>·</b>{" "}
-                {view.state.collectedTreasureIds.length}/{level.treasures.length} TREASURES
+                {view.phase === "ghost"
+                  ? "DRILLY GHOST"
+                  : view.mode === "replay"
+                    ? "REPLAY"
+                    : "PLAYER"}{" "}
+                <b>·</b> {view.state.collectedTreasureIds.length}/{level.treasures.length} TREASURES
               </>
             )}
           </span>

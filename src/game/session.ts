@@ -5,6 +5,9 @@ import { parseEditorLevel, parseJumpTicks, parseLevel, parseReplay } from "../..
 import { createAttempt } from "./attempt";
 import { applyEdit, type Edit } from "./editor";
 
+import { scoreRound, type RaidAttempt } from "../../shared/game/round";
+import { runDrillyFixture } from "./drillyFixture";
+
 type Activity = "prison" | "testing" | "raiding";
 type Flow =
   | { phase: "prison" }
@@ -14,6 +17,8 @@ type Flow =
   | { phase: "cleared" }
   | { phase: "raiding" }
   | { phase: "raid-complete" }
+  | { phase: "ghost"; index: number }
+  | { phase: "results" }
   | { phase: "replay"; returnTo: Activity };
 
 type Clear = { revision: number; replay: Replay };
@@ -24,6 +29,7 @@ export function createSession(
     prisonLevel?: Level;
     opponentLevel?: Level;
     editorLevel?: Level;
+    developmentFixture?: boolean;
   } = {},
 ) {
   const prison = parseLevel(options.prisonLevel ?? getPrison());
@@ -36,6 +42,17 @@ export function createSession(
   let prisonClear: Replay | null = null;
   let clear: Clear | null = null;
   let submission: Clear | null = null;
+  let fixture = options.developmentFixture ?? false;
+  let roundId = 0;
+  let round: {
+    id: number;
+    fixture: boolean;
+    human: RaidAttempt[];
+    drilly: RaidAttempt[];
+  } | null = null;
+  let result: ReturnType<typeof scoreRound> | null = null;
+  let best: number | null = null;
+  let recordedAttempt = false;
   const listeners = new Set<() => void>();
   let snapshot = makeSnapshot();
 
@@ -58,6 +75,10 @@ export function createSession(
       prisonEscaped: prisonClear !== null,
       canSubmit: canSubmit(),
       submission: structuredClone(submission),
+      round: structuredClone(round),
+      result: structuredClone(result),
+      best,
+      developmentFixture: fixture,
     };
   }
 
@@ -71,7 +92,8 @@ export function createSession(
       flow.phase === "prison" ||
       flow.phase === "testing" ||
       flow.phase === "raiding" ||
-      flow.phase === "replay"
+      flow.phase === "replay" ||
+      flow.phase === "ghost"
     );
   }
 
@@ -89,6 +111,8 @@ export function createSession(
       case "replay":
         return flow.returnTo;
       case "building":
+      case "ghost":
+      case "results":
         return null;
     }
   }
@@ -110,12 +134,16 @@ export function createSession(
     flow =
       activity === "testing" ? { phase: activity, revision: layoutRevision } : { phase: activity };
     levelRevision++;
+    recordedAttempt = false;
     attempt.loadLevel(level);
   }
 
   function editDungeon() {
     if (!prisonClear) throw new Error("Escape the prison before building your dungeon.");
 
+    roundId++;
+    round = null;
+    result = null;
     flow = { phase: "building" };
     levelRevision++;
     // The editor renders its own draft, which need not be a playable level yet.
@@ -136,14 +164,74 @@ export function createSession(
 
     // The proof includes the exact submitted geometry and cannot change with later edits.
     submission = structuredClone(clear);
+    round = { id: ++roundId, fixture, human: [], drilly: [] };
+    result = null;
     startAttempt("raiding");
   }
 
   function reset() {
-    if (flow.phase === "building" || flow.phase === "escaped") return;
+    if (
+      flow.phase === "building" ||
+      flow.phase === "escaped" ||
+      flow.phase === "raid-complete" ||
+      flow.phase === "results"
+    )
+      return;
 
+    if (flow.phase === "ghost") {
+      showGhost(flow.index);
+      return;
+    }
+    if (flow.phase === "raiding") {
+      recordRaid("restart");
+      if (flow.phase !== "raiding") {
+        notify();
+        return;
+      }
+    }
     const activity = currentActivity();
     if (activity) startAttempt(activity);
+  }
+
+  function recordRaid(outcome: RaidAttempt["outcome"]) {
+    if (!round) {
+      flow = { phase: "raid-complete" };
+      return;
+    }
+    if (recordedAttempt) return;
+    recordedAttempt = true;
+    round.human.push({ replay: attempt.exportReplay(), outcome });
+    if (outcome === "won" || round.human.length >= RULES.raidAttempts) {
+      flow = { phase: "raid-complete" };
+      if (round.fixture && submission) {
+        const id = round.id;
+        const level = structuredClone(submission.replay.level);
+        void Promise.resolve().then(() => receiveDrilly(id, runDrillyFixture(level)));
+      }
+    }
+  }
+
+  function receiveDrilly(id: number, attempts: RaidAttempt[]) {
+    if (!round || round.id !== id || round.drilly.length || !round.fixture) return;
+    round.drilly = structuredClone(attempts);
+    notify();
+  }
+
+  function showGhost(index: number) {
+    if (!round?.drilly[index]) return;
+    flow = { phase: "ghost", index };
+    levelRevision++;
+    attempt.loadReplay(round.drilly[index].replay);
+  }
+
+  function showResults() {
+    if (!round?.drilly.length) return;
+    if (!result) {
+      result = scoreRound(round.human, round.drilly, best);
+      best = result.best;
+    }
+    flow = { phase: "results" };
+    notify();
   }
 
   attempt.subscribe(() => {
@@ -164,9 +252,12 @@ export function createSession(
           }
           break;
         case "raiding":
-          flow = { phase: "raid-complete" };
+          recordRaid("won");
           break;
       }
+    }
+    if (flow.phase === "raiding" && view.mode === "human" && view.finished) {
+      recordRaid(view.state.status === "dead" ? "dead" : "tick-limit");
     }
     notify();
   });
@@ -205,6 +296,14 @@ export function createSession(
       notify();
     },
     editDungeon,
+    setDevelopmentFixture(enabled: boolean) {
+      if (flow.phase !== "building") return;
+      fixture = enabled;
+      notify();
+    },
+    replayGhost() {
+      showGhost(0);
+    },
     replaceDraft(value: unknown) {
       if (flow.phase !== "building" && flow.phase !== "prison" && flow.phase !== "escaped") {
         throw new Error("Return to editing before loading a saved draft.");
@@ -226,8 +325,20 @@ export function createSession(
         case "building":
           return;
         case "escaped":
-        case "raid-complete":
+        case "results":
           editDungeon();
+          return;
+        case "raid-complete":
+          if (round?.drilly.length) showGhost(0);
+          else if (!round?.fixture) editDungeon();
+          return;
+        case "ghost":
+          if (!attempt.getSnapshot().finished) {
+            attempt.play();
+            return;
+          }
+          if (round && flow.index + 1 < round.drilly.length) showGhost(flow.index + 1);
+          else showResults();
           return;
         case "cleared":
           submitDungeon();
@@ -263,6 +374,8 @@ export function createSession(
         jumpTicks,
         endTick: RULES.maxTicks,
       });
+      round = null;
+      result = null;
       flow = { phase: "replay", returnTo: activity };
       levelRevision++;
       attempt.loadReplay(replay);
@@ -272,6 +385,8 @@ export function createSession(
       const activity = currentActivity();
       if (!activity) throw new Error("Start an attempt before loading a replay.");
 
+      round = null;
+      result = null;
       flow = { phase: "replay", returnTo: activity };
       levelRevision++;
       attempt.loadReplay(replay);

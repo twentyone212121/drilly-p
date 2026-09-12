@@ -5,14 +5,14 @@ import { COLORS } from "./assets";
 
 type Graphics = Phaser.GameObjects.Graphics;
 
-export function drawRoom(graphics: Graphics, level: Level, state: State): void {
+export function drawRoom(graphics: Graphics, level: Level, state: State, ghost = false): void {
   drawBackground(graphics, level);
   drawPlatforms(graphics, level.platforms);
   drawTraps(graphics, level.traps, state.tick);
   for (const treasure of level.treasures) {
     if (!state.collectedTreasureIds.includes(treasure.id)) drawTreasure(graphics, treasure);
   }
-  drawPlayer(graphics, state);
+  drawPlayer(graphics, state, ghost);
 }
 
 function drawBackground(graphics: Graphics, level: Level): void {
@@ -89,12 +89,15 @@ function drawTreasure(graphics: Graphics, chest: Level["treasures"][number]): vo
   graphics.fillRect(chest.x + chest.width / 2 - 3, chest.y + 9, 6, 10);
 }
 
-function drawPlayer(graphics: Graphics, state: State): void {
+function drawPlayer(graphics: Graphics, state: State, ghost: boolean): void {
   const player = state.player;
 
   graphics.fillStyle(0x000000, 0.18);
   graphics.fillEllipse(player.x + 12, player.y + RULES.playerHeight + 3, 26, 6);
-  graphics.fillStyle(state.status === "dead" ? COLORS.danger : COLORS.player);
+  graphics.fillStyle(
+    ghost ? 0x9e9bff : state.status === "dead" ? COLORS.danger : COLORS.player,
+    ghost ? 0.55 : 1,
+  );
   graphics.fillRoundedRect(player.x, player.y, RULES.playerWidth, RULES.playerHeight, 7);
   graphics.fillStyle(0x19271e);
   graphics.fillRoundedRect(player.x + 3, player.y + 6, 18, 9, 3);
