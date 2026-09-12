@@ -1,6 +1,7 @@
 // Provisional mechanics and editor tuning. Bump the rules version when mechanics change.
 export const RULES = Object.freeze({
   version: "editor-2",
+  raidAttempts: 3,
   tickRate: 60,
   playerWidth: 24,
   playerHeight: 28,
