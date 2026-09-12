@@ -1,0 +1,8 @@
+{
+  "source": "browser-win.replay.json",
+  "outcome": "won",
+  "terminalTick": 246,
+  "states": 247,
+  "browserTrajectoryParity": true,
+  "browserEventsMatch": true
+}

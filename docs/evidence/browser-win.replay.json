@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "rulesVersion": "checkpoint-1",
+  "level": {
+    "version": 1,
+    "id": "checkpoint",
+    "name": "The first vault",
+    "width": 900,
+    "height": 480,
+    "spawn": {
+      "x": 72,
+      "y": 392,
+      "direction": 1
+    },
+    "platforms": [
+      {
+        "x": 24,
+        "y": 420,
+        "width": 852,
+        "height": 36,
+        "id": "floor"
+      },
+      {
+        "x": 12,
+        "y": 24,
+        "width": 24,
+        "height": 432,
+        "id": "left-wall"
+      },
+      {
+        "x": 864,
+        "y": 24,
+        "width": 24,
+        "height": 432,
+        "id": "right-wall"
+      },
+      {
+        "x": 476,
+        "y": 298,
+        "width": 260,
+        "height": 18,
+        "id": "vault-ledge"
+      }
+    ],
+    "traps": [
+      {
+        "id": "saw-1",
+        "x": 320,
+        "y": 398,
+        "radius": 22
+      }
+    ],
+    "treasure": {
+      "x": 600,
+      "y": 270,
+      "width": 32,
+      "height": 28
+    }
+  },
+  "jumpTicks": [44, 193],
+  "endTick": 246
+}

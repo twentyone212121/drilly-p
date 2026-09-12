@@ -1,0 +1,30 @@
+{
+  "death": {
+    "muted": false,
+    "volume": 0.6,
+    "ready": true,
+    "unlocked": true,
+    "played": 1,
+    "last": "death",
+    "missing": []
+  },
+  "mutedJump": {
+    "muted": true,
+    "volume": 0.6,
+    "ready": true,
+    "unlocked": true,
+    "played": 1,
+    "last": "death",
+    "missing": []
+  },
+  "volumeChange": {
+    "muted": false,
+    "volume": 0.1,
+    "ready": true,
+    "unlocked": true,
+    "played": 1,
+    "last": "death",
+    "missing": []
+  },
+  "note": "Playback acceptance checked via Phaser diagnostics; not a physical speaker listening test."
+}
