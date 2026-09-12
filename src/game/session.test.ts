@@ -32,6 +32,44 @@ function submit(session: Session) {
 }
 
 describe("local game state machine", () => {
+  it("loads an unfinished saved draft without restoring a prison escape or clear", () => {
+    const draft = createSession().getSnapshot().editorLevel;
+    draft.treasures = [];
+    const session = createSession({ editorLevel: draft });
+    expect(session.getSnapshot()).toMatchObject({
+      phase: "prison",
+      prisonEscaped: false,
+      canSubmit: false,
+      editorLevel: { treasures: [] },
+    });
+    escape(session);
+    expect(() => session.testDungeon()).toThrow();
+  });
+
+  it("invalidates a clear when loading a saved draft and isolates active attempts", () => {
+    const session = createSession();
+    escape(session);
+    const draft = session.getSnapshot().editorLevel;
+    session.testDungeon();
+    const before = session.observe();
+    expect(() => session.replaceDraft(draft)).toThrow("Return to editing");
+    expect(session.observe()).toEqual(before);
+    finishHumanAttempt(session);
+    expect(session.getSnapshot().canSubmit).toBe(true);
+    session.submitDungeon();
+    const submission = session.getSnapshot().submission;
+    expect(() => session.replaceDraft(draft)).toThrow();
+    session.editDungeon();
+    session.replaceDraft(draft);
+    expect(session.getSnapshot().canSubmit).toBe(false);
+    expect(session.getSnapshot().submission).toEqual(submission);
+    draft.treasures = [];
+    expect(session.getSnapshot().editorLevel.treasures).not.toEqual([]);
+    const restored = session.observe();
+    expect(() => session.replaceDraft({ ...draft, width: 1000 })).toThrow("fixed");
+    expect(session.observe()).toEqual(restored);
+  });
+
   it("requires a human prison escape before building, testing, or submitting", () => {
     const session = createSession();
     expect(session.getSnapshot()).toMatchObject({
@@ -118,7 +156,10 @@ describe("local game state machine", () => {
     session.jump();
     session.step(31);
     session.play();
-    expect(session.getSnapshot().state.player).toMatchObject({ direction: -1, grounded: true });
+    expect(session.getSnapshot().state.player).toMatchObject({
+      direction: -1,
+      grounded: true,
+    });
     expect(sessionView(session.getSnapshot()).status).toContain("jump over the upper saw");
     expect(session.getSnapshot().paused).toBe(false);
 
