@@ -1,5 +1,5 @@
 import type Phaser from "phaser";
-import type { Level, State } from "../../../shared/game/types";
+import type { GameEvent, Level, State } from "../../../shared/game/types";
 import { RULES } from "../../../shared/game/rules";
 
 export function createRoomArt(scene: Phaser.Scene, level: Level) {
@@ -41,18 +41,32 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
   );
   const player = scene.add.image(0, 0, "esc", "idle").setOrigin(0.5, 1);
   objects.push(player);
-  let wasGrounded = true;
+  const fragments = scene.add.graphics();
+  let jumpTick = -100;
+  let wallJumpTick = -100;
+  let deathMs = 0;
   let lastTick = -1;
   let landingTick = -100;
 
   return {
-    update(state: State, ghost: boolean) {
-      if (state.tick < lastTick) landingTick = -100;
-      if (state.tick !== lastTick) {
-        if (!wasGrounded && state.player.grounded) landingTick = state.tick;
-        wasGrounded = state.player.grounded;
-        lastTick = state.tick;
+    consume(events: GameEvent[]) {
+      for (const event of events) {
+        if (event.type === "landed") landingTick = event.tick;
+        if (event.type === "jumped") {
+          jumpTick = event.tick;
+          if (event.kind === "wall") wallJumpTick = event.tick;
+        }
       }
+    },
+    update(state: State, ghost: boolean, delta: number) {
+      if (state.tick < lastTick) {
+        landingTick = jumpTick = wallJumpTick = -100;
+        deathMs = 0;
+      }
+      lastTick = state.tick;
+      if (state.status !== "dead") deathMs = 0;
+      else deathMs = Math.min(500, deathMs + Math.max(0, Math.min(delta, 100)));
+      fragments.clear();
       const landed = state.tick - landingTick < 6;
       const running =
         !ghost &&
@@ -80,16 +94,58 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
         ghost ? "hover" : running ? "run-0" : "idle",
       );
       const scale = RULES.playerHeight / reference.height;
-      player.setScale(scale);
+      const jumpStrength =
+        !ghost && state.status === "running"
+          ? Math.max(0, 1 - (state.tick - jumpTick) / 8)
+          : 0;
+      const landStrength =
+        !ghost && state.status === "running" && landed
+          ? Math.max(0, 1 - (state.tick - landingTick) / 6)
+          : 0;
+      player.setScale(
+        scale * (1 - jumpStrength * 0.08 + landStrength * 0.08),
+        scale * (1 + jumpStrength * 0.1 - landStrength * 0.08),
+      );
       player.setPosition(
         state.player.x + RULES.playerWidth / 2,
         state.player.y + RULES.playerHeight,
       );
       // A small visual lean communicates direction without mirroring the ESC label.
       player.setRotation(
-        state.status === "running" ? state.player.direction * 0.04 : 0,
+        state.status === "running"
+          ? state.player.direction *
+              (0.04 +
+                (!ghost
+                  ? Math.max(0, 1 - (state.tick - wallJumpTick) / 10) * 0.16
+                  : 0))
+          : 0,
       );
-      player.setAlpha(ghost ? 0.8 : 1);
+      player.setAlpha(
+        ghost
+          ? 0.8
+          : state.status === "dead"
+            ? Math.max(0.3, 1 - deathMs / 300)
+            : 1,
+      );
+      if (!ghost && state.status === "dead" && deathMs < 500) {
+        const t = deathMs / 1000;
+        for (let index = 0; index < 6; index++) {
+          const angle = (index * Math.PI * 2) / 6;
+          fragments.fillStyle(
+            index % 2 ? 0xeee4d2 : 0x50dcf3,
+            1 - deathMs / 500,
+          );
+          fragments.fillRect(
+            player.x + Math.cos(angle) * t * 55 - 2,
+            player.y -
+              RULES.playerHeight / 2 +
+              Math.sin(angle) * t * 45 +
+              t * t * 80,
+            3,
+            3,
+          );
+        }
+      }
       player.setTint(state.status === "dead" && !ghost ? 0xff8297 : 0xffffff);
       saws.forEach((image) => image.setRotation(state.tick / 10));
       treasures.forEach((image, index) =>
@@ -99,6 +155,7 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
       );
     },
     destroy() {
+      fragments.destroy();
       objects.forEach((image) => image.destroy());
     },
   };

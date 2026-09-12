@@ -71,6 +71,7 @@ export class GameScene extends Phaser.Scene {
     this.roomArt?.update(
       this.session.frameState(),
       this.session.getSnapshot().phase === "ghost",
+      delta,
     );
   }
 
@@ -111,9 +112,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private connectAudio() {
-    const offEvents = this.session.onEvents((events) =>
-      this.audio?.consume(events),
-    );
+    const offEvents = this.session.onEvents((events) => {
+      this.audio?.consume(events);
+      this.roomArt?.consume(events);
+    });
     const offSession = this.session.subscribe(() =>
       this.stopAudioOnTransition(),
     );
