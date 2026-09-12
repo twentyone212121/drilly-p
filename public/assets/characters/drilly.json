@@ -2,74 +2,74 @@
   "frames": {
     "hover": {
       "frame": {
-        "x": 0,
-        "y": 0,
-        "w": 128,
-        "h": 128
+        "x": 25,
+        "y": 12,
+        "w": 78,
+        "h": 104
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 128,
-        "h": 128
+        "w": 78,
+        "h": 104
       },
       "sourceSize": {
-        "w": 128,
-        "h": 128
+        "w": 78,
+        "h": 104
       },
       "pivot": {
         "x": 0.5,
-        "y": 0.90625
+        "y": 1
       }
     },
     "active": {
       "frame": {
-        "x": 128,
-        "y": 0,
-        "w": 128,
-        "h": 128
+        "x": 154,
+        "y": 18,
+        "w": 76,
+        "h": 98
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 128,
-        "h": 128
+        "w": 76,
+        "h": 98
       },
       "sourceSize": {
-        "w": 128,
-        "h": 128
+        "w": 76,
+        "h": 98
       },
       "pivot": {
         "x": 0.5,
-        "y": 0.90625
+        "y": 1
       }
     },
     "defeated": {
       "frame": {
-        "x": 256,
-        "y": 0,
-        "w": 128,
-        "h": 128
+        "x": 281,
+        "y": 12,
+        "w": 78,
+        "h": 104
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 128,
-        "h": 128
+        "w": 78,
+        "h": 104
       },
       "sourceSize": {
-        "w": 128,
-        "h": 128
+        "w": 78,
+        "h": 104
       },
       "pivot": {
         "x": 0.5,
-        "y": 0.90625
+        "y": 1
       }
     }
   },

@@ -40,11 +40,13 @@ def export_atlas(name, sprites, labels, cell, columns, directory):
         sprite = sprite.resize(size, Image.Resampling.LANCZOS)
         x, y = (index % columns) * cell, (index // columns) * cell
         atlas.alpha_composite(sprite, (x + (cell - size[0]) // 2, y + cell - 12 - size[1]))
-        frames[label] = {'frame': {'x': x, 'y': y, 'w': cell, 'h': cell},
+        left = x + (cell - size[0]) // 2
+        top = y + cell - 12 - size[1]
+        frames[label] = {'frame': {'x': left, 'y': top, 'w': size[0], 'h': size[1]},
                          'rotated': False, 'trimmed': False,
-                         'spriteSourceSize': {'x': 0, 'y': 0, 'w': cell, 'h': cell},
-                         'sourceSize': {'w': cell, 'h': cell},
-                         'pivot': {'x': 0.5, 'y': (cell - 12) / cell}}
+                         'spriteSourceSize': {'x': 0, 'y': 0, 'w': size[0], 'h': size[1]},
+                         'sourceSize': {'w': size[0], 'h': size[1]},
+                         'pivot': {'x': 0.5, 'y': 1}}
     directory.mkdir(parents=True, exist_ok=True)
     atlas.save(directory / f'{name}.png', optimize=True)
     metadata = {'frames': frames, 'meta': {'image': f'{name}.png', 'format': 'RGBA8888',

@@ -8,9 +8,9 @@ export function drawAmbience(
   seconds: number,
 ) {
   graphics.clear();
-  const x = width * 0.12;
-  const y = height * 0.19;
-  const radius = Math.min(width, height) * 0.065;
+  const x = width * 0.26;
+  const y = height * 0.08;
+  const radius = Math.min(width, height) * 0.105;
 
   graphics.fillStyle(0x0b1321);
   graphics.fillCircle(x, y, radius);

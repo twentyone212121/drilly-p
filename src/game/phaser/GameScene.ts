@@ -3,11 +3,11 @@ import type { Level } from "../../../shared/game/types";
 import type { Session } from "../session";
 import { AUDIO } from "./assets";
 import { createAudio, type AudioSettings, type AudioStatus } from "./audio";
-import { drawRoom } from "./drawRoom";
+import { createRoomArt } from "./roomArt";
 import { drawAmbience } from "./ambience";
 
 export class GameScene extends Phaser.Scene {
-  private drawing!: Phaser.GameObjects.Graphics;
+  private roomArt?: ReturnType<typeof createRoomArt>;
   private background!: Phaser.GameObjects.Image;
   private ambience!: Phaser.GameObjects.Graphics;
   private ambientSeconds = 0;
@@ -28,6 +28,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload() {
+    for (const name of ["esc", "drilly"]) {
+      this.load.atlas(
+        name,
+        `/assets/characters/${name}.png`,
+        `/assets/characters/${name}.json`,
+      );
+    }
+    this.load.atlas(
+      "computer-props",
+      "/assets/environment/computer-props.png",
+      "/assets/environment/computer-props.json",
+    );
     this.load.image(
       "computer-interior",
       "/assets/backgrounds/computer-interior.webp",
@@ -40,7 +52,6 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.background = this.add.image(0, 0, "computer-interior").setOrigin(0);
     this.ambience = this.add.graphics();
-    this.drawing = this.add.graphics();
     this.audio = createAudio(this, this.settings, this.reportAudio);
     this.connectAudio();
     this.input.on("pointerdown", () => this.session.primaryAction());
@@ -57,9 +68,7 @@ export class GameScene extends Phaser.Scene {
       this.level.height,
       this.ambientSeconds,
     );
-    drawRoom(
-      this.drawing,
-      this.level,
+    this.roomArt?.update(
       this.session.frameState(),
       this.session.getSnapshot().phase === "ghost",
     );
@@ -78,6 +87,8 @@ export class GameScene extends Phaser.Scene {
     this.scale.resize(this.level.width, this.level.height);
     this.background.setDisplaySize(this.level.width, this.level.height);
     this.ambientSeconds = 0;
+    this.roomArt?.destroy();
+    this.roomArt = createRoomArt(this, this.level);
 
     this.label?.destroy();
     this.label = this.add.text(56, 52, this.level.name.toUpperCase(), {

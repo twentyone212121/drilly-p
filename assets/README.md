@@ -23,8 +23,8 @@ marks collectible concepts. These are art conventions, not new mechanics.
 
 Each character has three key poses, not a finished animation cycle. Drilly's
 poses are hover, active, and defeated; ESC's are idle, jump, and land.
-The renderer loads the background with ambient fan and light animation. Character
-and prop integration is still pending. Sprite size and collisions remain the
+The renderer loads ESC, Drilly ghosts, platforms, saws, data pickups, and the
+background with ambient fan and light animation. Sprite size and collisions remain the
 renderer and simulation's responsibility respectively.
 
 Only load files from `public/assets` in the game. The export script removes
@@ -34,9 +34,10 @@ Gates are visual concepts; this kit does not introduce gate mechanics.
 
 ## Runtime format
 
-Characters use RGBA PNG atlases (384 × 128), with three 128 × 128 frames.
-Props use a 768 × 512 atlas with six 256 × 256 frames. JSON files use Phaser's
-hash atlas format and include bottom-center pivots and transparent padding.
+Characters use RGBA PNG atlases (384 × 128), with three poses in padded 128 × 128 cells.
+Props use a 768 × 512 atlas with six padded 256 × 256 cells. JSON files use Phaser's
+hash atlas format with tight frame rectangles and bottom-center pivots.
+Padding stays outside frame rectangles to avoid texture bleeding.
 The background is an opaque WebP bounded to 1600 × 900. Keep linear filtering
 for this shaded artwork. The visible silhouette fits inside its frame; frame
 dimensions must not be used as collision bounds.
