@@ -23,7 +23,8 @@ marks collectible concepts. These are art conventions, not new mechanics.
 
 Each character has three key poses, not a finished animation cycle. Drilly's
 poses are hover, active, and defeated; ESC's are idle, jump, and land.
-The game does not load this kit yet. Sprite size and collisions remain the
+The renderer loads the background with ambient fan and light animation. Character
+and prop integration is still pending. Sprite size and collisions remain the
 renderer and simulation's responsibility respectively.
 
 Only load files from `public/assets` in the game. The export script removes
