@@ -9,9 +9,24 @@ The game is **Drilly P**: **Drilly** is the AI opponent, and **P** represents th
   Update the design doc when the team agrees to a behavior change.
 - Keep simulation independent of rendering and network requests. Human inputs
   and AI inputs must use the same movement rules; attempts must be reproducible.
+- Keep tuning in `shared/game/rules.ts`. Use fixed simulation ticks and bump the
+  rules version when changing mechanics so incompatible replays are rejected.
+- Validate external data in `shared/validation.ts`. Keep session coordination in
+  `src/game/session.ts` and Phaser integration in `src/game/phaser/`; renderers
+  and audio react to simulation state/events rather than deciding outcomes.
+- Prefer small named functions and blank lines between logical steps. Extract
+  modules around clear responsibilities, not one-line wrappers.
+- Keep durable development guidance here and gameplay decisions in the design doc.
+  Don't duplicate code constants or maintain milestone status reports. Keep one-off
+  screenshots, diagnostics, and verification output outside Git; summarize in PRs.
+- Use `npm run run:attempt -- --describe` to inspect the headless runner's rules
+  and input format. Keep browser and headless attempts on the same simulation.
+- When the user is actively playtesting, hand off small UX checks to them instead
+  of repeating browser automation unless requested.
 - Preserve unrelated local edits. Keep changes focused on the requested task.
-- Use npm and the committed lockfile. For code changes, run `npm run lint` and
-  `npm run build`; add focused tests for gameplay rules and replay determinism.
+- Use npm and the committed lockfile. For code changes, run `npm test`,
+  `npm run lint`, and `npm run build`; add focused tests for gameplay rules and
+  replay determinism.
   Documentation-only changes need link and formatting checks, not a full build.
 - Keep secrets in backend configuration, never in browser code or `VITE_` variables.
 

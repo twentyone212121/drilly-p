@@ -18,10 +18,7 @@ export default defineConfig([
     ],
   },
   {
-    extends: [
-      js.configs.recommended,
-      ...tseslint.configs.recommendedTypeChecked,
-    ],
+    extends: [js.configs.recommended, ...tseslint.configs.recommendedTypeChecked],
     files: ["**/*.{ts,tsx}"],
     languageOptions: {
       ecmaVersion: 2020,
@@ -30,11 +27,7 @@ export default defineConfig([
         ...globals.node,
       },
       parserOptions: {
-        project: [
-          "./tsconfig.node.json",
-          "./tsconfig.app.json",
-          "./convex/tsconfig.json",
-        ],
+        project: ["./tsconfig.node.json", "./tsconfig.app.json", "./convex/tsconfig.json"],
       },
     },
     plugins: {
@@ -43,10 +36,7 @@ export default defineConfig([
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      "react-refresh/only-export-components": [
-        "warn",
-        { allowConstantExport: true },
-      ],
+      "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       // All of these overrides ease getting into
       // TypeScript, and can be removed for stricter
       // linting down the line.
@@ -74,6 +64,31 @@ export default defineConfig([
       // Allow async functions without await
       // for consistency (esp. Convex `handler`s)
       "@typescript-eslint/require-await": "off",
+    },
+  },
+  {
+    files: ["shared/game/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              regex: "^[^.]|/src/",
+              message:
+                "Keep library imports in shared/validation.ts and browser integration in src/. Simulation modules use local imports.",
+            },
+          ],
+        },
+      ],
+      "no-restricted-globals": [
+        "error",
+        "window",
+        "document",
+        "performance",
+        "requestAnimationFrame",
+      ],
     },
   },
   ...convexPlugin.configs.recommended,

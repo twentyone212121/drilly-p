@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   checks:
-    name: Lint and build
+    name: Tests, lint and build
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -25,6 +25,8 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Test simulation and replay
+        run: npm test
       - name: Typecheck and lint
         run: npm run lint
       - name: Build
