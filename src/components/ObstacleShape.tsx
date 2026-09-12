@@ -26,7 +26,12 @@ export function ObstacleShape({ obstacle }: { obstacle: Obstacle }) {
   return (
     <image
       {...bounds}
-      href={`/assets/obstacles/${obstacle.kind}.svg`}
+      href={`/assets/obstacles/${obstacle.kind}.${obstacle.kind === "turret" ? "png" : "svg"}`}
+      transform={
+        obstacle.kind === "turret" && obstacle.direction === -1
+          ? `translate(${obstacle.x * 2} 0) scale(-1 1)`
+          : undefined
+      }
       preserveAspectRatio="none"
       pointerEvents="none"
     />

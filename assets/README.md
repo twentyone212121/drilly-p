@@ -75,13 +75,18 @@ time so it can finish after the attempt stops. Restart clears transient effects.
 
 ## Obstacle artwork
 
-`public/assets/obstacles/` contains small hand-authored SVG sprites for spikes,
-firewall turrets, patrol drones, and pursuers. The sliding saw reuses the saw atlas.
-These are code-native vector sources: the editor displays them directly and Phaser
-rasterizes them when loading. They need no Python export and introduce no duplicate
-raster files. Cyan marks routes, magenta marks danger, and amber marks attack warnings.
-The renderer draws barrels, projectiles, flames, rotor accents, and pursuit trails
-from simulation state. Pausing freezes those effects with the mechanics.
+`public/assets/obstacles/` contains small vector sprites for spikes, patrol drones,
+and pursuers, plus a shaded PNG firewall turret. The sliding saw reuses the saw atlas.
+The editor displays these directly; Phaser rasterizes vector sprites when loading.
+The turret source is `source/obstacles/turret.png`; rebuild its trimmed, optimized
+runtime sprite with `python3 scripts/art/export-turret.py` using the same dependencies
+as the main export script. Its built-in image-generation prompt is in `turret-prompt.json`.
+
+The turret turns toward its firing direction. Recessed charge lights and muzzle glow
+telegraph shots; layered, flickering flame silhouettes and short projectile trails
+replace debug-style outlines. Flame artwork stays inside the simulation's reach;
+the collision footprint remains the full flame rectangle. All effects follow fixed
+simulation ticks and freeze during pause. These are presentation changes only.
 
 The obstacle lab is accessible from **Try the obstacle lab** above the game room.
 Use its room selector to inspect each behavior before building with it.

@@ -29,8 +29,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    for (const name of OBSTACLE_TEXTURES)
-      this.load.svg(`obstacle-${name}`, `/assets/obstacles/${name}.svg`);
+    for (const name of OBSTACLE_TEXTURES) {
+      if (name === "turret") this.load.image("obstacle-turret", "/assets/obstacles/turret.png");
+      else this.load.svg(`obstacle-${name}`, `/assets/obstacles/${name}.svg`);
+    }
     for (const name of ["esc", "esc-run", "drilly"]) {
       this.load.atlas(name, `/assets/characters/${name}.png`, `/assets/characters/${name}.json`);
     }

@@ -47,7 +47,7 @@ export function createObstacleArt(scene: Phaser.Scene, level: Level) {
             );
           }
         }
-        if (current.phase === "warning") {
+        if (current.phase === "warning" && o.kind !== "turret") {
           effects.lineStyle(2, 0xffbd65, 0.65 + Math.sin(state.tick / 4) * 0.25);
           effects.strokeCircle(current.x, current.y, o.radius + 5);
           effects.lineBetween(
@@ -72,39 +72,68 @@ export function createObstacleArt(scene: Phaser.Scene, level: Level) {
           }
         }
         if (o.kind === "turret") {
-          sprite.setAlpha(current.phase === "idle" ? 0.65 : 1);
           const dx = Math.cos(current.angle),
             dy = Math.sin(current.angle);
-          effects.lineStyle(7, 0x56627a);
-          effects.lineBetween(o.x, o.y, o.x + dx * o.radius, o.y + dy * o.radius);
-          effects.lineStyle(3, current.phase === "warning" ? 0xffbd65 : 0xee42b0);
-          effects.lineBetween(o.x, o.y, o.x + dx * o.radius, o.y + dy * o.radius);
-          if (current.phase === "warning") {
-            effects.lineStyle(1, 0xffbd65, 0.35);
-            effects.lineBetween(o.x, o.y, o.x + dx * o.range, o.y + dy * o.range);
+          sprite.setRotation(current.angle).setFlipY(dx < 0);
+          sprite.setAlpha(current.phase === "idle" ? 0.85 : 1);
+          const muzzle = { x: o.x + dx * o.radius * 0.88, y: o.y + dy * o.radius * 0.88 };
+          const charge =
+            current.phase === "warning" ? (state.tick % o.intervalTicks) / o.warmupTicks : 0;
+          // A recessed charging chamber and muzzle light replace the floating UI ring.
+          if (charge > 0) {
+            effects.fillStyle(0xffa954, 0.1 + charge * 0.2);
+            effects.fillCircle(muzzle.x, muzzle.y, 2 + charge * 4);
+            effects.fillStyle(0xffd48c, 0.4 + charge * 0.5);
+            effects.fillCircle(muzzle.x, muzzle.y, 1 + charge * 1.5);
+            effects.fillStyle(0xffb75c, 0.5 + charge * 0.5);
+            effects.fillCircle(o.x - dy * o.radius * 0.35, o.y + dx * o.radius * 0.35, 1.7);
           }
           if (o.mode === "flame" && current.phase === "active") {
             const flame = flameBounds(o, level);
-            effects.fillStyle(0xf46b28, 0.8);
-            effects.fillRect(flame.x, flame.y, flame.width, flame.height);
-            effects.fillStyle(0xffda6b, 0.9);
-            const inset = 3 + (state.tick % 4);
-            effects.fillRect(
-              flame.x,
-              flame.y + inset,
-              flame.width,
-              Math.max(2, flame.height - inset * 2),
-            );
+            drawFlame(effects, o.x, o.y, o.direction, flame.width, flame.height / 2, state.tick);
+          } else if (o.mode !== "flame") {
+            const sinceShot = (state.tick % o.intervalTicks) - o.warmupTicks;
+            if (sinceShot >= 0 && sinceShot < 5) {
+              effects.fillStyle(0xffdfbd, (1 - sinceShot / 5) * 0.8);
+              effects.fillTriangle(
+                muzzle.x - dy * 3,
+                muzzle.y + dx * 3,
+                muzzle.x + dy * 3,
+                muzzle.y - dx * 3,
+                muzzle.x + dx * (8 - sinceShot),
+                muzzle.y + dy * (8 - sinceShot),
+              );
+            }
           }
         }
       });
       for (const p of state.projectiles) {
-        effects.fillStyle(0xff4cbe, 0.2);
-        effects.fillCircle(p.x, p.y, RULES.obstacles.projectileRadius + 3);
-        effects.fillStyle(0xff83d2);
-        effects.fillCircle(p.x, p.y, RULES.obstacles.projectileRadius);
-        effects.fillStyle(0xffe7fa);
-        effects.fillCircle(p.x, p.y, 2);
+        const speed = Math.hypot(p.vx, p.vy);
+        const dx = p.vx / speed,
+          dy = p.vy / speed;
+        const r = RULES.obstacles.projectileRadius;
+        effects.fillStyle(0xd837b0, 0.22);
+        effects.fillTriangle(
+          p.x - dy * r,
+          p.y + dx * r,
+          p.x + dy * r,
+          p.y - dx * r,
+          p.x - dx * 18,
+          p.y - dy * 18,
+        );
+        effects.fillStyle(0xff53c4, 0.85);
+        effects.fillTriangle(
+          p.x - dy * r * 0.65,
+          p.y + dx * r * 0.65,
+          p.x + dy * r * 0.65,
+          p.y - dx * r * 0.65,
+          p.x - dx * 9,
+          p.y - dy * 9,
+        );
+        effects.fillStyle(0xff89d6);
+        effects.fillCircle(p.x, p.y, r);
+        effects.fillStyle(0xffe8f7);
+        effects.fillCircle(p.x + dx, p.y + dy, r * 0.45);
       }
     },
     destroy() {
@@ -113,4 +142,49 @@ export function createObstacleArt(scene: Phaser.Scene, level: Level) {
       sprites.forEach((sprite) => sprite.destroy());
     },
   };
+}
+
+// Tick-driven silhouettes: no particles or randomness can drift during pause/replay.
+function drawFlame(
+  graphics: Phaser.GameObjects.Graphics,
+  x: number,
+  y: number,
+  direction: number,
+  length: number,
+  halfHeight: number,
+  tick: number,
+) {
+  if (length <= 0) return;
+  for (const [color, scale, alpha] of [
+    [0xec4a26, 1, 0.35],
+    [0xff8a32, 0.8, 0.9],
+    [0xffe39b, 0.38, 0.95],
+  ]) {
+    const points: { x: number; y: number }[] = [];
+    for (const side of [-1, 1]) {
+      for (let i = 0; i <= 24; i++) {
+        const f = side === -1 ? i / 24 : 1 - i / 24;
+        const wave =
+          Math.sin(f * 34 - tick * 0.65 + side) * 0.17 + Math.sin(f * 71 - tick * 0.9) * 0.1;
+        const envelope = Math.min(1, 0.4 + f * 3) * (1 - Math.pow(f, 7));
+        const spread = halfHeight * scale * Math.max(0.05, envelope * (0.7 + wave));
+        points.push({ x: x + direction * f * length, y: y + side * spread });
+      }
+    }
+    graphics.fillStyle(color, alpha);
+    graphics.fillPoints(points, true);
+  }
+  // Short embers stay inside the actual reach and make the tip readable.
+  for (let i = 0; i < 5; i++) {
+    const phase = ((tick * 3 + i * 19) % 100) / 100;
+    const f = 0.35 + phase * 0.65;
+    const cy = y + Math.sin(i * 7 + tick * 0.15) * halfHeight * 0.7;
+    graphics.lineStyle(1.5, 0xffc671, (1 - phase) * 0.8);
+    graphics.lineBetween(
+      x + direction * Math.max(0, f * length - 5),
+      cy,
+      x + direction * f * length,
+      cy,
+    );
+  }
 }
