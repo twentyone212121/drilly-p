@@ -1,0 +1,53 @@
+export type Rect = { x: number; y: number; width: number; height: number };
+export type Platform = Rect & { id: string };
+
+export type Level = {
+  version: 1;
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  spawn: { x: number; y: number; direction: -1 | 1 };
+  platforms: Platform[];
+  traps: { id: string; x: number; y: number; radius: number }[];
+  treasure: Rect;
+};
+
+export type State = {
+  tick: number;
+  status: "running" | "dead" | "won";
+  player: {
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    direction: -1 | 1;
+    grounded: boolean;
+    wall: -1 | 0 | 1;
+  };
+};
+
+export type Input = { jump: boolean };
+
+export type GameEvent =
+  | { type: "jumped"; tick: number; kind: "ground" | "wall" }
+  | { type: "jump-ignored"; tick: number; reason: "airborne" }
+  | { type: "landed"; tick: number; platformId: string }
+  | { type: "wall-contact"; tick: number; side: -1 | 1 }
+  | { type: "died"; tick: number; trapId: string }
+  | { type: "won"; tick: number };
+
+export type Replay = {
+  version: 1;
+  rulesVersion: string;
+  level: Level;
+  jumpTicks: number[];
+  endTick: number;
+};
+
+export type AttemptResult = {
+  state: State;
+  events: GameEvent[];
+  trajectory: State[];
+  stopReason: "dead" | "won" | "tick-limit";
+};
