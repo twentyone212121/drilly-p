@@ -1,4 +1,4 @@
-import { DRILLY_ERRORS } from "../../shared/game/drillyErrors";
+import { DRILLY_ERRORS } from "../../../shared/game/drillyErrors";
 import type { Planner } from "./protocol";
 
 export function withDeadline(plan: Planner, duration: number): Planner {

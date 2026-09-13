@@ -1,7 +1,7 @@
 import { RULES } from "../../shared/game/rules";
 import { initialState, step } from "../../shared/game/simulation";
-import { parseLevel, parseJumpTicks, parseReplay } from "../../shared/validation";
-import type { GameEvent, Level, Replay, State } from "../../shared/game/types";
+import { parseLevel, parseReplay } from "../../shared/validation";
+import type { GameEvent, Level, Replay } from "../../shared/game/types";
 
 const TICK_DURATION_MS = 1000 / RULES.tickRate;
 const MAX_FRAME_DELTA_MS = 100;
@@ -16,7 +16,6 @@ export function createAttempt(initialLevel: Level) {
   let pendingJump = false;
   let jumps: number[] = [];
   let events: GameEvent[] = [];
-  let trajectory: State[] = [state];
   let mode: "human" | "replay" = "human";
   let schedule = new Set<number>();
   let endTick: number = RULES.maxTicks;
@@ -50,7 +49,6 @@ export function createAttempt(initialLevel: Level) {
     pendingJump = false;
     jumps = [];
     events = [];
-    trajectory = [state];
   }
 
   function resetToHuman() {
@@ -77,7 +75,6 @@ export function createAttempt(initialLevel: Level) {
     pendingJump = false;
     state = result.state;
     events.push(...result.events);
-    trajectory.push(state);
 
     eventListeners.forEach((fn) => fn(result.events));
     if (isFinished()) paused = true;
@@ -94,8 +91,6 @@ export function createAttempt(initialLevel: Level) {
 
     frameState: () => state,
     getSnapshot: () => snapshot,
-    observe: () => structuredClone(makeSnapshot()),
-    trajectory: () => structuredClone(trajectory),
     exportReplay: (): Replay => ({
       version: 2,
       rulesVersion: RULES.version,
@@ -173,16 +168,6 @@ export function createAttempt(initialLevel: Level) {
 
     reset() {
       resetToHuman();
-      notify();
-    },
-
-    loadSchedule(ticks: unknown) {
-      const validated = parseJumpTicks(ticks);
-
-      mode = "replay";
-      endTick = RULES.maxTicks;
-      schedule = new Set(validated);
-      resetAttempt();
       notify();
     },
 

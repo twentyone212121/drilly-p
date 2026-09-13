@@ -1,31 +1,10 @@
-import { LAB_ROOMS } from "../../shared/game/obstacleLab";
 import { RULES } from "../../shared/game/rules";
 import type { SessionSnapshot } from "./session";
 
 // Presentation only: transitions and outcomes belong to the session.
 export function sessionView(view: SessionSnapshot) {
   const { phase, state, paused, finished } = view;
-  const replayActivity =
-    view.flow.phase === "replay" ? view.flow.returnTo : null;
   switch (phase) {
-    case "lab":
-      return {
-        step: -1,
-        title: "Obstacle lab",
-        hint: LAB_ROOMS.find((room) => room.id === view.labRoom)!.hint,
-        status: finished
-          ? state.status === "won"
-            ? "Lab cleared. Try another obstacle or replay this room."
-            : "Try again: every attempt resets the obstacles."
-          : "Practice only — your dungeon and progression are safe.",
-        action: finished
-          ? "Try again"
-          : paused
-            ? state.tick === 0
-              ? "Start practice"
-              : "Resume"
-            : "Jump",
-      };
     case "prison":
       return {
         step: 0,
@@ -87,8 +66,9 @@ export function sessionView(view: SessionSnapshot) {
         step: 2,
         title: "Your vault is ready",
         hint: "You proved this layout can be beaten. Submit it to enter Drilly’s first dungeon.",
-        status:
-          "Dungeon beaten. If you change it, beat it again before submitting.",
+        status: view.liveDrilly
+          ? "Dungeon beaten. If you change it, beat it again before submitting."
+          : "Connect Convex to challenge Drilly.",
         action: "Submit & raid",
       };
     case "preparing":
@@ -106,10 +86,7 @@ export function sessionView(view: SessionSnapshot) {
       return {
         step: 3,
         title: "Into Drilly’s vault",
-        hint:
-          view.liveDrilly && !view.round?.fixture
-            ? "Drilly built and cleared this room. Read the traps and find your own route."
-            : "Two saws guard the treasure. Leave time to land before your next jump.",
+        hint: "Drilly built and cleared this room. Read the traps and find your own route.",
         status: finished
           ? `Raid failed. ${view.round?.human.length ?? 0}/${RULES.raidAttempts} attempts used. Retry, or return to your draft.`
           : paused
@@ -129,37 +106,24 @@ export function sessionView(view: SessionSnapshot) {
       return {
         step: 3,
         title: "Raid finished",
-        hint: view.round?.fixture
-          ? "Development fixture · Watch the recorded attempts on your submitted vault."
-          : view.liveDrilly
-            ? "Drilly gets three tries at your dungeon, learning from each failure."
-            : "This was local practice. Live Drilly is not connected, so this raid has no round score.",
-        status: view.round?.fixture
-          ? "Your raid is complete. Drilly’s review comes next."
-          : view.liveDrilly
-            ? (view.aiError ??
-              (view.round?.drilly.length
-                ? "Drilly’s recordings are ready."
-                : "Drilly is reading your room, choosing jumps, and learning from its attempts. This may take up to 3 minutes."))
-            : "Return to your draft to revise.",
+        hint: "Drilly gets three tries at your dungeon.",
+        status:
+          view.aiError ??
+          (view.round?.drilly.length
+            ? "Drilly’s recordings are ready."
+            : "Drilly is attempting your room. This may take up to 3 minutes."),
         action: view.round?.drilly.length
           ? "Watch Drilly"
-          : view.round?.fixture
-            ? "Preparing Drilly…"
-            : view.liveDrilly
-              ? view.aiStatus === "error"
-                ? "Retry Drilly"
-                : "Drilly is thinking…"
-              : "Revise your dungeon",
+          : view.aiStatus === "error"
+            ? "Retry Drilly"
+            : "Drilly is thinking…",
       };
     case "ghost": {
       const index = view.flow.phase === "ghost" ? view.flow.index : 0;
       return {
         step: 4,
         title: "Drilly’s attempts",
-        hint: view.round?.fixture
-          ? "Development fixture · Recorded inputs on your submitted dungeon."
-          : "Actual AI attempts on your submitted dungeon. Watch where your design fooled Drilly.",
+        hint: "Actual AI attempts on your submitted dungeon.",
         status: `Attempt ${index + 1} of ${view.round?.drilly.length ?? 0}: ${finished ? (state.status === "won" ? "Cleared your vault" : state.status === "dead" ? "Died here" : "Time ran out here") : "Watching Drilly"}`,
         action: finished
           ? index + 1 < (view.round?.drilly.length ?? 0)
@@ -179,46 +143,9 @@ export function sessionView(view: SessionSnapshot) {
             : view.result?.outcome === "draw"
               ? "A draw"
               : "Drilly wins",
-        hint: view.round?.fixture
-          ? "Development fixture · Revise your vault and try another round."
-          : "Revise your vault using what you learned from Drilly’s attempts.",
-        status: `${view.result?.total ?? 0}/6 medals · Best ${view.best ?? 0}/6`,
+        hint: "Revise your vault using what you learned from Drilly’s attempts.",
+        status: `${view.result?.total ?? 0}/6 medals`,
         action: "Revise your dungeon",
-      };
-    case "proof":
-      return {
-        step: 4,
-        title: "Drilly’s own clear",
-        hint: "The winning run recorded before this room was offered to you. Watching it uses no attempts and changes no medals.",
-        status: finished
-          ? "Room proof complete."
-          : "Watching Drilly’s build test.",
-        action: finished
-          ? "Return to round"
-          : paused
-            ? "Play proof"
-            : "Playing proof",
-      };
-    case "replay":
-      return {
-        step:
-          replayActivity === "lab"
-            ? -1
-            : replayActivity === "prison"
-              ? 0
-              : replayActivity === "testing"
-                ? 2
-                : 3,
-        title: "Review an attempt",
-        hint: "Developer replay. Playback does not advance the prison, clear your draft, or complete a raid.",
-        status: finished
-          ? "Replay ended. Return to a fresh human attempt."
-          : "Watching the recorded inputs.",
-        action: finished
-          ? "Return to attempt"
-          : paused
-            ? "Play replay"
-            : "Playing replay",
       };
   }
 }

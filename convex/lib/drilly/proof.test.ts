@@ -1,12 +1,13 @@
+import { getExampleRoom } from "../../../shared/testing/rooms";
 import { it, expect } from "vitest";
-import { getDungeon, newPlayerDungeon } from "../../shared/game/campaign";
-import { replayAttempt } from "../../shared/game/replay";
+import { newPlayerDungeon } from "../../../shared/game/rooms";
+import { replayAttempt } from "../../../shared/game/replay";
 import { practiceRoom } from "./proof";
 import { playAttempt } from "./attempt";
-import { directStrategy } from "./testing";
+import { directStrategy } from "../../../shared/testing/planner";
 
 it("proves the room using the exact raid controller, not a separate perfect solver", async () => {
-  const level = getDungeon("first-vault");
+  const level = getExampleRoom();
   const strategy = directStrategy(level);
   const proof = await practiceRoom(level, strategy);
   const raid = await playAttempt(level, async () => strategy, []);

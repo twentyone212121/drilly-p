@@ -39,12 +39,7 @@ async function boundedRequest<T>(
 
 export function createDrillySource(client: ConvexReactClient): DrillySource {
   return {
-    build: (context) =>
-      boundedRequest(
-        client.action(api.drilly.build, {
-          context,
-        }),
-      ),
+    build: () => boundedRequest(client.action(api.drilly.build, {})),
     raid: (level) =>
       boundedRequest(
         client.action(api.drilly.raid, { level }),

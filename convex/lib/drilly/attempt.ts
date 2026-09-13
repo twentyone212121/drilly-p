@@ -1,9 +1,9 @@
-import { initialState, step } from "../../shared/game/simulation";
-import { RULES } from "../../shared/game/rules";
-import { parseDrillyStrategy } from "../../shared/validation";
-import type { Level, GameEvent, State } from "../../shared/game/types";
-import type { RaidAttempt } from "../../shared/game/round";
-import type { DrillyStrategy } from "../../shared/game/drilly";
+import { initialState, step } from "../../../shared/game/simulation";
+import { RULES } from "../../../shared/game/rules";
+import { parseDrillyStrategy } from "../../../shared/validation";
+import type { Level, GameEvent, State } from "../../../shared/game/types";
+import type { RaidAttempt } from "../../../shared/game/round";
+import type { DrillyStrategy } from "../../../shared/game/drilly";
 import { strategySchema, type Planner } from "./protocol";
 import { observeRoom } from "./observation";
 import { advanceWaypoint, planMovement } from "./movement";

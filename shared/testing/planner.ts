@@ -1,6 +1,6 @@
-import { getDungeon } from "../../shared/game/campaign";
-import type { Level } from "../../shared/game/types";
-import type { DrillyStrategy } from "../../shared/game/drilly";
+import { getExampleRoom } from "./rooms";
+import type { Level } from "../game/types";
+import type { DrillyStrategy } from "../game/drilly";
 
 export function directStrategy(level: Level): DrillyStrategy {
   return {
@@ -12,7 +12,7 @@ export function directStrategy(level: Level): DrillyStrategy {
   };
 }
 
-export const testStrategy = directStrategy(getDungeon("first-vault"));
+export const testStrategy = directStrategy(getExampleRoom());
 export function roomEdit(
   level: Level,
   base: "working" | "checkpoint" = "working",
@@ -37,7 +37,7 @@ export const buildPlan = async (_instructions: string, data: unknown) => {
   const input = data as { observation?: unknown; checkpoint?: unknown };
   if (input.observation) return directStrategy((data as { room: Level }).room);
   return {
-    ...roomEdit(getDungeon("first-vault")),
+    ...roomEdit(getExampleRoom()),
     action: input.checkpoint ? "finish" : "edit",
   };
 };

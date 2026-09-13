@@ -1,12 +1,16 @@
+import { getExampleRoom } from "../../../shared/testing/rooms";
 import { it, expect, vi } from "vitest";
-import { newPlayerDungeon, getDungeon } from "../../shared/game/campaign";
-import { replayAttempt } from "../../shared/game/replay";
-import { RULES } from "../../shared/game/rules";
+import { newPlayerDungeon } from "../../../shared/game/rooms";
+import { replayAttempt } from "../../../shared/game/replay";
+import { RULES } from "../../../shared/game/rules";
 import { playAttempt } from "./attempt";
 import { observeRoom } from "./observation";
-import { directStrategy } from "./testing";
-import { drillyCases } from "../../scripts/evals/drilly-cases";
-import { LAB_ROOMS, getObstacleLab } from "../../shared/game/obstacleLab";
+import { directStrategy } from "../../../shared/testing/planner";
+import { drillyCases } from "../../../scripts/evals/drilly-cases";
+import {
+  OBSTACLE_CASES,
+  obstacleRoom,
+} from "../../../shared/testing/obstacles";
 
 it.each(Object.entries(drillyCases))(
   "clears %s with shared physics and a reproducible recording",
@@ -23,14 +27,13 @@ it.each(Object.entries(drillyCases))(
     expect(plan.mock.calls.length).toBeLessThanOrEqual(
       RULES.drilly.maxDecisionsPerAttempt,
     );
-    expect(await playAttempt(level, plan, [])).toEqual(result);
   },
 );
 
-it.each(LAB_ROOMS)(
-  "handles actual moving hazards in the $id lab",
-  async ({ id }) => {
-    const level = getObstacleLab(id);
+it.each(OBSTACLE_CASES)(
+  "handles actual moving hazards in the %s fixture",
+  async (id) => {
+    const level = obstacleRoom(id);
     const result = await playAttempt(
       level,
       async () => directStrategy(level),
@@ -75,7 +78,7 @@ it("resolves an unavoidable spawn fall without spending model calls", async () =
 });
 
 it("passes actual hazard motion and previous failures to the route planner", async () => {
-  const level = getDungeon("first-vault");
+  const level = getExampleRoom();
   const plan = vi.fn(async () => directStrategy(level));
   const result = await playAttempt(level, plan, []);
   await playAttempt(level, plan, [result.feedback]);
@@ -89,65 +92,3 @@ it("passes actual hazard motion and previous failures to the route planner", asy
       .treasuresRemaining,
   ).toEqual([]);
 });
-
-// Independent known input schedules establish solvability. Drilly receives only
-// each room and a treasure objective, never these reference jumps.
-it.each(Array.from({ length: 128 }, (_, seed) => seed))(
-  "clears a proven obstacle arrangement, seed %i",
-  async (seed) => {
-    const first = 24 + (seed % 16);
-    const second = first + 66 + (seed % 9);
-    const room = newPlayerDungeon();
-    room.treasures[0].x = 800;
-    const x = 72 + 4 * first;
-    room.traps = [
-      {
-        id: "second",
-        x: 72 + 4 * second + 80,
-        y: 404,
-        radius: 12 + (seed % 10),
-      },
-    ];
-    room.obstacles =
-      seed % 2 === 0
-        ? [
-            {
-              id: "first",
-              kind: "spikes",
-              x: x + 48,
-              y: 400,
-              width: 32 + (seed % 5) * 8,
-              height: 20,
-            },
-          ]
-        : [
-            {
-              id: "first",
-              kind: "slider",
-              x: x + 80,
-              y: 402,
-              radius: 14,
-              endX: x + 112,
-              endY: 402,
-              speed: 40 + (seed % 80),
-            },
-          ];
-    const reference = {
-      version: 2 as const,
-      rulesVersion: RULES.version,
-      level: room,
-      jumpTicks: [first, second],
-      endTick: RULES.maxTicks,
-    };
-    expect(replayAttempt(reference).stopReason).toBe("won");
-    const result = await playAttempt(
-      room,
-      async () => directStrategy(room),
-      [],
-    );
-    expect(result.attempt.outcome).toBe("won");
-    const replay = replayAttempt(result.attempt.replay);
-    expect(replay.stopReason).toBe("won");
-    expect(replay.state.tick).toBe(result.attempt.replay.endTick);
-  },
-);

@@ -1,4 +1,4 @@
-import { RULES } from "../../shared/game/rules";
+import { RULES } from "../../../shared/game/rules";
 
 export type PlannerOptions = {
   schema?: Record<string, unknown>;

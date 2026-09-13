@@ -1,8 +1,4 @@
-import {
-  HAZARD_KINDS,
-  type BuildContext,
-  type BuildBudget,
-} from "./game/drilly";
+import type { BuildBudget } from "./game/drilly";
 import { obstacleBounds } from "./game/obstacles";
 import { segmentRect, sweptCircle } from "./game/sweep";
 import * as v from "valibot";
@@ -425,53 +421,6 @@ export function parseDrillyAttempts(value: unknown, level: Level) {
   )
     throw new Error("Drilly has not finished its attempts.");
   return attempts;
-}
-
-export function parseBuildContext(value: unknown): BuildContext {
-  const count = v.pipe(
-    v.number(),
-    v.integer(),
-    v.minValue(0),
-    v.maxValue(RULES.maxTicks * RULES.raidAttempts),
-  );
-  return v.parse(
-    v.object({
-      recentRaids: v.pipe(
-        v.array(
-          v.object({
-            level: LevelSchema,
-            attempts: v.pipe(
-              v.number(),
-              v.integer(),
-              v.minValue(1),
-              v.maxValue(RULES.raidAttempts),
-            ),
-            cleared: v.boolean(),
-            ignoredJumps: count,
-            wallJumps: count,
-            deaths: v.pipe(
-              v.array(
-                v.object({
-                  kind: v.picklist(HAZARD_KINDS),
-                  tick: TickLimitSchema,
-                  // An out-of-bounds death can legitimately be outside the room.
-                  x: v.pipe(v.number(), v.finite()),
-                  y: v.pipe(v.number(), v.finite()),
-                }),
-              ),
-              v.maxLength(RULES.raidAttempts),
-            ),
-          }),
-        ),
-        v.maxLength(RULES.drilly.recentRaidLimit),
-      ),
-      recentRooms: v.optional(
-        v.pipe(v.array(LevelSchema), v.maxLength(RULES.drilly.recentRoomLimit)),
-        [],
-      ),
-    }),
-    value,
-  );
 }
 
 export function parseDrillyStrategy(value: unknown, level: Level) {

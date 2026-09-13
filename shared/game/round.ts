@@ -11,11 +11,7 @@ export function attackMedals(attempts: RaidAttempt[]) {
   return firstClear < 0 ? 0 : Math.max(0, RULES.raidAttempts - firstClear);
 }
 
-export function scoreRound(
-  human: RaidAttempt[],
-  drilly: RaidAttempt[],
-  previousBest: number | null,
-) {
+export function scoreRound(human: RaidAttempt[], drilly: RaidAttempt[]) {
   const attack = attackMedals(human);
   const defense = RULES.raidAttempts - attackMedals(drilly);
   const total = attack + defense;
@@ -24,7 +20,5 @@ export function scoreRound(
     defense,
     total,
     outcome: total >= 4 ? "win" : total === 3 ? "draw" : "loss",
-    best: Math.max(previousBest ?? 0, total),
-    improved: previousBest === null || total > previousBest,
   };
 }

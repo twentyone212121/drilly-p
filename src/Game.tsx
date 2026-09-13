@@ -3,17 +3,10 @@ import { useConvex, useConvexAuth } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import App from "./App";
 import { createDrillySource } from "./ai/drillySource";
-import { createLocalDrillySource } from "./ai/localDrillySource";
 import { createSession } from "./game/session";
 
 export function LocalGame() {
-  const [session] = useState(() =>
-    createSession({
-      drilly: import.meta.env.VITE_LOCAL_DRILLY
-        ? createLocalDrillySource()
-        : undefined,
-    }),
-  );
+  const [session] = useState(() => createSession());
   return <App session={session} />;
 }
 

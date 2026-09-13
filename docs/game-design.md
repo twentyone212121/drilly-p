@@ -47,6 +47,9 @@ Full-screen Arcade presentation: existing computer art, chunky controls, compact
 editor tools, minimal HUD, and in-game overlays. Keep the five-step path visible;
 highlight the current step, check completed steps, and name the next action.
 
+Keep all existing hazards available in the editor as presets. Remove their settings
+forms; placing and moving hazards should not require configuring numbers.
+
 Use functional copy only. No slogans, taunts, decorative labels, or developer panels.
 Respond immediately to input; avoid scene rebuilds, expensive full-screen effects,
 idle rendering, and artificial waits. Mockup motion never becomes game logic.
@@ -70,8 +73,8 @@ keep useful headless tests. Add no new hazards or AI framework.
 3. Compare direct model inputs on representative rooms before replacing it.
 
 Keep each step playable and verify simulation, replays, UI, and live integration.
-Starter layout, advanced trap controls, difficulty, and acceptable AI latency remain
-open to playtesting.
+Starter layout, preset tuning, difficulty, and acceptable AI latency remain open
+to playtesting. Follow the [cleanup plan](cleanup-plan.md) for implementation.
 
 Engineering: [AGENTS.md](../AGENTS.md). Current setup and architecture:
 [README](../README.md), [backend notes](../convex/README.md).

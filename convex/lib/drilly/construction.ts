@@ -1,9 +1,9 @@
-import { newPlayerDungeon } from "../../shared/game/campaign";
-import { roomSideWalls } from "../../shared/game/roomBoundary";
-import { RULES } from "../../shared/game/rules";
-import type { Level } from "../../shared/game/types";
-import type { BuildBudget } from "../../shared/game/drilly";
-import { parseDrillyBuild, parseDrillyEdit } from "../../shared/validation";
+import { newPlayerDungeon } from "../../../shared/game/rooms";
+import { roomSideWalls } from "../../../shared/game/roomBoundary";
+import { RULES } from "../../../shared/game/rules";
+import type { Level } from "../../../shared/game/types";
+import type { BuildBudget } from "../../../shared/game/drilly";
+import { parseDrillyBuild, parseDrillyEdit } from "../../../shared/validation";
 
 export function emptyWorkspace(): Level {
   const room = newPlayerDungeon();

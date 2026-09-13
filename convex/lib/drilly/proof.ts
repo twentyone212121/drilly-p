@@ -1,25 +1,7 @@
-import { replayAttempt, runAttempt } from "../../shared/game/replay";
-import { RULES } from "../../shared/game/rules";
-import type { Level } from "../../shared/game/types";
-import type { DrillyStrategy } from "../../shared/game/drilly";
+import { replayAttempt, runAttempt } from "../../../shared/game/replay";
+import type { Level } from "../../../shared/game/types";
+import type { DrillyStrategy } from "../../../shared/game/drilly";
 import { playAttempt } from "./attempt";
-
-// Timing variation is useful feedback, not another whole-room rejection rule.
-export function timingScore(level: Level, jumps: number[]) {
-  return [
-    -RULES.drilly.timingTolerance,
-    0,
-    RULES.drilly.timingTolerance,
-  ].filter(
-    (offset) =>
-      runAttempt(
-        level,
-        [...new Set(jumps.map((tick) => Math.max(0, tick + offset)))].filter(
-          (tick) => tick < RULES.maxTicks,
-        ),
-      ).stopReason === "won",
-  ).length;
-}
 
 export async function practiceRoom(level: Level, strategy: DrillyStrategy) {
   const result = await playAttempt(level, async () => strategy, [], strategy);
@@ -29,9 +11,6 @@ export async function practiceRoom(level: Level, strategy: DrillyStrategy) {
   return {
     replay: result.attempt.replay,
     cleared,
-    timingScore: cleared
-      ? timingScore(level, result.attempt.replay.jumpTicks)
-      : 0,
     meaningful: cleared && runAttempt(level, []).stopReason !== "won",
     feedback: result.feedback,
     landings: replay.events

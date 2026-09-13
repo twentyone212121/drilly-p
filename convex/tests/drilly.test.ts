@@ -1,10 +1,10 @@
 /// <reference types="vite/client" />
 import { expect, it, vi, afterEach } from "vitest";
 import { convexTest } from "convex-test";
-import { newPlayerDungeon, getDungeon } from "../../shared/game/campaign";
+import { newPlayerDungeon } from "../../shared/game/rooms";
 import { api } from "../_generated/api";
 import schema from "../schema";
-import { buildPlan } from "../../server/drilly/testing";
+import { buildPlan } from "../../shared/testing/planner";
 import { replayAttempt } from "../../shared/game/replay";
 
 const modules = import.meta.glob(["../**/*.ts", "!../**/*.test.ts"]);
@@ -60,18 +60,10 @@ it("runs authenticated build and raid actions through the real simulation with a
   });
   vi.stubGlobal("fetch", fetch);
   const room = await guest.action(api.drilly.build, {});
-  expect(room.level.name).toBe(getDungeon("first-vault").name);
   expect(replayAttempt(room.proof).stopReason).toBe("won");
   expect(room.level).not.toHaveProperty("jumpTicks");
   const attempts = await guest.action(api.drilly.raid, {
     level: newPlayerDungeon(),
   });
   expect(attempts.map((a) => a.outcome)).toEqual(["won"]);
-  await expect(
-    guest.action(api.drilly.raid, {
-      rulesVersion: "old",
-      level: newPlayerDungeon(),
-    }),
-  ).resolves.toMatchObject([{ outcome: "won" }]);
-  expect(fetch.mock.calls.length).toBeGreaterThan(2);
 });

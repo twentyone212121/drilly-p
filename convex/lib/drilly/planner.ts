@@ -1,8 +1,8 @@
 import { playAttempt, type AttemptFeedback } from "./attempt";
 import { withDeadline } from "./deadline";
-import { RULES } from "../../shared/game/rules";
-import type { RaidAttempt } from "../../shared/game/round";
-import { parseLevel } from "../../shared/validation";
+import { RULES } from "../../../shared/game/rules";
+import type { RaidAttempt } from "../../../shared/game/round";
+import { parseLevel } from "../../../shared/validation";
 import type { Planner } from "./protocol";
 
 export type { Planner } from "./protocol";

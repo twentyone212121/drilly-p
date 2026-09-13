@@ -1,15 +1,14 @@
 import Phaser from "phaser";
 import type { Session } from "../session";
 import { GameScene } from "./GameScene";
-import type { AudioSettings, AudioStatus } from "./audio";
+import type { AudioSettings } from "./audio";
 
 export function createGame(
   parent: HTMLElement,
   session: Session,
   settings: AudioSettings,
-  reportAudio: (status: AudioStatus) => void,
 ) {
-  const scene = new GameScene(session, settings, reportAudio);
+  const scene = new GameScene(session, settings);
   const game = new Phaser.Game({
     type: Phaser.AUTO,
     parent,

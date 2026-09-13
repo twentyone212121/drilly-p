@@ -1,17 +1,15 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
-import { openAIPlanner } from "../server/drilly/provider";
+import { writeFileSync } from "node:fs";
+import { openAIPlanner } from "../convex/lib/drilly/provider";
 import {
   buildDungeon,
   playDungeon,
   type Planner,
-} from "../server/drilly/planner";
-import type { BuildContext } from "../shared/game/drilly";
+} from "../convex/lib/drilly/planner";
 import { RULES } from "../shared/game/rules";
 import { replayAttempt } from "../shared/game/replay";
 import { drillyCases } from "./evals/drilly-cases";
-import { parseBuildContext } from "../shared/validation";
-import type { BuildProgress } from "../server/drilly/build";
+import type { BuildProgress } from "../convex/lib/drilly/build";
 
 // Explicit opt-in: ordinary npm test never calls a paid provider.
 const args = process.argv.slice(2);
@@ -27,9 +25,6 @@ const option = (name: string) => {
     throw new Error(`Missing value for ${name}.`);
   return value;
 };
-const profile = option("--player-profile") ?? "new";
-if (!["new", "confident", "struggling"].includes(profile))
-  throw new Error("Unknown player profile.");
 const deployment = option("--deployment");
 function setting(name: string) {
   return deployment
@@ -58,44 +53,12 @@ function writeReport() {
         {
           model,
           controller: "route-controller-v3",
-          simulatedPlayerProfile: profile,
           reports,
         },
         null,
         2,
       ),
     );
-}
-const buildHistory: BuildContext = { recentRooms: [], recentRaids: [] };
-if (profile !== "new") {
-  buildHistory.recentRaids = Array.from(
-    { length: RULES.drilly.recentRaidLimit },
-    () => ({
-      level: drillyCases.saws,
-      attempts: profile === "confident" ? 1 : 3,
-      cleared: profile === "confident",
-      deaths:
-        profile === "confident"
-          ? []
-          : [{ kind: "saw" as const, tick: 40, x: 232, y: 392 }],
-      ignoredJumps: profile === "confident" ? 0 : 4,
-      wallJumps: 0,
-    }),
-  );
-}
-const historyReport = option("--history-report");
-if (historyReport) {
-  const previous = JSON.parse(readFileSync(historyReport, "utf8"));
-  buildHistory.recentRooms = parseBuildContext({
-    recentRaids: [],
-    recentRooms: previous.reports
-      .filter(
-        (entry: { passed?: boolean; room?: unknown }) =>
-          entry.passed && entry.room,
-      )
-      .map((entry: { room: unknown }) => entry.room)
-      .slice(-RULES.drilly.recentRoomLimit),
-  }).recentRooms;
 }
 for (const name of selected) {
   const calls: { input: unknown; output?: unknown; error?: string }[] = [];
@@ -124,15 +87,11 @@ for (const name of selected) {
   let summary: Record<string, unknown>;
   try {
     if (name === "build") {
-      const built = await buildDungeon(planner, buildHistory, (event) => {
+      const built = await buildDungeon(planner, (event) => {
         progress.push(event);
         writeReport();
       });
       const room = built.level;
-      buildHistory.recentRooms.push(room);
-      buildHistory.recentRooms = buildHistory.recentRooms.slice(
-        -RULES.drilly.recentRoomLimit,
-      );
       summary = {
         case: name,
         passed: replayAttempt(built.proof).stopReason === "won",

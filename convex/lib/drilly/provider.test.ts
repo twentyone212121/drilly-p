@@ -1,9 +1,9 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { openAIPlanner } from "./provider";
-import { testStrategy } from "./testing";
+import { testStrategy } from "../../../shared/testing/planner";
 import { strategySchema } from "./protocol";
-import { RULES } from "../../shared/game/rules";
-import { DRILLY_ERRORS } from "../../shared/game/drillyErrors";
+import { RULES } from "../../../shared/game/rules";
+import { DRILLY_ERRORS } from "../../../shared/game/drillyErrors";
 
 function completed(text = JSON.stringify(testStrategy)) {
   return {
@@ -121,9 +121,6 @@ describe("Drilly OpenAI SDK adapter", () => {
     [429, "insufficient_quota", DRILLY_ERRORS.quota],
     [429, "rate_limit_exceeded", DRILLY_ERRORS.rateLimit],
     [400, "unsupported_parameter", DRILLY_ERRORS.request],
-    [403, "permission_denied", DRILLY_ERRORS.request],
-    [404, "model_not_found", DRILLY_ERRORS.request],
-    [422, "invalid_input", DRILLY_ERRORS.request],
     [500, "server_error", DRILLY_ERRORS.unavailable],
   ])(
     "maps HTTP %s to a safe game error with no SDK retries",

@@ -1,7 +1,7 @@
-import { step } from "../../shared/game/simulation";
-import { RULES } from "../../shared/game/rules";
-import type { Level, State } from "../../shared/game/types";
-import type { DrillyRoute } from "../../shared/game/drilly";
+import { step } from "../../../shared/game/simulation";
+import { RULES } from "../../../shared/game/rules";
+import type { Level, State } from "../../../shared/game/types";
+import type { DrillyRoute } from "../../../shared/game/drilly";
 
 type Branch = { state: State; jumps: number[]; waypoint: number };
 

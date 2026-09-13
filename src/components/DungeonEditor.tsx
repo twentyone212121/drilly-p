@@ -1,5 +1,4 @@
 import type { ObstacleKind } from "../../shared/game/obstacleTypes";
-import { ObstacleInspector } from "./ObstacleInspector";
 import { ObstacleShape, ObstacleGuides } from "./ObstacleShape";
 import { useRef, useState, type PointerEvent } from "react";
 import { RULES } from "../../shared/game/rules";
@@ -43,7 +42,13 @@ const TOOLS: { tool: Tool; label: string; obstacleKind?: ObstacleKind }[] = [
   { tool: "obstacle", obstacleKind: "pursuer", label: "+ Pursuer" },
 ];
 
-export function DungeonEditor({ session, level }: { session: Session; level: Level }) {
+export function DungeonEditor({
+  session,
+  level,
+}: {
+  session: Session;
+  level: Level;
+}) {
   const [obstacleKind, setObstacleKind] = useState<ObstacleKind>("spikes");
   const [tool, setTool] = useState<Tool>("select");
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -170,11 +175,17 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
 
   return (
     <div className="dungeon-editor">
-      <div className="editor-toolbar" role="toolbar" aria-label="Dungeon objects">
+      <div
+        className="editor-toolbar"
+        role="toolbar"
+        aria-label="Dungeon objects"
+      >
         {TOOLS.map(({ tool: next, label, obstacleKind: variant }) => (
           <button
             key={label}
-            aria-pressed={tool === next && (!variant || obstacleKind === variant)}
+            aria-pressed={
+              tool === next && (!variant || obstacleKind === variant)
+            }
             onClick={() => {
               if (variant) setObstacleKind(variant);
               chooseTool(next);
@@ -186,7 +197,9 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
         <button disabled={!selected} onClick={deleteSelected}>
           Delete selected
         </button>
-        <span className="hint">{RULES.editor.gridSize} px grid · room & spawn fixed</span>
+        <span className="hint">
+          {RULES.editor.gridSize} px grid · room & spawn fixed
+        </span>
       </div>
       <svg
         className={"editor-canvas tool-" + tool}
@@ -250,8 +263,17 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
           height={level.height}
           preserveAspectRatio="none"
         />
-        <rect width={level.width} height={level.height} fill="#07111e" opacity="0.35" />
-        <rect width={level.width} height={level.height} fill="url(#editor-grid)" />
+        <rect
+          width={level.width}
+          height={level.height}
+          fill="#07111e"
+          opacity="0.35"
+        />
+        <rect
+          width={level.width}
+          height={level.height}
+          fill="url(#editor-grid)"
+        />
         {objects.map((object) => (
           <ObjectShape key={object.value.id} object={object} />
         ))}
@@ -269,8 +291,12 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
         {selected?.kind === "obstacle" && (
           <ObstacleGuides obstacle={selected.value} level={level} />
         )}
-        {preview?.kind === "obstacle" && <ObstacleGuides obstacle={preview.value} level={level} />}
-        {selected && <ObjectOutline object={selected} resize={tool === "select"} />}
+        {preview?.kind === "obstacle" && (
+          <ObstacleGuides obstacle={preview.value} level={level} />
+        )}
+        {selected && (
+          <ObjectOutline object={selected} resize={tool === "select"} />
+        )}
         {preview && (
           <g opacity="0.65" pointerEvents="none">
             <ObjectShape object={preview} />
@@ -278,53 +304,12 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
           </g>
         )}
       </svg>
-      <div className="editor-inspector">
-        <label>
-          Selected object
-          <select
-            value={selected?.value.id ?? ""}
-            onChange={(event) => {
-              const object = objects.find((item) => item.value.id === event.target.value);
-              setSelection(object ? { kind: object.kind, id: object.value.id } : null);
-              chooseTool("select");
-            }}
-          >
-            <option value="">None</option>
-            {objects.map((object) => (
-              <option key={object.value.id} value={object.value.id}>
-                {object.kind === "obstacle" ? object.value.kind : object.kind} · {object.value.id}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className="hint">
-          {selected
-            ? `${selected.value.id} · x ${selected.value.x}, y ${selected.value.y}`
-            : "Click an object to select it."}
-          {selected?.kind === "platform" &&
-            ` · ${selected.value.width} × ${selected.value.height} · drag the corner to resize`}
-        </p>
-        <p className="hint object-counts">
-          Platforms {level.platforms.length}/{RULES.editor.maxPlatforms} · Saws {level.traps.length}
-          /{RULES.editor.maxSaws} · Obstacles {(level.obstacles ?? []).length}/
-          {RULES.obstacles.maxCount} · Treasures {level.treasures.length}/
-          {RULES.editor.maxTreasures}
-        </p>
-      </div>
-      {selected?.kind === "obstacle" && (
-        <ObstacleInspector
-          key={JSON.stringify(selected.value)}
-          obstacle={selected.value}
-          onApply={(value) => {
-            const object: EditorObject = { kind: "obstacle", value };
-            const error = placementError(level, object);
-            if (error) return error;
-            commit(object);
-            return null;
-          }}
-        />
-      )}
-      <p className={error || message ? "editor-feedback invalid" : "editor-feedback"} role="status">
+      <p
+        className={
+          error || message ? "editor-feedback invalid" : "editor-feedback"
+        }
+        role="status"
+      >
         {error ??
           (message ||
             (tool === "select"
@@ -353,7 +338,8 @@ function AtlasFrame({
   width: number;
   height: number;
 }) {
-  const size = atlas === "characters/esc" ? escAtlas.meta.size : propsAtlas.meta.size;
+  const size =
+    atlas === "characters/esc" ? escAtlas.meta.size : propsAtlas.meta.size;
 
   return (
     <svg
@@ -373,13 +359,18 @@ function AtlasFrame({
 }
 
 function ObjectShape({ object }: { object: EditorObject }) {
-  if (object.kind === "obstacle") return <ObstacleShape obstacle={object.value} />;
+  if (object.kind === "obstacle")
+    return <ObstacleShape obstacle={object.value} />;
   const bounds = objectBounds(object);
   if (object.kind === "platform") {
     return (
       <g pointerEvents="none" aria-hidden="true">
         {platformPanels(bounds).map(({ color, ...rect }, index) => (
-          <rect key={index} {...rect} fill={`#${color.toString(16).padStart(6, "0")}`} />
+          <rect
+            key={index}
+            {...rect}
+            fill={`#${color.toString(16).padStart(6, "0")}`}
+          />
         ))}
       </g>
     );
@@ -408,7 +399,13 @@ function ObjectOutline({
   const color = invalid ? "#ff568e" : "#50dcf3";
   return (
     <g pointerEvents="none">
-      <rect {...bounds} fill="none" stroke={color} strokeWidth="2" strokeDasharray="6 3" />
+      <rect
+        {...bounds}
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeDasharray="6 3"
+      />
       {resize && object.kind === "platform" && (
         <rect
           x={bounds.x + bounds.width - 6}

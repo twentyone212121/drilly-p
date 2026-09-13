@@ -3,17 +3,13 @@ import Phaser from "phaser";
 import type { Level } from "../../../shared/game/types";
 import type { Session } from "../session";
 import { AUDIO } from "./assets";
-import { createAudio, type AudioSettings, type AudioStatus } from "./audio";
+import { createAudio, type AudioSettings } from "./audio";
 import { createRoomArt } from "./roomArt";
-import { drawAmbience } from "./ambience";
 
 export class GameScene extends Phaser.Scene {
   private roomArt?: ReturnType<typeof createRoomArt>;
   private background!: Phaser.GameObjects.Image;
-  private ambience!: Phaser.GameObjects.Graphics;
-  private ambientSeconds = 0;
   private audio?: ReturnType<typeof createAudio>;
-  private label?: Phaser.GameObjects.Text;
   private lastTick = 0;
   private wasPaused = true;
   private levelRevision = -1;
@@ -22,7 +18,6 @@ export class GameScene extends Phaser.Scene {
   constructor(
     private session: Session,
     private settings: AudioSettings,
-    private reportAudio: (status: AudioStatus) => void,
   ) {
     super("room");
     this.level = session.level;
@@ -57,8 +52,7 @@ export class GameScene extends Phaser.Scene {
 
   create() {
     this.background = this.add.image(0, 0, "computer-interior").setOrigin(0);
-    this.ambience = this.add.graphics();
-    this.audio = createAudio(this, this.settings, this.reportAudio);
+    this.audio = createAudio(this, this.settings);
     this.connectAudio();
     this.input.on("pointerdown", () => this.session.primaryAction());
   }
@@ -66,17 +60,9 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     this.session.update(delta);
     this.syncLevel();
-    if (!this.session.getSnapshot().paused)
-      this.ambientSeconds += Math.min(delta, 100) / 1000;
-    drawAmbience(
-      this.ambience,
-      this.level.width,
-      this.level.height,
-      this.ambientSeconds,
-    );
     this.roomArt?.update(
       this.session.frameState(),
-      ["ghost", "proof"].includes(this.session.getSnapshot().phase),
+      this.session.getSnapshot().phase === "ghost",
       delta,
     );
   }
@@ -93,16 +79,8 @@ export class GameScene extends Phaser.Scene {
     this.levelRevision = this.session.levelRevision;
     this.scale.resize(this.level.width, this.level.height);
     this.background.setDisplaySize(this.level.width, this.level.height);
-    this.ambientSeconds = 0;
     this.roomArt?.destroy();
     this.roomArt = createRoomArt(this, this.level);
-
-    this.label?.destroy();
-    this.label = this.add.text(56, 52, this.level.name.toUpperCase(), {
-      fontFamily: "monospace",
-      fontSize: "12px",
-      color: "#7d929e",
-    });
   }
 
   private stopAudioOnTransition() {

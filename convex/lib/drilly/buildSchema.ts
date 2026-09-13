@@ -1,6 +1,6 @@
-import type { BuildBudget } from "../../shared/game/drilly";
+import type { BuildBudget } from "../../../shared/game/drilly";
 import { strategySchema } from "./protocol";
-import { RULES } from "../../shared/game/rules";
+import { RULES } from "../../../shared/game/rules";
 
 // Provider wire format only. Shared validation still owns gameplay correctness.
 function object(properties: Record<string, unknown>) {

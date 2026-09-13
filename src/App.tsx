@@ -1,27 +1,16 @@
-import { LAB_ROOMS, type LabRoomId } from "../shared/game/obstacleLab";
 import { useState, useSyncExternalStore } from "react";
-import { DUNGEONS } from "../shared/game/campaign";
 import type { Session } from "./game/session";
 import { sessionView } from "./game/sessionView";
 import { GameControls } from "./components/GameControls";
 import { GameView } from "./components/GameView";
-import { DebugPanel } from "./components/DebugPanel";
 import { DungeonEditor } from "./components/DungeonEditor";
-import type { AudioSettings, AudioStatus } from "./game/phaser/audio";
+import type { AudioSettings } from "./game/phaser/audio";
 
 export default function App({ session }: { session: Session }) {
   const view = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const [audio, setAudio] = useState<AudioSettings>({
     muted: false,
     volume: 0.6,
-  });
-  const [audioStatus, setAudioStatus] = useState<AudioStatus>({
-    ...audio,
-    ready: false,
-    unlocked: false,
-    played: 0,
-    last: "none",
-    missing: [],
   });
   const copy = sessionView(view);
   const building = view.phase === "building";
@@ -34,8 +23,6 @@ export default function App({ session }: { session: Session }) {
           DRILLY <b>P</b>
           <span className="wordmark-dot" />
         </span>
-        <span className="header-note">ONE SMALL KEY. A WHOLE SYSTEM.</span>
-        <small>{view.liveDrilly ? "LIVE AI" : "LOCAL PRACTICE"}</small>
       </header>
       <ol className="flow-steps" aria-label="Game progress">
         {["Escape", "Build", "Clear", "Raid", "Watch", "Results"].map(
@@ -65,66 +52,6 @@ export default function App({ session }: { session: Session }) {
         </div>
         <p>{copy.hint}</p>
       </section>
-      {import.meta.env.DEV &&
-        (view.phase === "prison" || view.phase === "escaped") && (
-          <button onClick={() => session.skipTutorial()}>Skip tutorial</button>
-        )}
-      {(view.phase === "prison" || view.phase === "escaped" || building) && (
-        <div className="lab-entry">
-          <button onClick={() => session.openLab()}>
-            Try the obstacle lab
-          </button>
-          <p className="hint">
-            Practice every trap. Your own dungeon stays untouched.
-          </p>
-        </div>
-      )}
-      {view.inLab && (
-        <section className="lab-controls" aria-label="Obstacle lab">
-          <label>
-            Practice room{" "}
-            <select
-              value={view.labRoom}
-              onChange={(e) => session.openLab(e.target.value as LabRoomId)}
-            >
-              {LAB_ROOMS.map((room) => (
-                <option key={room.id} value={room.id}>
-                  {room.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button onClick={() => session.exitLab()}>Leave obstacle lab</button>
-          <span className="hint">No medals · unlimited retries</span>
-        </section>
-      )}
-      {building && (
-        <ol className="dungeon-list" aria-label="Opponent dungeons">
-          {DUNGEONS.map((dungeon, index) => (
-            <li key={dungeon.id} aria-disabled={!dungeon.available}>
-              <span>
-                0{index + 1} / {dungeon.name}
-              </span>
-              <small>
-                {dungeon.available
-                  ? "CURRENT OPPONENT"
-                  : "COMING LATER · UNAVAILABLE"}
-              </small>
-            </li>
-          ))}
-        </ol>
-      )}
-      {!view.liveDrilly &&
-        !view.developmentFixture &&
-        (building || view.phase === "cleared") && (
-          <p role="status">
-            Local practice · Live Drilly is not connected. You can test and
-            raid, but scored rivalry is unavailable.
-          </p>
-        )}
-      {view.round?.fixture && (
-        <p role="status">Development fixture · Scripted Drilly, not live AI</p>
-      )}
       {view.phase === "results" && view.result && view.round && (
         <section className="round-results" aria-label="Round results">
           <p>
@@ -134,10 +61,6 @@ export default function App({ session }: { session: Session }) {
           </p>
           <p>
             Attack: {view.result.attack}/3 · Defense: {view.result.defense}/3
-          </p>
-          <p>
-            {view.result.improved ? "New best" : "Best unchanged"}:{" "}
-            {view.result.best}/6
           </p>
           <p>
             Your attempts:{" "}
@@ -159,8 +82,7 @@ export default function App({ session }: { session: Session }) {
       <div
         className={building ? "flow-controls build-actions" : "flow-controls"}
       >
-        {(view.phase === "preparing" ||
-          (view.phase === "raid-complete" && view.liveDrilly)) && (
+        {(view.phase === "preparing" || view.phase === "raid-complete") && (
           <button onClick={() => session.editDungeon()}>
             Return to your draft
           </button>
@@ -186,13 +108,14 @@ export default function App({ session }: { session: Session }) {
                 ? "The previous AI request is finishing. You can keep editing."
                 : !view.editorLevel.treasures.length
                   ? "Add a treasure before testing."
-                  : view.canSubmit
-                    ? "Dungeon beaten. Ready to submit."
-                    : "Beat your dungeon to unlock submission."}
+                  : !view.liveDrilly
+                    ? "Connect Convex to challenge Drilly."
+                    : view.canSubmit
+                      ? "Dungeon beaten. Ready to submit."
+                      : "Beat your dungeon to unlock submission."}
             </p>
           </>
-        ) : !view.inLab &&
-          view.prisonEscaped &&
+        ) : view.prisonEscaped &&
           view.phase !== "escaped" &&
           view.phase !== "raid-complete" &&
           view.phase !== "results" ? (
@@ -219,7 +142,7 @@ export default function App({ session }: { session: Session }) {
         {building ? (
           <DungeonEditor session={session} level={view.editorLevel} />
         ) : (
-          <GameView session={session} audio={audio} onAudio={setAudioStatus} />
+          <GameView session={session} audio={audio} />
         )}
         <div className="room-footer">
           <span
@@ -262,11 +185,6 @@ export default function App({ session }: { session: Session }) {
         Your layout and progress stay in this tab. Reloading starts a fresh
         game.
       </p>
-      {!building && <DebugPanel session={session} audio={audioStatus} />}
-      <footer>
-        <span>DRILLY = YOUR AI RIVAL · P = YOU</span>
-        <span>Prison + first dungeon · Local play</span>
-      </footer>
     </main>
   );
 }

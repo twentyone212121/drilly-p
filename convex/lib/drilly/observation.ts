@@ -1,6 +1,6 @@
-import { flameBounds } from "../../shared/game/obstacles";
-import { RULES } from "../../shared/game/rules";
-import type { Level, State, Rect } from "../../shared/game/types";
+import { flameBounds } from "../../../shared/game/obstacles";
+import { RULES } from "../../../shared/game/rules";
+import type { Level, State, Rect } from "../../../shared/game/types";
 
 // Perception of present geometry only: no candidate rollouts or solution search.
 export function observeRoom(level: Level, state: State) {

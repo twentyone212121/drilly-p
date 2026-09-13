@@ -23,11 +23,10 @@ Use `npm run dev:fe` to start only Vite when Convex is already running.
 Frontend-only mode still connects to Convex when `VITE_CONVEX_URL` is configured.
 Restart Vite after changing its environment.
 
-Guest authentication is automatic. The header shows **LIVE AI** when the game is
-connected. Each reload starts a fresh game; no old draft or save version blocks
+Guest authentication is automatic. Each reload starts a fresh game; no old draft or save version blocks
 startup.
 
-1. Click **Skip tutorial** in development, or escape the prison normally.
+1. Escape the prison.
 2. Build your room, click **Test dungeon**, and collect every treasure.
 3. Click **Submit & raid** to enter Drilly’s generated room. Building can take up
    to three minutes; provider errors appear with a retry button.
@@ -36,11 +35,10 @@ startup.
 
 Space or tap starts/resumes play and jumps. Wall jumps reverse direction. Editing
 a cleared dungeon requires clearing the edited layout before submitting it.
-Layouts, medals and learning history remain in the current tab only.
+Layouts and the current round remain in the tab only.
 
-Without Convex, local AI is available by setting `OPENAI_API_KEY` in ignored
-`.env.local` and running `npm run dev:fe`. Without either AI connection, the game labels
-itself **LOCAL PRACTICE**.
+Convex is the only AI backend. Without its connection you can escape and edit/test
+your room, but cannot submit a challenge.
 
 ## Verification
 

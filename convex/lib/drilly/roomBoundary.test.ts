@@ -1,14 +1,13 @@
+import { getExampleRoom } from "../../../shared/testing/rooms";
 import { expect, it, vi } from "vitest";
-import { getDungeon } from "../../shared/game/campaign";
-import { runAttempt } from "../../shared/game/replay";
-import { RULES } from "../../shared/game/rules";
-import { parseDrillyBuild } from "../../shared/validation";
+import { runAttempt } from "../../../shared/game/replay";
+import { RULES } from "../../../shared/game/rules";
+import { parseDrillyBuild } from "../../../shared/validation";
 import { buildDungeon } from "./build";
-import { roomEdit } from "./testing";
-import { similarRooms } from "./variety";
+import { roomEdit } from "../../../shared/testing/planner";
 
 function openRoom() {
-  const room = getDungeon("first-vault");
+  const room = getExampleRoom();
   room.platforms = [
     { id: "floor", x: 0, y: 420, width: room.width, height: 24 },
   ];
@@ -27,7 +26,6 @@ it("adds full-height sides outside the interior budget without mutating or dupli
   ]);
   expect(original).toEqual(snapshot);
   expect(parseDrillyBuild({ level: room }, original, budget)).toEqual(room);
-  expect(similarRooms(original, room)).toBe(true);
 });
 
 it.each([-1, 1] as const)(

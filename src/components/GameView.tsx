@@ -1,16 +1,14 @@
 import { useEffect, useRef } from "react";
 import { createGame } from "../game/phaser/createGame";
-import type { AudioSettings, AudioStatus } from "../game/phaser/audio";
+import type { AudioSettings } from "../game/phaser/audio";
 import type { Session } from "../game/session";
 
 export function GameView({
   session,
   audio,
-  onAudio,
 }: {
   session: Session;
   audio: AudioSettings;
-  onAudio: (status: AudioStatus) => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const game = useRef<ReturnType<typeof createGame> | null>(null);
@@ -19,18 +17,14 @@ export function GameView({
   useEffect(() => {
     if (!host.current) return;
 
-    let active = true;
-    const instance = createGame(host.current, session, initialAudio.current, (status) => {
-      if (active) onAudio(status);
-    });
+    const instance = createGame(host.current, session, initialAudio.current);
     game.current = instance;
 
     return () => {
-      active = false;
       instance.destroy();
       game.current = null;
     };
-  }, [session, onAudio]);
+  }, [session]);
 
   useEffect(() => game.current?.setAudio(audio), [audio]);
 

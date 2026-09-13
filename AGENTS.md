@@ -24,6 +24,7 @@ The game is **Drilly P**: **Drilly** is the AI opponent, and **P** represents th
 - When the user is actively playtesting, hand off small UX checks to them instead
   of repeating browser automation unless requested.
 - Preserve unrelated local edits. Keep changes focused on the requested task.
+- Do not commit or push changes without explicit user approval.
 - Use npm and the committed lockfile. For code changes, run `npm test`,
   `npm run lint`, and `npm run build`; add focused tests for gameplay rules and
   replay determinism.

@@ -1,10 +1,10 @@
 import OpenAI from "openai";
 import type { Planner } from "./protocol";
-import { RULES } from "../../shared/game/rules";
+import { RULES } from "../../../shared/game/rules";
 import {
   DRILLY_ERRORS,
   drillyErrorMessage,
-} from "../../shared/game/drillyErrors";
+} from "../../../shared/game/drillyErrors";
 
 export function openAIPlanner(
   apiKey: string | undefined,

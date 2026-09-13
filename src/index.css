@@ -55,25 +55,16 @@ header {
 }
 
 small,
-.header-note,
 .eyebrow,
 .room-bar,
-.room-footer,
-footer {
+.room-footer {
   font-family: ui-monospace, monospace;
   font-size: 10px;
   letter-spacing: 0.08em;
 }
 
-small,
-.header-note {
+small {
   color: #8e9caa;
-}
-
-.header-note {
-  margin-left: auto;
-  margin-right: 22px;
-  font-size: 9px;
 }
 
 .intro {
@@ -224,8 +215,6 @@ button:disabled {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible,
-summary:focus-visible,
 .editor-canvas:focus-visible,
 .game-host:focus-visible {
   outline: 2px solid #f1c76c;
@@ -271,62 +260,10 @@ kbd {
   background: transparent;
 }
 
-.instructions {
-  display: flex;
-  gap: 28px;
-  padding-top: 22px;
-}
-
-.instructions p {
-  font-size: 11px;
-}
-
-.instructions span {
-  font-family: monospace;
-  color: #50dcf3;
-  margin-right: 7px;
-}
-
 .control-help {
   font-size: 11px;
   color: #8093a0;
   margin-top: 6px;
-}
-
-.debug-panel {
-  margin-top: 25px;
-  border: 1px solid #293843;
-  border-radius: 8px;
-  background: #131c25;
-}
-
-summary {
-  cursor: pointer;
-  padding: 15px 16px;
-  color: #c5d1d8;
-  font-size: 12px;
-}
-
-summary small {
-  float: right;
-  font-size: 9px;
-}
-
-.debug-content {
-  border-top: 1px solid #293843;
-  padding: 17px;
-}
-
-.debug-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 25px;
-}
-
-h3 {
-  font-size: 12px;
-  font-weight: 650;
-  margin: 18px 0 10px;
 }
 
 label {
@@ -334,55 +271,9 @@ label {
   color: #a9b5c2;
 }
 
-textarea,
-input[type="number"] {
-  display: block;
-  width: 100%;
-  margin-top: 5px;
-  background: #10171f;
-  border: 1px solid #3a4a59;
-  border-radius: 5px;
-  padding: 9px;
-  color: #dce6dc;
-  font:
-    11px/1.5 ui-monospace,
-    monospace;
-}
-
-textarea {
-  resize: vertical;
-}
-
-input[type="number"] {
-  width: 95px;
-}
-
-.field-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-
 .hint {
   color: #8b9daa;
   font-size: 11px;
-}
-
-pre {
-  max-height: 270px;
-  overflow: auto;
-  font:
-    10px/1.6 ui-monospace,
-    monospace;
-  padding: 12px;
-  margin-top: 8px;
-  background: #10171f;
-  border: 1px solid #253540;
-  border-radius: 5px;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 
 [role="alert"] {
@@ -390,18 +281,8 @@ pre {
   margin: 10px 0;
 }
 
-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  color: #718492;
-  margin-top: 24px;
-  font-size: 9px;
-}
-
 .flow-controls,
-.editor-toolbar,
-.editor-inspector {
+.editor-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -416,8 +297,7 @@ footer {
   margin-left: auto;
 }
 
-.editor-toolbar,
-.editor-inspector {
+.editor-toolbar {
   padding: 12px;
   background: #1b2530;
 }
@@ -452,26 +332,6 @@ footer {
   fill: #50dcf3;
 }
 
-.editor-inspector {
-  border-top: 1px solid #35434e;
-  gap: 14px;
-}
-
-.editor-inspector select {
-  display: block;
-  max-width: 230px;
-  margin-top: 5px;
-  padding: 6px;
-  color: #eee9de;
-  background: #10171f;
-  border: 1px solid #445362;
-  border-radius: 5px;
-}
-
-.object-counts {
-  margin-left: auto;
-}
-
 .editor-feedback {
   padding: 10px 12px;
   min-height: 40px;
@@ -504,41 +364,9 @@ footer {
   padding-bottom: 6px;
 }
 
-.dungeon-list {
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  padding: 0;
-  margin: 0 0 18px;
-}
-
-.dungeon-list li {
-  border: 1px solid #35434e;
-  border-radius: 8px;
-  padding: 12px;
-  font-size: 12px;
-}
-
-.dungeon-list small {
-  display: block;
-  margin-top: 8px;
-  font-size: 9px;
-  letter-spacing: 0;
-}
-
-.dungeon-list [aria-disabled="true"] {
-  color: #8e9caa;
-  border-style: dashed;
-}
-
 @media (max-width: 650px) {
   main {
     padding: 18px 12px;
-  }
-
-  .header-note {
-    display: none;
   }
 
   header {
@@ -558,10 +386,6 @@ footer {
   .intro p {
     text-align: left;
     max-width: none;
-  }
-
-  .dungeon-list {
-    grid-template-columns: 1fr;
   }
 
   .room-footer {
@@ -590,38 +414,6 @@ footer {
     padding: 10px;
     font-size: 9px;
   }
-
-  .instructions {
-    flex-direction: column;
-    gap: 3px;
-    padding-top: 15px;
-  }
-
-  .debug-grid {
-    grid-template-columns: 1fr;
-    gap: 0;
-  }
-
-  summary small {
-    display: none;
-  }
-
-  footer {
-    flex-direction: column;
-  }
-}
-/* Draft saves stay visible during testing as well as editing. */
-.draft-save {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.8rem 0;
-  font-size: 0.85rem;
-}
-.draft-save p {
-  flex: 1 1 20rem;
-  margin: 0;
 }
 .guest-loading {
   padding-top: 10vh;
@@ -659,15 +451,6 @@ footer {
   background: #101e2d;
 }
 
-.dungeon-list li:not([aria-disabled="true"]) {
-  border-color: #795078;
-  background: #21182b;
-}
-
-.dungeon-list li:not([aria-disabled="true"]) small {
-  color: #f38ad1;
-}
-
 .round-results {
   display: grid;
   gap: 8px;
@@ -685,44 +468,4 @@ footer {
 
 .round-results button {
   justify-self: start;
-}
-
-input[type="checkbox"] {
-  accent-color: #50dcf3;
-}
-
-.obstacle-inspector,
-.lab-controls {
-  padding: 14px;
-  background: #111d2e;
-  border-top: 1px solid #344b61;
-}
-.obstacle-inspector strong {
-  display: block;
-  margin-bottom: 12px;
-  text-transform: capitalize;
-  color: #f397d4;
-  font-size: 13px;
-}
-.obstacle-inspector select,
-.lab-controls select {
-  display: block;
-  margin-top: 5px;
-  padding: 8px;
-  background: #0b1422;
-  color: #eee9de;
-  border: 1px solid #4c6580;
-  border-radius: 5px;
-}
-.lab-entry,
-.lab-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.lab-controls {
-  border: 1px solid #725170;
-  border-radius: 8px;
 }
