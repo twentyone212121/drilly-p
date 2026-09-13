@@ -1,0 +1,80 @@
+/// <reference types="vite/client" />
+import { expect, it, vi, afterEach } from "vitest";
+import { convexTest } from "convex-test";
+import { newPlayerDungeon, getDungeon } from "../../shared/game/campaign";
+import { RULES } from "../../shared/game/rules";
+import { api } from "../_generated/api";
+import schema from "../schema";
+import { buildPlan } from "../../server/drilly/testing";
+import { replayAttempt } from "../../shared/game/replay";
+
+const modules = import.meta.glob(["../**/*.ts", "!../**/*.test.ts"]);
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  vi.useRealTimers();
+});
+
+it("requires guest authentication before calling the provider", async () => {
+  const fetch = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  const t = convexTest(schema, modules);
+  await expect(
+    t.action(api.drilly.build, { rulesVersion: RULES.version }),
+  ).rejects.toThrow("Sign in");
+  await expect(
+    t.action(api.drilly.raid, {
+      rulesVersion: RULES.version,
+      level: newPlayerDungeon(),
+    }),
+  ).rejects.toThrow("Sign in");
+  expect(fetch).not.toHaveBeenCalled();
+});
+it("runs authenticated build and raid actions through the real simulation with a stubbed provider", async () => {
+  const t = convexTest(schema, modules);
+  const userId = await t.run((ctx) =>
+    ctx.db.insert("users", { isAnonymous: true }),
+  );
+  const guest = t.withIdentity({
+    subject: `${userId}|session`,
+    issuer: "https://test",
+  });
+  vi.stubEnv("OPENAI_API_KEY", "test-only");
+  vi.stubEnv("DRILLY_MODEL", "test-model");
+  const response = (value: unknown) =>
+    new Response(
+      JSON.stringify({
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            content: [{ type: "output_text", text: JSON.stringify(value) }],
+          },
+        ],
+      }),
+    );
+  const fetch = vi.fn(async (_url: unknown, init: RequestInit) => {
+    const body = JSON.parse(init.body as string);
+    const data = JSON.parse(body.input.slice(body.input.indexOf("\n") + 1));
+    return response(await buildPlan("", data));
+  });
+  vi.stubGlobal("fetch", fetch);
+  const room = await guest.action(api.drilly.build, {
+    rulesVersion: RULES.version,
+  });
+  expect(room.level.name).toBe(getDungeon("first-vault").name);
+  expect(replayAttempt(room.proof).stopReason).toBe("won");
+  expect(room.level).not.toHaveProperty("jumpTicks");
+  const attempts = await guest.action(api.drilly.raid, {
+    rulesVersion: RULES.version,
+    level: newPlayerDungeon(),
+  });
+  expect(attempts.map((a) => a.outcome)).toEqual(["won"]);
+  await expect(
+    guest.action(api.drilly.raid, {
+      rulesVersion: "old",
+      level: newPlayerDungeon(),
+    }),
+  ).rejects.toThrow("Reload");
+  expect(fetch.mock.calls.length).toBeGreaterThan(2);
+});

@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as drilly from "../drilly.js";
 import type * as dungeons from "../dungeons.js";
 import type * as http from "../http.js";
 import type * as lib_identity from "../lib/identity.js";
@@ -22,6 +23,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  drilly: typeof drilly;
   dungeons: typeof dungeons;
   http: typeof http;
   "lib/identity": typeof lib_identity;
