@@ -13,7 +13,7 @@ the player. Build a dungeon to protect your treasure, prove it can be beaten, an
 raid Drilly's dungeon. Learn from watching Drilly attack your own design.
 
 Runtime AI attempting the player's dungeon is required for the full rivalry.
-Opponent layouts are authored first; AI dungeon generation can follow later.
+Drilly generates an original opponent room and proves a successful route before the human raid. Authored rooms remain available in local development mode.
 
 ## Core loop — accepted
 
@@ -32,7 +32,7 @@ draft forward between rounds, separately from that immutable submission.
 ## Current implementation scope — local rounds and guest drafts
 
 The prison leads into building, clearing the current draft, submitting an immutable
-snapshot, raiding the first opponent dungeon, reviewing Drilly’s attempts, and
+snapshot, preparing Drilly’s proven room, raiding it, reviewing Drilly’s attempts, and
 results. Results return to the same draft without repeating prison. Two other
 opponent slots remain unavailable placeholders.
 
@@ -46,15 +46,14 @@ rounds; best totals use a maximum. Ghost viewing and imported developer replays 
 not award progression or repeat awards. Importing a developer replay abandons the
 active scored round.
 
-Use a clearly labeled development fixture until runtime Drilly AI is connected.
+Keep a clearly labeled development fixture for testing without runtime Drilly AI.
 **Provisional:** an opt-in development switch runs three fixed input schedules on
 the submitted geometry, stopping on success. These inputs do not use the player’s
 clear proof. Ordinary play without a source shows Drilly as unavailable and awards
 no round result. Ghost review holds each ending for inspection, with next-attempt
 and replay controls.
 
-Guest authentication and private draft save/load remain the only backend work.
-Round persistence and runtime AI are separate subsequent work. Presentation uses
+Guest authentication, private draft save/load, and authenticated Drilly building/playing requests form the backend scope. Completed-round persistence remains separate. Presentation uses
 the computer-interior art direction: ESC represents the human player and the drill
 virus represents Drilly in ghost review. Character animation and decorative lights
 and fans react to gameplay without changing simulation or collision rules. See
@@ -87,7 +86,7 @@ and fans react to gameplay without changing simulation or collision rules. See
 - Clear your current dungeon version once before submitting it. Any accepted
   gameplay-relevant edit invalidates the clear, even if later reverted manually.
 - Submission records the successful input replay and its exact geometry, then
-  opens the authored opponent room. Returning to edit preserves the draft.
+  opens the generated opponent room in live mode. Returning to edit preserves the draft.
 
 ## Editor and clear rules — provisional
 
@@ -118,8 +117,8 @@ and fans react to gameplay without changing simulation or collision rules. See
   room, even when an imported replay used a different layout.
 - The layout saves to the guest profile when Convex is configured. Tutorial
   completion, clears, and submissions remain in memory in this slice. Reloading
-  restarts the prison and requires clearing the restored draft again. Submission
-  still has no network or persistence side effect.
+  restarts the prison and requires clearing the restored draft again. Live room
+  preparation starts while editing; submission reuses it and does not persist the round.
 - Input recordings include the full geometry and treasure IDs. Older level and
   replay formats are rejected instead of silently changing their meaning. Geometry
   changes alone do not change physics; bump the rules version when mechanics change.
@@ -196,22 +195,38 @@ Do not persist simulation frames every tick; retain reproducible recordings.
 
 ## Drilly control — accepted subsequent scope
 
-Give the model the submitted room, movement rules, initial state, and previous
-attempt results. It returns jump timings for one attempt. Execute those timings
-through the same simulation and report the outcome so it can revise its next try.
-Do not reveal the player's successful clear inputs to Drilly.
+Drilly separates route planning from movement. The LLM chooses an ordered route
+through treasure, platform landings and wall reversals, using room geometry,
+current hazards and its own previous failures. It can revise the route during an
+attempt. Structured output is validated against actual room object IDs. The
+model never receives the human's clear recording or chooses new physics.
 
-Enforce the fixed attempt budget and preserve inputs and outcomes for ghost review.
-AI service errors are retryable technical failures, not successful dungeon defense.
-Begin with a simple authenticated backend request that runs Drilly's attempts and
-returns recordings to the local round. Show a waiting state and bounded error/retry
-behavior. Disable duplicate launches while a request is pending and ignore results
-for an old local round. A technical retry may repeat the request; durable jobs,
-per-call checkpoints, and seamless resumption are not required. Ghost playback
-reuses recordings and never calls the model again.
+A bounded receding-horizon controller calculates jump timings using the shared
+simulation, then executes only a short prefix before planning again. Predictions
+operate on copied states; the actual attempt only moves forward. Wall reversals
+are ordinary wall-jump inputs, not automatic bounces or steering. Uncontrollable
+flight advances without extra model calls. Local lookahead is now explicitly
+allowed; the earlier prohibition on all lookahead is superseded. The controller
+has no full-room oracle and can miss a longer trap combination or choose a poor
+route. Human and AI still use identical collisions and movement.
 
-Agree on the provider, request limits, and expected waiting experience before
-connecting it. AI dungeon building and adaptation across rounds come later.
+Scored raids retain the fixed attempt budget, stop after the first clear, and
+record actual inputs for deterministic ghost playback. Only Drilly's own earlier
+attempts inform its next strategy. Exhausting the strategy-call allowance keeps
+the last route running until the normal simulation limit; it does not manufacture
+a defeat or pause indefinitely. Provider failures remain retryable technical
+errors with no medals. Tuning, including lookahead, model-call and time budgets,
+lives in shared rules. These are provisional AI policy limits, not physics changes.
+
+Exact game-state access and short physics predictions give Drilly an advantage
+over a human. Predictions do not consume scored attempts. Human playtesting must
+establish a suitable difficulty; a passing simulation test does not prove that
+winning against Drilly feels fair. Difficulty tiers remain an open decision.
+
+The backend uses authenticated actions with server-only credentials. Late results
+from abandoned local rounds cannot replace drafts or award medals. Watching a
+recording never calls the provider. Durable raid recovery and cross-device round
+state remain deferred.
 
 ## Open decisions
 
@@ -278,5 +293,73 @@ escape completion, and editor. It includes a combined showcase and individual
 rooms for every obstacle and turret mode. Switching rooms starts a new attempt.
 Leaving restores the prior stage (restarting a tutorial attempt if needed), while
 preserving the player's draft and any earned clear. Lab wins never unlock escape,
-submission, medals, or saved progression. Real AI service integration and completed
-round persistence remain separate work.
+submission, medals, or saved progression. Completed-round persistence remains separate work.
+
+## Adaptive Drilly dungeon building — accepted scope, provisional difficulty
+
+Drilly designs original geometry through an incremental edit-and-test loop. The
+workspace starts with a floor, side walls and a goal so the designer can shape a
+route before introducing hazards. This empty scaffolding is never published as a
+challenge. The model chooses coordinates, landings, treasure placement and hazard
+behavior; the server does not select authored room templates.
+
+Each structured command updates or removes named objects. Unmentioned objects
+remain in place. The designer can repair its working layout or start the next edit
+from a proven checkpoint. Fixed dimensions/spawn and shared editor limits are
+validated after merging. Generated rooms always have ordinary full-height side
+walls, restored before testing and excluded from the interior-platform budget.
+Existing player rooms and replay geometry are unchanged.
+
+After a route clears, the designer gets a separate opportunity to add hazards.
+Private practice uses the same route planner contract and movement controller as
+scored raids. The designer supplies the route; the controller executes and records
+it. There is no separate omniscient solver whose result bypasses this controller.
+Every published room must actually clear in the simulation and require more than
+unassisted auto-running. A geometry-only jumping challenge can remain the best
+checkpoint if a later hazard edit fails.
+
+Timing variation and similarity to recent rooms are quality feedback, not
+whole-room rejection rules. Failed edits preserve the working layout for repair
+and the best proven checkpoint for delivery. A later provider error or exhausted
+edit budget returns that checkpoint. If no meaningful clear was obtained, return
+a technical error instead of claiming a proof or substituting an authored room.
+A finite builder cannot guarantee success on every model response.
+
+The builder sees bounded summaries of completed human raids: room geometry,
+attempts, deaths by hazard/location, ignored jumps and wall jumps. One death is
+weak evidence of a lasting weakness. Recent first-try clears allow more complexity;
+repeated losses should lead to clearer warnings, broader landings and a different
+challenge. Recent delivered rooms guide spatial and hazard variety. Inspiration
+prompts contain no coordinates and favor less-used ideas, without forbidding a
+valid room in the same broad category. Novelty and suitable human difficulty still
+need playtesting; clearing a simulation alone does not establish either.
+
+Room preparation starts while the human edits. One prepared request/result is
+reused on submission, so editing does not launch repeated paid builds. Only a
+room actually delivered to the raid enters recent-room history. The browser
+validates both the returned room and its exact winning proof before starting the
+human raid. The proof is available to watch after the human finishes their raid;
+it consumes no attempts and changes no medals. Drilly's attack on the human's
+room receives none of these proof inputs.
+
+While a submitted round is waiting, duplicate requests are disabled. Returning to
+editing abandons that round; late results do not advance it. Background preparation
+can remain available for the next submission. Provider errors consume no human
+attempts. Development fixtures remain explicitly labeled.
+
+The Vite development server can run the same backend planner without Convex, with
+server-only credentials. Its local endpoint is absent from production builds.
+Bounded learning history persists in browser storage scoped to deployment and
+guest profile, with a separate local scope. Restored data is validated; incompatible
+rules, corrupt data and excessive history are discarded. Storage failure leaves
+in-session learning available. History stores no input schedules or medals.
+Cross-device learning, cross-tab synchronization and durable round recovery are
+deferred.
+
+The architecture draws on [iterative PCG with simulation feedback](https://zehua-jiang.github.io/AgenticPCG/),
+[separating strategic planning from execution](https://arxiv.org/abs/2606.20014),
+and [movement-aware level construction](https://ceur-ws.org/Vol-2862/paper13.pdf).
+These inform the design; they do not establish this game's reliability. Use the
+headless regression suite and opt-in live evaluations to measure actual outcomes,
+replay validity, room variety, model calls and latency. Keep diagnostic reports
+outside Git.
