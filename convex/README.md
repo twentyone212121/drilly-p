@@ -1,8 +1,11 @@
 # Drilly P backend
 
-`dungeons.ts` owns authenticated guest draft saves. `drilly.ts` exposes the
-room-building and raid actions. Both hosted play and the optional Vite development
+`drilly.ts` exposes authenticated room-building and raid actions. Guest startup
+opens a fresh game; it does not load or save drafts. Both hosted play and the optional Vite development
 endpoint use the same modules under `server/drilly/`:
+
+Hosted AI actions use Convex's Node runtime because the OpenAI SDK requires URL
+operations that the default Convex runtime does not implement.
 
 | Module                                      | Responsibility                                                       |
 | ------------------------------------------- | -------------------------------------------------------------------- |
@@ -16,7 +19,7 @@ endpoint use the same modules under `server/drilly/`:
 | `observation.ts`                            | Current geometry, hazards and player state                           |
 | `proof.ts`                                  | Builder practice using the same controller and timing feedback       |
 | `variety.ts`                                | Structural comparison, used as quality feedback                      |
-| `protocol.ts`, `provider.ts`, `deadline.ts` | Model contract, HTTP and cancellation                                |
+| `protocol.ts`, `provider.ts`, `deadline.ts` | Model contract, OpenAI SDK and cancellation                          |
 
 Gameplay validation stays in `shared/validation.ts`; Convex wire validators live
 in `convex/lib/validators.ts`. Simulation and tuning stay in `shared/game/`.
@@ -24,15 +27,18 @@ There are no per-tick database writes or new persistence tables for AI play.
 
 ## Configuration
 
-Use the existing development deployment. Set `OPENAI_API_KEY` and `DRILLY_MODEL`
-in its backend environment. Both are optional declarations in `convex.config.ts`;
-missing values disable live AI with a clear error. Never put the key in `VITE_`
+Use the existing development deployment. Set `OPENAI_API_KEY` in its backend
+environment. Drilly defaults to `gpt-6-astra`; `DRILLY_MODEL` is an optional override.
+Both variables are optional declarations in `convex.config.ts`; a missing key
+disables live AI with a clear error. Never put the key in `VITE_`
 variables, browser code or Git. `VITE_CONVEX_URL` connects the guest frontend.
 
-The adapter uses the Responses API with strict structured output, bounded output
-size, `store: false`, and low reasoning effort for the configured GPT-5 model.
-No SDK or automatic HTTP retries are installed. Per-call timeouts and overall
-request deadlines abort outstanding HTTP requests. Limits are in shared rules;
+The adapter uses the official OpenAI TypeScript SDK's Responses API with strict
+structured output, bounded output size, `store: false`, and explicit low reasoning
+effort. It forwards the requested effort without inferring capabilities from model
+names. SDK retries are disabled with `maxRetries: 0`; SDK logging is disabled so
+provider bodies stay out of game logs. Per-call timeouts and overall request
+deadlines abort outstanding HTTP requests. Limits are in shared rules;
 they are per request, not account-wide spending controls. Controller changes do
 not change physics or replay compatibility.
 
@@ -76,11 +82,8 @@ raid. `src/game/session.ts` starts one preparation while the human edits and reu
 it on submission. The proof can be watched after the human raid, without spending
 attempts or awarding medals. Abandoned-round results cannot advance the session.
 
-`src/persistence/drillyMemory.ts` retains bounded learning summaries across reloads,
-scoped by deployment and guest profile. Delivered rooms inform variety, completed
-human raids inform difficulty. Neither input schedules nor medals enter this
-memory. Storage failure preserves in-session learning. Cross-device history and
-durable round recovery remain deferred.
+Learning summaries remain in the game session and reset on reload. Draft saving,
+restoration and revision-conflict handling are outside the current hackathon scope.
 
 Build logs contain edit-stage outcomes; raid logs contain actual attempt outcomes
 and brief route objectives. They exclude API keys, user identities, full prompts
@@ -97,7 +100,7 @@ tests never call a paid provider.
 Run an explicit live evaluation against the configured development model:
 
 ```sh
-npm run eval:drilly -- --live --deployment flexible-gopher-224 --cases saws,wall,spikes,slider,prison,build --report /tmp/drilly-eval.json
+npm run eval:drilly -- --live --deployment YOUR_DEV_DEPLOYMENT --cases saws,wall,spikes,slider,prison,build --report /tmp/drilly-eval.json
 ```
 
 Repeat `build` in the case list to test successive rooms with recent-room history.

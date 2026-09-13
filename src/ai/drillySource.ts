@@ -42,13 +42,12 @@ export function createDrillySource(client: ConvexReactClient): DrillySource {
     build: (context) =>
       boundedRequest(
         client.action(api.drilly.build, {
-          rulesVersion: RULES.version,
           context,
         }),
       ),
     raid: (level) =>
       boundedRequest(
-        client.action(api.drilly.raid, { level, rulesVersion: RULES.version }),
+        client.action(api.drilly.raid, { level }),
         RULES.drilly.raidClientTimeoutMs,
       ),
   };

@@ -43,13 +43,8 @@ async function request(path: string, data: unknown): Promise<unknown> {
 export function createLocalDrillySource(): DrillySource {
   return {
     build: async (context) =>
-      parseBuiltDungeon(
-        await request("build", { rulesVersion: RULES.version, context }),
-      ),
+      parseBuiltDungeon(await request("build", { context })),
     raid: async (level) =>
-      parseDrillyAttempts(
-        await request("raid", { rulesVersion: RULES.version, level }),
-        level,
-      ),
+      parseDrillyAttempts(await request("raid", { level }), level),
   };
 }

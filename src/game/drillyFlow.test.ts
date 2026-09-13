@@ -5,7 +5,6 @@ import { RULES } from "../../shared/game/rules";
 import type { DrillySource, BuiltDungeon } from "../../shared/game/drilly";
 import { createSession, type Session } from "./session";
 import { runDrillyFixture } from "./drillyFixture";
-import { drillyMemoryOptions } from "../persistence/drillyMemory";
 
 function built(level = newPlayerDungeon()): BuiltDungeon {
   return {
@@ -51,7 +50,18 @@ describe("live Drilly rivalry", () => {
       build: vi.fn(async () => built(level)),
       raid: vi.fn(async (room) => runDrillyFixture(room)),
     };
-    const session = ready(source);
+    const session = createSession({ drilly: source });
+    session.skipTutorial();
+    expect(session.observe()).toMatchObject({
+      phase: "building",
+      prisonEscaped: true,
+      liveDrilly: true,
+      canSubmit: false,
+    });
+    expect(source.build).toHaveBeenCalledTimes(1);
+    session.testDungeon();
+    session.step(RULES.maxTicks);
+    session.submitDungeon();
     expect(session.observe().phase).toBe("preparing");
     await flush();
     expect(session.level.name).toBe("AI room");
@@ -207,29 +217,6 @@ it("learns from completed human raids and sends fresh-layout history to the next
   expect(context).not.toHaveProperty("clear");
   expect(context.recentRaids[0]).not.toHaveProperty("replay");
   expect(source.raid.mock.calls[0]).toHaveLength(1);
-});
-
-it("remembers an abandoned room on reload without treating it as a completed raid", async () => {
-  const values = new Map<string, string>();
-  const storage = {
-    getItem: (key: string) => values.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      values.set(key, value);
-    },
-  };
-  const source = {
-    build: vi.fn(async () => built()),
-    raid: vi.fn(),
-  };
-  const options = () => drillyMemoryOptions("test-profile", () => storage);
-  const first = ready(source, options());
-  await flush();
-  first.editDungeon();
-  ready(source, options());
-  await flush();
-  expect(source.build.mock.calls[1]).toEqual([
-    { recentRooms: [newPlayerDungeon()], recentRaids: [] },
-  ]);
 });
 
 it("does not remember a stale build that the player never received", async () => {

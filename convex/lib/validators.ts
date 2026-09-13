@@ -70,15 +70,6 @@ export const levelValidator = v.object({
   treasures: v.array(v.object(rectangle)),
 });
 
-export const draftFields = {
-  ownerId: v.id("users"),
-  level: levelValidator,
-  rulesVersion: v.string(),
-  revision: v.number(),
-  updatedAt: v.number(),
-  lastSaveId: v.string(),
-};
-
 export const replayValidator = v.object({
   version: v.literal(2),
   rulesVersion: v.string(),

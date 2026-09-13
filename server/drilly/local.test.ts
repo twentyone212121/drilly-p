@@ -1,7 +1,6 @@
 import { Readable } from "node:stream";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, expect, it, vi } from "vitest";
-import { RULES } from "../../shared/game/rules";
 import { newPlayerDungeon } from "../../shared/game/campaign";
 import { directStrategy } from "./testing";
 import { localDrillyHandler } from "./local";
@@ -27,8 +26,7 @@ function response() {
     end,
   };
 }
-const body = () =>
-  JSON.stringify({ rulesVersion: RULES.version, level: newPlayerDungeon() });
+const body = () => JSON.stringify({ level: newPlayerDungeon() });
 
 describe("local Drilly API", () => {
   it("executes a real simulated raid without Convex", async () => {
@@ -47,7 +45,7 @@ describe("local Drilly API", () => {
       [body(), { host: "foreign.test" }, 403],
       ["x".repeat(64_001), {}, 413],
       ["null", {}, 400],
-      ['{"rulesVersion":"old"}', {}, 400],
+      ["[]", {}, 400],
     ] as [string, Record<string, string>, number][]) {
       const output = response();
       await handle(request(payload, headers), output.res, vi.fn());

@@ -68,7 +68,7 @@ export function createSession(
   let labReturn: "prison" | "escaped" | "building" = "prison";
   let layoutRevision = 0;
   let levelRevision = 0;
-  let prisonClear: Replay | null = null;
+  let prisonEscaped = false;
   let clear: Clear | null = null;
   let submission: Clear | null = null;
   let fixture = options.developmentFixture ?? false;
@@ -113,7 +113,7 @@ export function createSession(
       editorLevel: structuredClone(editorLevel),
       layoutRevision,
       clearedRevision: clear?.revision ?? null,
-      prisonEscaped: prisonClear !== null,
+      prisonEscaped,
       canSubmit: canSubmit(),
       submission: structuredClone(submission),
       round: structuredClone(round),
@@ -202,7 +202,7 @@ export function createSession(
   }
 
   function editDungeon() {
-    if (!prisonClear)
+    if (!prisonEscaped)
       throw new Error("Escape the prison before building your dungeon.");
 
     roundId++;
@@ -453,7 +453,7 @@ export function createSession(
     if (view.mode === "human" && view.state.status === "won") {
       switch (flow.phase) {
         case "prison":
-          prisonClear = attempt.exportReplay();
+          prisonEscaped = true;
           flow = { phase: "escaped" };
           break;
         case "testing":
@@ -512,6 +512,12 @@ export function createSession(
       notify();
     },
     editDungeon,
+    skipTutorial() {
+      if (flow.phase !== "prison" && flow.phase !== "escaped") return;
+      prisonEscaped = true;
+      editDungeon();
+      notify();
+    },
     setDevelopmentFixture(enabled: boolean) {
       if (flow.phase !== "building") return;
       fixture = enabled;

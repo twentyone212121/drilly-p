@@ -1,5 +1,5 @@
 import { LAB_ROOMS, type LabRoomId } from "../shared/game/obstacleLab";
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { DUNGEONS } from "../shared/game/campaign";
 import type { Session } from "./game/session";
 import { sessionView } from "./game/sessionView";
@@ -9,13 +9,7 @@ import { DebugPanel } from "./components/DebugPanel";
 import { DungeonEditor } from "./components/DungeonEditor";
 import type { AudioSettings, AudioStatus } from "./game/phaser/audio";
 
-export default function App({
-  session,
-  saving,
-}: {
-  session: Session;
-  saving?: ReactNode;
-}) {
+export default function App({ session }: { session: Session }) {
   const view = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const [audio, setAudio] = useState<AudioSettings>({
     muted: false,
@@ -41,7 +35,7 @@ export default function App({
           <span className="wordmark-dot" />
         </span>
         <span className="header-note">ONE SMALL KEY. A WHOLE SYSTEM.</span>
-        <small>{saving ? "GUEST PROFILE" : "LOCAL PLAY · SAVING OFF"}</small>
+        <small>{view.liveDrilly ? "LIVE AI" : "LOCAL PRACTICE"}</small>
       </header>
       <ol className="flow-steps" aria-label="Game progress">
         {["Escape", "Build", "Clear", "Raid", "Watch", "Results"].map(
@@ -71,6 +65,10 @@ export default function App({
         </div>
         <p>{copy.hint}</p>
       </section>
+      {import.meta.env.DEV &&
+        (view.phase === "prison" || view.phase === "escaped") && (
+          <button onClick={() => session.skipTutorial()}>Skip tutorial</button>
+        )}
       {(view.phase === "prison" || view.phase === "escaped" || building) && (
         <div className="lab-entry">
           <button onClick={() => session.openLab()}>
@@ -115,18 +113,6 @@ export default function App({
             </li>
           ))}
         </ol>
-      )}
-      {building && import.meta.env.DEV && (
-        <label className="control-help">
-          <input
-            type="checkbox"
-            checked={view.developmentFixture}
-            onChange={(event) =>
-              session.setDevelopmentFixture(event.target.checked)
-            }
-          />
-          Development fixture · Use scripted Drilly attempts for local testing
-        </label>
       )}
       {!view.liveDrilly &&
         !view.developmentFixture &&
@@ -259,7 +245,6 @@ export default function App({
           </span>
         </div>
       </div>
-      {saving}
       {!building && (
         <GameControls
           session={session}
@@ -274,9 +259,8 @@ export default function App({
           : "Space or a tap starts and resumes, jumps during play, and retries after a failed attempt. Wall jumps reverse direction."}
       </p>
       <p className="control-help">
-        {saving
-          ? "Your layout saves to this browser’s guest profile. Reloading restarts the prison and requires clearing your draft again. Keep browser storage to retain guest access."
-          : "Saving is off. Your layout and progress stay in this tab; reloading starts over."}
+        Your layout and progress stay in this tab. Reloading starts a fresh
+        game.
       </p>
       {!building && <DebugPanel session={session} audio={audioStatus} />}
       <footer>

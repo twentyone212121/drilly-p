@@ -2,7 +2,6 @@
 import { expect, it, vi, afterEach } from "vitest";
 import { convexTest } from "convex-test";
 import { newPlayerDungeon, getDungeon } from "../../shared/game/campaign";
-import { RULES } from "../../shared/game/rules";
 import { api } from "../_generated/api";
 import schema from "../schema";
 import { buildPlan } from "../../server/drilly/testing";
@@ -19,12 +18,9 @@ it("requires guest authentication before calling the provider", async () => {
   const fetch = vi.fn();
   vi.stubGlobal("fetch", fetch);
   const t = convexTest(schema, modules);
-  await expect(
-    t.action(api.drilly.build, { rulesVersion: RULES.version }),
-  ).rejects.toThrow("Sign in");
+  await expect(t.action(api.drilly.build, {})).rejects.toThrow("Sign in");
   await expect(
     t.action(api.drilly.raid, {
-      rulesVersion: RULES.version,
       level: newPlayerDungeon(),
     }),
   ).rejects.toThrow("Sign in");
@@ -63,14 +59,11 @@ it("runs authenticated build and raid actions through the real simulation with a
     return response(await buildPlan("", data));
   });
   vi.stubGlobal("fetch", fetch);
-  const room = await guest.action(api.drilly.build, {
-    rulesVersion: RULES.version,
-  });
+  const room = await guest.action(api.drilly.build, {});
   expect(room.level.name).toBe(getDungeon("first-vault").name);
   expect(replayAttempt(room.proof).stopReason).toBe("won");
   expect(room.level).not.toHaveProperty("jumpTicks");
   const attempts = await guest.action(api.drilly.raid, {
-    rulesVersion: RULES.version,
     level: newPlayerDungeon(),
   });
   expect(attempts.map((a) => a.outcome)).toEqual(["won"]);
@@ -79,6 +72,6 @@ it("runs authenticated build and raid actions through the real simulation with a
       rulesVersion: "old",
       level: newPlayerDungeon(),
     }),
-  ).rejects.toThrow("Reload");
+  ).resolves.toMatchObject([{ outcome: "won" }]);
   expect(fetch.mock.calls.length).toBeGreaterThan(2);
 });

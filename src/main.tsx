@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient } from "convex/react";
 import "./index.css";
-import { GuestGame, LocalGame } from "./persistence/GuestGame";
+import { GuestGame, LocalGame } from "./Game";
 
 const convexUrl = import.meta.env.VITE_CONVEX_URL;
 const client = convexUrl ? new ConvexReactClient(convexUrl) : null;

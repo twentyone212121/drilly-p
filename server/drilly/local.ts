@@ -1,6 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
-import { RULES } from "../../shared/game/rules";
 import { buildDungeon, playDungeon, type Planner } from "./planner";
 import { openAIPlanner } from "./provider";
 import {
@@ -58,18 +57,14 @@ export function localDrillyHandler(plan: () => Planner) {
         }
         chunks.push(buffer);
       }
-      let input: { rulesVersion?: unknown; level?: unknown; context?: unknown };
+      let input: { level?: unknown; context?: unknown };
       try {
         input = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-        if (
-          !input ||
-          typeof input !== "object" ||
-          input.rulesVersion !== RULES.version
-        )
+        if (!input || typeof input !== "object" || Array.isArray(input))
           throw new Error();
       } catch {
         reply(400, {
-          error: "Invalid request or outdated rules. Reload the game.",
+          error: "Invalid request.",
         });
         return;
       }

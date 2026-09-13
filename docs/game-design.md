@@ -21,7 +21,7 @@ Begin with a prison escape tutorial. It teaches automatic movement, jump timing,
 wall-jump reversal, and collecting all treasures through play, with unlimited retries.
 It should challenge new players; failing a few times while learning is expected.
 After the first successful escape, enter the main loop without repeating the prison
-within that session. Repeating it on reload is fine for prototype testing:
+within that session. Development builds also offer **Skip tutorial** to enter building immediately for AI playtesting:
 
 **Build/revise → clear your own dungeon → submit → raid Drilly's dungeon → watch
 Drilly's attempts on yours → results → revise and repeat.**
@@ -29,7 +29,7 @@ Drilly's attempts on yours → results → revise and repeat.**
 The submitted layout is the exact version the player cleared. Carry the editable
 draft forward between rounds, separately from that immutable submission.
 
-## Current implementation scope — local rounds and guest drafts
+## Current implementation scope — local rounds and live Drilly
 
 The prison leads into building, clearing the current draft, submitting an immutable
 snapshot, preparing Drilly’s proven room, raiding it, reviewing Drilly’s attempts, and
@@ -53,7 +53,7 @@ clear proof. Ordinary play without a source shows Drilly as unavailable and awar
 no round result. Ghost review holds each ending for inspection, with next-attempt
 and replay controls.
 
-Guest authentication, private draft save/load, and authenticated Drilly building/playing requests form the backend scope. Completed-round persistence remains separate. Presentation uses
+Guest authentication and authenticated Drilly building/playing requests form the backend scope. Each reload starts a fresh game; saved drafts are outside this hackathon slice. Completed-round persistence remains separate. Presentation uses
 the computer-interior art direction: ESC represents the human player and the drill
 virus represents Drilly in ghost review. Character animation and decorative lights
 and fans react to gameplay without changing simulation or collision rules. See
@@ -115,10 +115,8 @@ and fans react to gameplay without changing simulation or collision rules. See
 - Schedule playback and imported replays never earn a prison escape, draft clear,
   or raid completion. Leaving playback starts a fresh human attempt in the original
   room, even when an imported replay used a different layout.
-- The layout saves to the guest profile when Convex is configured. Tutorial
-  completion, clears, and submissions remain in memory in this slice. Reloading
-  restarts the prison and requires clearing the restored draft again. Live room
-  preparation starts while editing; submission reuses it and does not persist the round.
+- Layouts and progress stay in the current tab. Reloading starts fresh. Live room
+  preparation starts while editing; submission reuses it.
 - Input recordings include the full geometry and treasure IDs. Older level and
   replay formats are rejected instead of silently changing their meaning. Geometry
   changes alone do not change physics; bump the rules version when mechanics change.
@@ -144,36 +142,14 @@ and fans react to gameplay without changing simulation or collision rules. See
 - Do not introduce mastery ranks. A growing stash is deferred until it buys
   something meaningful. Infinite content and new mechanics are not required now.
 
-## Guest identity and draft saves — accepted first Convex slice
+## Guest sessions — accepted hackathon scope
 
-Use anonymous authenticated sessions: no sign-in form before playing, and private
-saves per guest. Return to the same browser to continue. Account linking and recovery
-across browsers are later work; clearing browser storage can lose guest access.
-Use Convex Auth's anonymous provider. The browser retains its session credentials;
-server functions derive ownership from that authenticated session. Auth's library
-actions handle sign-in and renewal; its HTTP routes publish token verification
-metadata. Dungeon reads and writes use ordinary queries and mutations.
-
-- Store one draft per guest: full validated geometry, rules version, server
-  revision, update time, and the last save request ID. Drafts may have no treasures.
-- Finish auth and the initial draft read before starting a saved game. A first
-  read does not create a default draft. Incompatible saved rules or geometry stay
-  untouched; show an error instead of silently replacing them.
-- Autosave accepted layout edits only. **Provisional:** debounce edits for 500 ms.
-  Tests, simulation ticks, selection, previews, and unchanged/rejected edits do
-  not write. A successful server acknowledgement marks the captured version saved;
-  newer edits still need their own save.
-- Each write checks the expected server revision. Retrying an uncertain save uses
-  the same request ID and payload. A stale write cannot overwrite another tab.
-- On conflict, preserve the current layout and offer **Load saved draft** or
-  **Save this version**. The latter still checks the latest known server revision.
-  Loading requires returning from a test/raid to editing and invalidates any clear.
-- Offline or failed saves leave edits in this tab, visibly unsaved. Retry an error
-  explicitly; reconnecting resumes queued edits. Warn before closing with pending
-  changes. There is no durable offline queue in this slice.
-- If auth or initial loading fails, offer an explicit **Play without saving**
-  option. A local game never automatically uploads when connectivity returns.
-  With no Convex URL configured, play locally with saving visibly disabled.
+Open an anonymous authenticated session automatically to access hosted Drilly.
+Start a fresh dungeon without reading or writing old drafts. Draft restoration,
+autosave, revision conflicts and save-version checks are removed from this slice.
+Authentication errors offer a connection retry; they do not route the player into
+a game without AI under a misleading saving option. With no Convex URL, the local
+AI endpoint is available when its server API key is configured.
 
 ## Completed-round saves — accepted subsequent hackathon scope
 
@@ -349,12 +325,8 @@ attempts. Development fixtures remain explicitly labeled.
 
 The Vite development server can run the same backend planner without Convex, with
 server-only credentials. Its local endpoint is absent from production builds.
-Bounded learning history persists in browser storage scoped to deployment and
-guest profile, with a separate local scope. Restored data is validated; incompatible
-rules, corrupt data and excessive history are discarded. Storage failure leaves
-in-session learning available. History stores no input schedules or medals.
-Cross-device learning, cross-tab synchronization and durable round recovery are
-deferred.
+Learning summaries stay in the current session and reset on reload. Persistent
+learning and durable round recovery are deferred.
 
 The architecture draws on [iterative PCG with simulation feedback](https://zehua-jiang.github.io/AgenticPCG/),
 [separating strategic planning from execution](https://arxiv.org/abs/2606.20014),

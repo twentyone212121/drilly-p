@@ -12,19 +12,16 @@ import {
 } from "./lib/validators";
 import { buildDungeon, playDungeon } from "../server/drilly/planner";
 import { openAIPlanner } from "../server/drilly/provider";
-import { RULES } from "../shared/game/rules";
 
 export const build = action({
   args: {
-    rulesVersion: v.string(),
+    rulesVersion: v.optional(v.string()),
     context: v.optional(buildContextValidator),
   },
   returns: builtDungeonValidator,
   handler: async (ctx, args) => {
     if (!(await getAuthUserId(ctx)))
       throw new ConvexError("Sign in as a guest to play Drilly.");
-    if (args.rulesVersion !== RULES.version)
-      throw new ConvexError("Reload to use the current game rules.");
     try {
       return await buildDungeon(
         openAIPlanner(env.OPENAI_API_KEY, env.DRILLY_MODEL),
@@ -40,13 +37,11 @@ export const build = action({
 });
 
 export const raid = action({
-  args: { level: levelValidator, rulesVersion: v.string() },
+  args: { level: levelValidator, rulesVersion: v.optional(v.string()) },
   returns: v.array(raidAttemptValidator),
   handler: async (ctx, args) => {
     if (!(await getAuthUserId(ctx)))
       throw new ConvexError("Sign in as a guest to play Drilly.");
-    if (args.rulesVersion !== RULES.version)
-      throw new ConvexError("Reload to use the current game rules.");
     try {
       return await playDungeon(
         args.level,
