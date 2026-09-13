@@ -26,7 +26,7 @@ function ready(drilly: DrillySource) {
   session.primaryAction();
   session.testDungeon();
   session.step(RULES.maxTicks);
-  session.submitDungeon();
+  session.challengeDrilly();
   return session;
 }
 async function flush() {
@@ -34,7 +34,11 @@ async function flush() {
 }
 async function review(session: Session) {
   session.primaryAction();
-  while (session.getSnapshot().phase === "ghost") {
+  for (
+    let i = 0;
+    i < RULES.raidAttempts && !session.getSnapshot().result;
+    i++
+  ) {
     session.step(RULES.maxTicks);
     session.primaryAction();
   }
@@ -48,25 +52,20 @@ describe("live Drilly rivalry", () => {
       raid: vi.fn(async (room) => runDrillyFixture(room)),
     };
     const session = createSession({
-      prisonLevel: newPlayerDungeon(),
+      tutorialCompleted: true,
       drilly: source,
     });
-    session.step(RULES.maxTicks);
-    session.primaryAction();
-    expect(session.getSnapshot()).toMatchObject({
-      phase: "building",
-      prisonEscaped: true,
-      liveDrilly: true,
-      canSubmit: false,
-    });
+    session.prepareRoom();
+    session.prepareRoom();
     expect(source.build).toHaveBeenCalledTimes(1);
-    session.testDungeon();
+    session.challengeDrilly();
+    expect(session.getSnapshot().round).toBeNull();
     session.step(RULES.maxTicks);
-    session.submitDungeon();
-    expect(session.getSnapshot().phase).toBe("preparing");
+    session.challengeDrilly();
+    expect(session.getSnapshot().canPlay).toBe(false);
     await flush();
     expect(session.level.name).toBe("AI room");
-    expect(session.getSnapshot().phase).toBe("raiding");
+    expect(session.getSnapshot().canPlay).toBe(true);
     session.step(RULES.maxTicks);
     await flush();
     expect(source.raid).toHaveBeenCalledTimes(1);
@@ -75,11 +74,19 @@ describe("live Drilly rivalry", () => {
     await review(session);
     expect(session.getSnapshot().result?.total).toBe(3);
     const result = session.getSnapshot().result;
-    session.replayGhost();
+    session.replayDrilly();
     session.step(RULES.maxTicks);
     session.primaryAction();
     expect(session.getSnapshot().result).toEqual(result);
     expect(source.raid).toHaveBeenCalledTimes(1);
+
+    session.primaryAction();
+    const draft = session.level;
+    session.challengeDrilly();
+    await flush();
+    expect(session.getSnapshot().editorLevel).toEqual(draft);
+    expect(session.getSnapshot().round?.human).toHaveLength(0);
+    expect(source.build).toHaveBeenCalledTimes(2);
   });
 
   it("retries technical errors without awarding defense medals or consuming human attempts", async () => {
@@ -96,34 +103,12 @@ describe("live Drilly rivalry", () => {
     await flush();
     expect(session.getSnapshot().aiStatus).toBe("error");
     expect(session.getSnapshot().result).toBeNull();
-    session.retryDrilly();
-    session.retryDrilly();
+    session.primaryAction();
+    session.primaryAction();
     await flush();
     expect(source.raid).toHaveBeenCalledTimes(2);
     expect(session.getSnapshot().round?.human).toHaveLength(1);
-    expect(session.getSnapshot().aiStatus).toBe("ready");
-  });
-
-  it("ignores a room arriving after editing resumed and preserves the clear", async () => {
-    let resolve!: (level: BuiltDungeon) => void;
-    const source = {
-      build: vi.fn(
-        () =>
-          new Promise<BuiltDungeon>((r) => {
-            resolve = r;
-          }),
-      ),
-      raid: vi.fn(),
-    };
-    const session = ready(source);
-    session.primaryAction();
-    expect(source.build).toHaveBeenCalledTimes(1);
-    session.editDungeon();
-    resolve(built());
-    await flush();
-    expect(session.getSnapshot().phase).toBe("building");
-    expect(session.getSnapshot().round).toBeNull();
-    expect(session.getSnapshot().canSubmit).toBe(true);
+    expect(session.getSnapshot().aiStatus).toBe("idle");
   });
 
   it("rejects forged outcomes and partial losing attempt sets", async () => {
@@ -152,26 +137,6 @@ describe("live Drilly rivalry", () => {
   });
 });
 
-it("ignores raid results after the player returns to editing", async () => {
-  let resolve!: (value: ReturnType<typeof runDrillyFixture>) => void;
-  const source: DrillySource = {
-    build: async () => built(),
-    raid: () =>
-      new Promise((r) => {
-        resolve = r;
-      }),
-  };
-  const session = ready(source);
-  await flush();
-  session.step(RULES.maxTicks);
-  session.editDungeon();
-  resolve(runDrillyFixture(newPlayerDungeon()));
-  await flush();
-  expect(session.getSnapshot().phase).toBe("building");
-  expect(session.getSnapshot().round).toBeNull();
-  expect(session.getSnapshot().result).toBeNull();
-});
-
 it("retries room generation without consuming a human raid attempt", async () => {
   const source = {
     build: vi
@@ -188,28 +153,65 @@ it("retries room generation without consuming a human raid attempt", async () =>
   session.primaryAction();
   await flush();
   expect(source.build).toHaveBeenCalledTimes(2);
-  expect(session.getSnapshot().phase).toBe("raiding");
+  expect(session.getSnapshot().canPlay).toBe(true);
   expect(session.getSnapshot().round?.human).toHaveLength(0);
 });
 
-it("prepares one room while editing and reuses it on submission", async () => {
-  const source = { build: vi.fn(async () => built()), raid: vi.fn() };
-  const session = createSession({
-    prisonLevel: newPlayerDungeon(),
-    drilly: source,
+it("ignores an abandoned raid response while a new round is waiting", async () => {
+  const responses: ((value: ReturnType<typeof runDrillyFixture>) => void)[] =
+    [];
+  const source: DrillySource = {
+    build: async () => built(),
+    raid: () =>
+      new Promise((resolve) => {
+        responses.push(resolve);
+      }),
+  };
+  const session = ready(source);
+  await flush();
+  session.step(RULES.maxTicks);
+  session.editDungeon();
+  session.challengeDrilly();
+  await flush();
+  session.step(RULES.maxTicks);
+
+  responses[0](runDrillyFixture(newPlayerDungeon()));
+  await flush();
+  expect(session.getSnapshot()).toMatchObject({
+    aiStatus: "pending",
+    watchIndex: null,
+    result: null,
+  });
+  responses[1](runDrillyFixture(newPlayerDungeon()));
+  await flush();
+  expect(session.getSnapshot()).toMatchObject({
+    aiStatus: "idle",
+    watchIndex: 0,
+  });
+});
+
+it("returns to the draft after tutorial replay and ignores the abandoned room request", async () => {
+  let resolve!: (value: BuiltDungeon) => void;
+  const session = ready({
+    build: () =>
+      new Promise((done) => {
+        resolve = done;
+      }),
+    raid: vi.fn(),
+  });
+  const draft = session.getSnapshot().editorLevel;
+  session.replayTutorial();
+  resolve(built());
+  await flush();
+  expect(session.getSnapshot()).toMatchObject({
+    canPlay: true,
+    round: null,
+    result: null,
   });
   session.step(RULES.maxTicks);
   session.primaryAction();
-  expect(source.build).toHaveBeenCalledTimes(1);
-  expect(session.getSnapshot().phase).toBe("building");
-  await flush();
-  expect(session.getSnapshot().roomPreparation).toBe("ready");
-  session.testDungeon();
-  session.step(RULES.maxTicks);
-  session.submitDungeon();
-  await flush();
-  expect(source.build).toHaveBeenCalledTimes(1);
-  expect(session.getSnapshot().phase).toBe("raiding");
+  expect(session.level).toEqual(draft);
+  expect(session.getSnapshot().cleared).toBe(true);
 });
 
 it("does not accept a forged room proof or mismatched geometry", async () => {
@@ -225,7 +227,7 @@ it("does not accept a forged room proof or mismatched geometry", async () => {
   ]) {
     const session = ready({ build: async () => invalid, raid: vi.fn() });
     await flush();
-    expect(session.getSnapshot().phase).toBe("preparing");
+    expect(session.getSnapshot().canPlay).toBe(false);
     expect(session.getSnapshot().aiStatus).toBe("error");
     expect(session.getSnapshot().round?.human).toHaveLength(0);
     expect(session.getSnapshot().result).toBeNull();

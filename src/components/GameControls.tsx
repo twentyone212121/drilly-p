@@ -14,36 +14,31 @@ export function GameControls({
   onAudioChange: (settings: AudioSettings) => void;
 }) {
   const copy = sessionView(view);
-  const canRestart = [
-    "prison",
-    "testing",
-    "cleared",
-    "raiding",
-    "ghost",
-  ].includes(view.phase);
 
   return (
     <div className="controls">
       <button
         className="primary"
-        disabled={
-          (view.aiPending &&
-            (view.phase === "preparing" || view.phase === "raid-complete")) ||
-          (view.phase === "ghost" && !view.paused) ||
-          (view.phase === "cleared" && !view.canSubmit)
-        }
+        disabled={copy.actionDisabled}
         onClick={() => session.primaryAction()}
       >
         {copy.action} <kbd>SPACE</kbd>
       </button>
-      {!view.paused && <button onClick={() => session.pause()}>Pause</button>}
-      {canRestart && (
+      {view.canPlay && !view.paused && (
+        <button onClick={() => session.pause()}>Pause</button>
+      )}
+      {view.canRestart && (
         <button onClick={() => session.reset()}>
-          {view.phase === "cleared"
+          {view.phase === "test" && view.state.status === "won"
             ? "Test again"
-            : view.phase === "ghost"
+            : view.phase === "watch"
               ? "Replay attempt"
               : "Restart"}
+        </button>
+      )}
+      {view.canReplayTutorial && (
+        <button onClick={() => session.replayTutorial()}>
+          Replay tutorial
         </button>
       )}
       <div className="audio-controls">

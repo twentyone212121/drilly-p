@@ -4,9 +4,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import App from "./App";
 import { createDrillySource } from "./ai/drillySource";
 import { createSession } from "./game/session";
+import {
+  loadTutorialCompleted,
+  saveTutorialCompleted,
+} from "./persistence/tutorial";
 
 export function LocalGame() {
-  const [session] = useState(() => createSession());
+  const [session] = useState(() =>
+    createSession({
+      tutorialCompleted: loadTutorialCompleted(),
+      onTutorialCompleted: saveTutorialCompleted,
+    }),
+  );
   return <App session={session} />;
 }
 
@@ -51,7 +60,14 @@ export function GuestGame() {
 function ConnectedGame() {
   const client = useConvex();
   const [session] = useState(() =>
-    createSession({ drilly: createDrillySource(client) }),
+    createSession({
+      drilly: createDrillySource(client),
+      tutorialCompleted: loadTutorialCompleted(),
+      onTutorialCompleted: saveTutorialCompleted,
+    }),
   );
+  useEffect(() => {
+    session.prepareRoom();
+  }, [session]);
   return <App session={session} />;
 }

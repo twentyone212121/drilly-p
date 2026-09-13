@@ -26,9 +26,20 @@ The game is **Drilly P**: **Drilly** is the AI opponent, and **P** represents th
 - Preserve unrelated local edits. Keep changes focused on the requested task.
 - Do not commit or push changes without explicit user approval.
 - Use npm and the committed lockfile. For code changes, run `npm test`,
-  `npm run lint`, and `npm run build`; add focused tests for gameplay rules and
-  replay determinism.
+  `npm run lint`, and `npm run build`.
   Documentation-only changes need link and formatting checks, not a full build.
+- Keep tests lean during prototype iteration. Do not add a test for every feature,
+  helper, or branch. Add one only for a stable gameplay contract or a concrete bug
+  that is costly to catch by playtesting; extend an existing scenario when it fits.
+- Prioritize physics/collisions, browser/headless replay parity, clear invalidation,
+  scoring, stale AI results, external-data validation, authentication, and storage
+  failure. Keep one tutorial-solvability check and a compact round-flow check.
+- Playtest changing UI, navigation, copy, art, and AI strategy quality. Do not freeze
+  prompt wording, internal phase names, incidental call counts, or authored layouts
+  in assertions. Test our behavior, not SDK/library internals or trivial wrappers.
+- Avoid overlapping scenarios and large fixture/parameter matrices that exercise
+  the same rule. Remove tests and unused fixtures with retired features. Do not
+  preserve tests for coverage numbers or merge unrelated cases just to lower counts.
 - Keep secrets in backend configuration, never in browser code or `VITE_` variables.
 - Group Convex entry points by feature (`convex/drilly.ts` contains AI actions).
   Keep ordinary shared helpers in `convex/lib/`; do not add service/repository layers.

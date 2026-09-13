@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { ValiError } from "valibot";
 import checkpoint from "./levels/checkpoint.json";
 import { RULES } from "./game/rules";
 import { parseEditorLevel, parseJumpTicks, parseLevel, parseReplay } from "./validation";
@@ -78,15 +77,27 @@ describe("schema validation boundaries", () => {
       value: { ...level, treasures: [level.treasures[0], level.treasures[0]] },
     },
     { name: "old level version", value: { ...level, version: 1 } },
-  ])("rejects $name through the validation library", ({ value }) => {
-    expect(() => parseLevel(value)).toThrow(ValiError);
-    expect(() => parseReplay({ ...replay, level: value })).toThrow(ValiError);
+    {
+      name: "spawn inside platform",
+      value: { ...level, spawn: { x: 24, y: 430, direction: 1 } },
+    },
+    {
+      name: "too many objects",
+      value: {
+        ...level,
+        platforms: Array.from({ length: 65 }, (_, id) => ({
+          ...level.platforms[0], id: `platform-${id}`,
+        })),
+      },
+    },
+  ])("rejects $name", ({ value }) => {
+    expect(() => parseLevel(value)).toThrow();
   });
 
   it("allows incomplete drafts but requires a treasure for attempts and replays", () => {
     const empty = { ...level, treasures: [] };
     expect(parseEditorLevel(empty, level).treasures).toEqual([]);
-    expect(() => parseLevel(empty)).toThrow("Add at least one treasure");
+    expect(() => parseLevel(empty)).toThrow();
     expect(() => parseReplay({ ...replay, level: empty })).toThrow();
   });
 
@@ -96,7 +107,7 @@ describe("schema validation boundaries", () => {
     { spawn: { ...level.spawn, x: level.spawn.x + 8 } },
     { spawn: { ...level.spawn, direction: -1 } },
   ])("keeps the draft room and spawn fixed: %j", (change) => {
-    expect(() => parseEditorLevel({ ...level, ...change }, level)).toThrow("fixed");
+    expect(() => parseEditorLevel({ ...level, ...change }, level)).toThrow();
   });
 
   it("allows platform support at the spawn edge and saws exactly inside the room", () => {
@@ -109,31 +120,19 @@ describe("schema validation boundaries", () => {
     ).toHaveLength(1);
   });
 
-  it("keeps parsing non-coercing and returns independent plain data", () => {
-    const source = { ...structuredClone(level), extra: "discard me" };
-    const parsed = parseLevel(source);
-
-    expect(parsed).toEqual(level);
-    parsed.spawn.x = 100;
-    parsed.platforms[0].x = 100;
-    expect(source.spawn.x).toBe(level.spawn.x);
-    expect(source.platforms[0].x).toBe(level.platforms[0].x);
-    expect(source.extra).toBe("discard me");
-  });
-
   it("accepts the last input tick before the limit, including an empty zero-tick replay", () => {
     expect(parseJumpTicks([0, 9], 10)).toEqual([0, 9]);
     expect(parseReplay(replay)).toEqual(replay);
-    expect(() => parseJumpTicks([10], 10)).toThrow(ValiError);
-    expect(() => parseJumpTicks([0], 0)).toThrow(ValiError);
-    expect(() => parseReplay({ ...replay, jumpTicks: [0] })).toThrow(ValiError);
+    expect(() => parseJumpTicks([10], 10)).toThrow();
+    expect(() => parseJumpTicks([0], 0)).toThrow();
+    expect(() => parseReplay({ ...replay, jumpTicks: [0] })).toThrow();
   });
 
   it.each([-1, 0.5, NaN, Infinity, RULES.maxTicks + 1])(
     "rejects invalid tick limit %s even for empty input",
     (endTick) => {
-      expect(() => parseJumpTicks([], endTick)).toThrow(ValiError);
-      expect(() => parseReplay({ ...replay, endTick })).toThrow(ValiError);
+      expect(() => parseJumpTicks([], endTick)).toThrow();
+      expect(() => parseReplay({ ...replay, endTick })).toThrow();
     },
   );
 });

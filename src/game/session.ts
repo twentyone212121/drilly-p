@@ -1,101 +1,91 @@
 import { drillyErrorMessage } from "../../shared/game/drillyErrors";
 import { getPrison, newPlayerDungeon } from "../../shared/game/rooms";
 import { RULES } from "../../shared/game/rules";
-import type { Level, Replay } from "../../shared/game/types";
+import type { Level } from "../../shared/game/types";
 import {
   parseDrillyAttempts,
   parseBuiltDungeon,
   parseEditorLevel,
   parseLevel,
 } from "../../shared/validation";
-import type { BuiltDungeon } from "../../shared/game/drilly";
-import type { DrillySource } from "../../shared/game/drilly";
+import type { BuiltDungeon, DrillySource } from "../../shared/game/drilly";
 import { replayAttempt } from "../../shared/game/replay";
+import { scoreRound, type RaidAttempt } from "../../shared/game/round";
 import { createAttempt } from "./attempt";
 import { applyEdit, type Edit } from "./editor";
 
-import { scoreRound, type RaidAttempt } from "../../shared/game/round";
+type Phase = "prison" | "build" | "test" | "raid" | "watch" | "results";
+type Round = { level: Level; human: RaidAttempt[]; drilly: RaidAttempt[] };
 
-type Activity = "prison" | "testing" | "raiding";
-type Flow =
-  | { phase: "prison" }
-  | { phase: "escaped" }
-  | { phase: "building" }
-  | { phase: "testing"; revision: number }
-  | { phase: "cleared" }
-  | { phase: "raiding" }
-  | { phase: "preparing" }
-  | { phase: "raid-complete" }
-  | { phase: "ghost"; index: number }
-  | { phase: "results" };
-
-type Clear = { revision: number; replay: Replay };
-
-// The attempt owns the clock and input. The session owns progression and layout versions.
+// Attempts own simulation and inputs. The session owns the draft and round.
 export function createSession(
   options: {
     prisonLevel?: Level;
     editorLevel?: Level;
+    tutorialCompleted?: boolean;
+    onTutorialCompleted?: () => void;
     drilly?: DrillySource;
   } = {},
 ) {
   const prison = parseLevel(options.prisonLevel ?? getPrison());
-  let opponent = prison;
   const attempt = createAttempt(prison);
   let editorLevel = parseEditorLevel(
     options.editorLevel ?? newPlayerDungeon(),
     newPlayerDungeon(),
   );
-  let flow: Flow = { phase: "prison" };
-  let layoutRevision = 0;
+  let tutorialCompleted = options.tutorialCompleted ?? false;
+  let phase: Phase = tutorialCompleted ? "build" : "prison";
   let levelRevision = 0;
-  let prisonEscaped = false;
-  let clear: Clear | null = null;
-  let submission: Clear | null = null;
-  let roundId = 0;
-  let round: {
-    id: number;
-    human: RaidAttempt[];
-    drilly: RaidAttempt[];
-  } | null = null;
+  // Edits replace the draft and invalidate its clear; no revision bookkeeping needed.
+  let clearedLevel: Level | null = null;
+  let opponent: Level | null = null;
+  let round: Round | null = null;
   let result: ReturnType<typeof scoreRound> | null = null;
+  let watchIndex: number | null = null;
   let recordedAttempt = false;
-  let aiStatus: "idle" | "building" | "playing" | "ready" | "error" = "idle";
+  let aiStatus: "idle" | "pending" | "error" = "idle";
   let aiError: string | null = null;
-  let aiPending = false;
   let preparedRoom: Promise<BuiltDungeon> | null = null;
   let roomPreparation: "idle" | "building" | "ready" | "error" = "idle";
   const listeners = new Set<() => void>();
   let snapshot = makeSnapshot();
 
-  function canSubmit() {
+  function isPlaying() {
     return (
-      (flow.phase === "building" ||
-        flow.phase === "testing" ||
-        flow.phase === "cleared") &&
-      Boolean(options.drilly) &&
-      !aiPending &&
-      clear !== null &&
-      clear.revision === layoutRevision
+      phase === "prison" ||
+      phase === "test" ||
+      (phase === "raid" && opponent !== null) ||
+      (phase === "watch" && watchIndex !== null)
     );
   }
 
   function makeSnapshot() {
+    const view = attempt.getSnapshot();
     return {
-      ...attempt.getSnapshot(),
-      flow: { ...flow },
-      phase: flow.phase,
-      editorLevel: structuredClone(editorLevel),
-      layoutRevision,
-      clearedRevision: clear?.revision ?? null,
-      prisonEscaped,
-      canSubmit: canSubmit(),
-      round: structuredClone(round),
-      result: structuredClone(result),
+      ...view,
+      phase,
+      editorLevel,
+      tutorialCompleted,
+      cleared: clearedLevel !== null,
+      canChallenge:
+        (phase === "build" || phase === "test") &&
+        Boolean(options.drilly) &&
+        editorLevel.treasures.length > 0,
+      canReplayTutorial: tutorialCompleted && phase !== "prison" && view.paused,
+      canRestart:
+        isPlaying() && !(phase === "prison" && view.state.status === "won"),
+      canPlay: isPlaying(),
+      watchIndex,
+      round: round
+        ? {
+            human: round.human.map(({ outcome }) => ({ outcome })),
+            drilly: round.drilly.map(({ outcome }) => ({ outcome })),
+          }
+        : null,
+      result,
       liveDrilly: Boolean(options.drilly),
       aiStatus,
       aiError,
-      aiPending,
       roomPreparation,
     };
   }
@@ -105,139 +95,104 @@ export function createSession(
     listeners.forEach((fn) => fn());
   }
 
-  function isPlaying() {
-    return (
-      flow.phase === "prison" ||
-      flow.phase === "testing" ||
-      flow.phase === "raiding" ||
-      flow.phase === "ghost"
-    );
-  }
-
-  function currentActivity(): Activity | null {
-    switch (flow.phase) {
-      case "prison":
-      case "escaped":
-        return "prison";
-      case "testing":
-      case "cleared":
-        return "testing";
-      case "raiding":
-      case "raid-complete":
-        return "raiding";
-      case "building":
-      case "preparing":
-      case "ghost":
-      case "results":
-        return null;
-    }
-  }
-
-  function activityLevel(activity: Activity) {
-    switch (activity) {
-      case "prison":
-        return prison;
-      case "testing":
-        return editorLevel;
-      case "raiding":
-        return opponent;
-    }
-  }
-
-  function startAttempt(activity: Activity) {
-    // Validate before changing flow; an unfinished draft may have no treasures.
-    const level = parseLevel(activityLevel(activity));
-    flow =
-      activity === "testing"
-        ? { phase: activity, revision: layoutRevision }
-        : { phase: activity };
+  function loadAttempt(level: Level) {
     levelRevision++;
     recordedAttempt = false;
     attempt.loadLevel(level);
   }
 
-  function editDungeon() {
-    if (!prisonEscaped)
-      throw new Error("Escape the prison before building your dungeon.");
-
-    roundId++;
+  function leaveRound() {
     round = null;
+    opponent = null;
     result = null;
+    watchIndex = null;
     aiStatus = "idle";
     aiError = null;
-    flow = { phase: "building" };
+  }
+
+  function editDungeon() {
+    if (!tutorialCompleted)
+      throw new Error("Escape the prison before building your dungeon.");
+
+    leaveRound();
+    phase = "build";
     levelRevision++;
-    // The editor renders its own draft, which need not be a playable level yet.
-    attempt.reset();
-    warmOpponent();
+    attempt.pause();
+    prepareRoom();
+  }
+
+  function replayTutorial() {
+    if (!snapshot.canReplayTutorial) return;
+
+    leaveRound();
+    phase = "prison";
+    loadAttempt(prison);
   }
 
   function testDungeon() {
-    if (
-      flow.phase !== "building" &&
-      flow.phase !== "testing" &&
-      flow.phase !== "cleared"
-    ) {
+    if (phase !== "build" && phase !== "test")
       throw new Error("Return to building before testing your dungeon.");
-    }
 
-    startAttempt("testing");
+    // Validate before changing phase: unfinished drafts may have no treasures.
+    const level = parseLevel(editorLevel);
+    phase = "test";
+    loadAttempt(level);
   }
 
-  function submitDungeon() {
-    if (!options.drilly) throw new Error("Connect Convex to challenge Drilly.");
-    if (!canSubmit() || !clear)
-      throw new Error("Clear the current dungeon version before submitting.");
+  function challengeDrilly() {
+    if (!snapshot.canChallenge) return;
+    if (!clearedLevel) {
+      testDungeon();
+      return;
+    }
 
-    // The proof includes the exact submitted geometry and cannot change with later edits.
-    submission = structuredClone(clear);
-    round = { id: ++roundId, human: [], drilly: [] };
+    round = { level: structuredClone(clearedLevel), human: [], drilly: [] };
     result = null;
-    flow = { phase: "preparing" };
+    opponent = null;
+    phase = "raid";
+    attempt.pause();
     void prepareOpponent();
   }
 
   async function prepareOpponent() {
-    if (!round || !options.drilly || aiPending || flow.phase !== "preparing")
+    if (!round || phase !== "raid" || opponent || aiStatus === "pending")
       return;
-    const id = round.id;
-    aiPending = true;
-    aiStatus = "building";
+    const current = round;
+    aiStatus = "pending";
     aiError = null;
     notify();
     try {
-      warmOpponent();
+      prepareRoom();
       const generated = await preparedRoom!;
-      if (!round || round.id !== id || flow.phase !== "preparing") return;
+      if (round !== current) return;
+
       preparedRoom = null;
       roomPreparation = "idle";
       opponent = generated.level;
-      aiStatus = "ready";
-      startAttempt("raiding");
+      aiStatus = "idle";
+      loadAttempt(opponent);
     } catch (error) {
-      if (round?.id === id) {
-        preparedRoom = null;
-        roomPreparation = "idle";
-        aiStatus = "error";
-        aiError = drillyErrorMessage(
-          error,
-          "Drilly could not prepare a proven room. Retry or return to your draft.",
-        );
-      }
-    } finally {
-      aiPending = false;
+      if (round !== current) return;
+
+      preparedRoom = null;
+      roomPreparation = "idle";
+      aiStatus = "error";
+      aiError = drillyErrorMessage(
+        error,
+        "Drilly could not prepare a room. Retry or return to your draft.",
+      );
       notify();
     }
   }
 
-  function warmOpponent() {
+  function prepareRoom() {
     if (
       !options.drilly ||
       preparedRoom ||
-      !["building", "testing", "cleared", "preparing"].includes(flow.phase) ||
-      (aiPending && flow.phase !== "preparing")
+      !["build", "test", "raid"].includes(phase)
     )
       return;
+
     roomPreparation = "building";
     preparedRoom = options.drilly
       .build()
@@ -249,6 +204,7 @@ export function createSession(
           verified.state.tick !== built.proof.endTick
         )
           throw new Error("Drilly did not clear the generated room.");
+
         roomPreparation = "ready";
         notify();
         return built;
@@ -258,8 +214,7 @@ export function createSession(
         notify();
         throw error;
       });
-    // Preparation can finish while editing. Surface errors only when the player
-    // requests this room; never leave a background rejection unhandled.
+    // Background preparation is reused on challenge; errors surface there.
     void preparedRoom.catch(() => {});
     notify();
   }
@@ -267,17 +222,15 @@ export function createSession(
   async function requestDrilly() {
     if (
       !round ||
-      !submission ||
       !options.drilly ||
-      aiPending ||
-      flow.phase !== "raid-complete" ||
+      phase !== "watch" ||
+      aiStatus === "pending" ||
       round.drilly.length
     )
       return;
-    const id = round.id;
-    const level = structuredClone(submission.replay.level);
-    aiPending = true;
-    aiStatus = "playing";
+    const current = round;
+    const level = structuredClone(current.level);
+    aiStatus = "pending";
     aiError = null;
     notify();
     try {
@@ -285,7 +238,7 @@ export function createSession(
         await options.drilly.raid(level),
         level,
       );
-      if (!round || round.id !== id) return;
+      if (round !== current) return;
       for (const recording of attempts) {
         const verified = replayAttempt(recording.replay);
         if (
@@ -294,111 +247,90 @@ export function createSession(
         )
           throw new Error("Drilly recording does not match its outcome.");
       }
-      round.drilly = attempts;
-      aiStatus = "ready";
+      current.drilly = attempts;
+      aiStatus = "idle";
+      showAttempt(0);
     } catch (error) {
-      if (round?.id === id) {
-        aiStatus = "error";
-        aiError = drillyErrorMessage(
-          error,
-          "Drilly could not finish its attempts. Retry; no medals have been awarded.",
-        );
-      }
-    } finally {
-      aiPending = false;
-      warmOpponent();
+      if (round !== current) return;
+
+      aiStatus = "error";
+      aiError = drillyErrorMessage(
+        error,
+        "Drilly could not finish its attempts. Retry; no medals have been awarded.",
+      );
       notify();
     }
   }
 
   function reset() {
-    if (
-      flow.phase === "building" ||
-      flow.phase === "preparing" ||
-      flow.phase === "escaped" ||
-      flow.phase === "raid-complete" ||
-      flow.phase === "results"
-    )
-      return;
-
-    if (flow.phase === "ghost") {
-      showGhost(flow.index);
+    if (!snapshot.canRestart) return;
+    if (phase === "watch") {
+      showAttempt(watchIndex!);
       return;
     }
-    if (flow.phase === "raiding") {
+    if (phase === "raid") {
       recordRaid("restart");
-      if (flow.phase !== "raiding") {
-        notify();
-        return;
-      }
+      if (phase !== "raid") return;
     }
-    const activity = currentActivity();
-    if (activity) startAttempt(activity);
+    loadAttempt(
+      phase === "prison" ? prison : phase === "test" ? editorLevel : opponent!,
+    );
   }
 
   function recordRaid(outcome: RaidAttempt["outcome"]) {
-    if (!round) {
-      flow = { phase: "raid-complete" };
-      return;
-    }
-    if (recordedAttempt) return;
+    if (!round || recordedAttempt) return;
+
     recordedAttempt = true;
     round.human.push({ replay: attempt.exportReplay(), outcome });
     if (outcome === "won" || round.human.length >= RULES.raidAttempts) {
-      flow = { phase: "raid-complete" };
+      phase = "watch";
+      watchIndex = null;
+      attempt.pause();
       void requestDrilly();
     }
   }
 
-  function showGhost(index: number) {
+  function showAttempt(index: number) {
     if (!round?.drilly[index]) return;
-    flow = { phase: "ghost", index };
+
+    phase = "watch";
+    watchIndex = index;
     levelRevision++;
     attempt.loadReplay(round.drilly[index].replay);
   }
 
   function showResults() {
     if (!round?.drilly.length) return;
-    if (!result) {
-      result = scoreRound(round.human, round.drilly);
-    }
-    flow = { phase: "results" };
+
+    result ??= scoreRound(round.human, round.drilly);
+    phase = "results";
     notify();
   }
 
   attempt.subscribe(() => {
     const view = attempt.getSnapshot();
     if (view.mode === "human" && view.state.status === "won") {
-      switch (flow.phase) {
-        case "prison":
-          prisonEscaped = true;
-          flow = { phase: "escaped" };
-          break;
-        case "testing":
-          if (flow.revision === layoutRevision) {
-            clear = {
-              revision: layoutRevision,
-              replay: attempt.exportReplay(),
-            };
-            flow = { phase: "cleared" };
-          }
-          break;
-        case "raiding":
-          recordRaid("won");
-          break;
+      if (phase === "prison" && !tutorialCompleted) {
+        tutorialCompleted = true;
+        options.onTutorialCompleted?.();
+      } else if (phase === "test") {
+        clearedLevel = editorLevel;
       }
     }
-    if (flow.phase === "raiding" && view.mode === "human" && view.finished) {
-      recordRaid(view.state.status === "dead" ? "dead" : "tick-limit");
-    }
+    if (phase === "raid" && opponent && view.mode === "human" && view.finished)
+      recordRaid(
+        view.state.status === "won"
+          ? "won"
+          : view.state.status === "dead"
+            ? "dead"
+            : "tick-limit",
+      );
     notify();
   });
 
   return {
     get level() {
-      return flow.phase === "building"
-        ? structuredClone(editorLevel)
-        : attempt.level;
+      return phase === "build" ? structuredClone(editorLevel) : attempt.level;
     },
     get levelRevision() {
       return levelRevision;
@@ -412,64 +344,64 @@ export function createSession(
         listeners.delete(fn);
       };
     },
-
     edit(change: Edit) {
-      if (flow.phase !== "building")
+      if (phase !== "build")
         throw new Error("Return to editing before changing the dungeon.");
-
       const candidate = applyEdit(editorLevel, change);
       if (JSON.stringify(candidate) === JSON.stringify(editorLevel)) return;
 
       editorLevel = candidate;
-      layoutRevision++;
       levelRevision++;
-      clear = null;
+      clearedLevel = null;
       notify();
     },
     editDungeon,
-    replayGhost() {
-      showGhost(0);
+    replayTutorial,
+    replayDrilly() {
+      if (phase === "results") showAttempt(0);
     },
     testDungeon,
-    submitDungeon,
-    retryDrilly() {
-      if (aiStatus !== "error") return;
-      if (flow.phase === "preparing") void prepareOpponent();
-      else if (flow.phase === "raid-complete") void requestDrilly();
-    },
+    challengeDrilly,
+    prepareRoom,
     reset,
-
     primaryAction() {
-      switch (flow.phase) {
-        case "building":
+      switch (phase) {
+        case "build":
+          challengeDrilly();
           return;
-        case "preparing":
-          if (aiStatus === "error") void prepareOpponent();
-          return;
-        case "escaped":
         case "results":
           editDungeon();
           return;
-        case "raid-complete":
-          if (round?.drilly.length) showGhost(0);
-          else if (aiStatus === "error") void requestDrilly();
+        case "watch":
+          if (aiStatus === "error") void requestDrilly();
+          else if (watchIndex !== null) {
+            if (!attempt.getSnapshot().finished) attempt.play();
+            else if (round && watchIndex + 1 < round.drilly.length)
+              showAttempt(watchIndex + 1);
+            else showResults();
+          }
           return;
-        case "ghost":
-          if (!attempt.getSnapshot().finished) {
-            attempt.play();
+        case "raid":
+          if (!opponent) {
+            if (aiStatus === "error") void prepareOpponent();
             return;
           }
-          if (round && flow.index + 1 < round.drilly.length)
-            showGhost(flow.index + 1);
-          else showResults();
-          return;
-        case "cleared":
-          if (canSubmit()) submitDungeon();
-          return;
+          break;
+        case "prison":
+          if (attempt.frameState().status === "won") {
+            editDungeon();
+            return;
+          }
+          break;
+        case "test":
+          if (attempt.frameState().status === "won") {
+            challengeDrilly();
+            return;
+          }
+          break;
       }
-
       if (attempt.getSnapshot().finished) reset();
-      attempt.primaryAction();
+      if (isPlaying()) attempt.primaryAction();
     },
     jump() {
       if (isPlaying()) attempt.jump();

@@ -62,7 +62,7 @@ export class GameScene extends Phaser.Scene {
     this.syncLevel();
     this.roomArt?.update(
       this.session.frameState(),
-      this.session.getSnapshot().phase === "ghost",
+      this.session.getSnapshot().mode === "replay",
       delta,
     );
   }

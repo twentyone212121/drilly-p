@@ -46,7 +46,7 @@ it("allows unlimited prison retries and opens the editor after a real escape", (
   expect(() => session.editDungeon()).toThrow();
   for (let i = 0; i < RULES.raidAttempts + 1; i++) {
     finish(session);
-    expect(session.getSnapshot().prisonEscaped).toBe(false);
+    expect(session.getSnapshot().tutorialCompleted).toBe(false);
     session.reset();
   }
   finish(session, [44, 193, 228]);
@@ -57,10 +57,9 @@ it("allows unlimited prison retries and opens the editor after a real escape", (
 
 it("requires a clear and only invalidates it for accepted geometry changes", () => {
   const session = editingSession();
-  expect(() => session.submitDungeon()).toThrow();
-  session.testDungeon();
+  session.challengeDrilly();
   finish(session);
-  expect(session.getSnapshot().canSubmit).toBe(true);
+  expect(session.getSnapshot().cleared).toBe(true);
   session.editDungeon();
   const level = session.level;
   session.edit({
@@ -70,12 +69,12 @@ it("requires a clear and only invalidates it for accepted geometry changes", () 
   expect(() =>
     session.edit({ type: "put", object: newObject(level, "saw", level.spawn) }),
   ).toThrow();
-  expect(session.getSnapshot().canSubmit).toBe(true);
+  expect(session.getSnapshot().cleared).toBe(true);
   session.edit({
     type: "put",
     object: newObject(level, "saw", { x: 200, y: 96 }),
   });
-  expect(session.getSnapshot().canSubmit).toBe(false);
+  expect(session.getSnapshot().cleared).toBe(false);
 });
 
 it("allows incomplete drafts but refuses to test without a treasure", () => {
@@ -85,6 +84,8 @@ it("allows incomplete drafts but refuses to test without a treasure", () => {
     selection: { kind: "treasure", id: session.level.treasures[0].id },
   });
   expect(() => session.testDungeon()).toThrow();
+  session.replayTutorial();
+  session.editDungeon();
   expect(session.level.treasures).toHaveLength(0);
 });
 
@@ -98,7 +99,7 @@ it("never awards a clear for a failed test", () => {
     session.primaryAction();
     session.testDungeon();
     finish(session);
-    expect(session.getSnapshot().clearedRevision).toBeNull();
+    expect(session.getSnapshot().cleared).toBe(false);
   }
 });
 
@@ -107,7 +108,7 @@ it("counts each scored death or restart once, preserves the draft, and stops aft
   session.testDungeon();
   finish(session);
   const draft = session.getSnapshot().editorLevel;
-  session.submitDungeon();
+  session.challengeDrilly();
   for (let i = 0; i < 6; i++) await Promise.resolve();
   expect(session.level).toEqual(getExampleRoom());
   finish(session);

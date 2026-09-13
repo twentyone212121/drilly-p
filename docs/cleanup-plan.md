@@ -49,14 +49,9 @@ new components and new visual effects to the later redesign checkpoints.
 3. Extend the existing Phaser scene with `phaser/editorInput.ts`. Reuse room and
    obstacle art, handle scaled pointer coordinates, and commit edits on release.
    Preserve every existing hazard as an editor preset without settings forms.
-4. Delete `DungeonEditor.tsx`, `ObstacleShape.tsx`, `ObstacleInspector.tsx`,
-   `GameControls.tsx` and `DebugPanel.tsx` once replaced. Fold `platformPanels.ts`
-   into `roomArt.ts`. Remove lab, fixture, replay-import and proof-viewer navigation,
-   unused saved-draft commands and best-score state. Keep internal proof validation
-   and Drilly attempt playback. Move useful fixture helpers into test support.
-5. Replace `shared/game/campaign.ts` with `rooms.ts` for prison and starter room.
-   Delete level slots and local-practice rivalry branches. Preserve useful authored
-   rooms as test/evaluation data. Update the README to match the new player flow.
+4. Delete `DungeonEditor.tsx`, `ObstacleShape.tsx` and `GameControls.tsx` once
+   replaced. Fold `platformPanels.ts` into `roomArt.ts`. Keep internal proof
+   validation and Drilly attempt playback. Update the README to match the new flow.
 
 ## Backend removal details
 
@@ -66,18 +61,26 @@ new components and new visual effects to the later redesign checkpoints.
 2. Delete `drillyLearning.ts`, `variety.ts` and their history/novelty machinery.
    Simplify `buildBrief.ts`, `build.ts`, validators and evaluation scripts accordingly.
    Reduce the browser contract to `build()` and `raid(level)`.
-3. Retain the working movement controller, proven-room checks, bounded retries,
-   timeouts and stale-response protection. Direct model inputs are a later experiment.
+3. Preserve movement behavior during the removal pass. Keep proven-room checks,
+   bounded retries, timeouts and stale-response protection through later changes.
+
+## Later checkpoint: direct AI control
+
+Replace `convex/lib/drilly/movement.ts` predictive search with model-chosen inputs.
+Remove route-only contracts and tuning made unnecessary by that replacement.
+Execute inputs through the existing simulation and record the resulting attempt;
+do not branch into predicted futures, rewind, or hide failed raids. Keep Drilly's
+own-room verification, scored-attempt limits and replay validation. Model feedback
+may contain its own scored failures, never player clear inputs.
+
+Use a small set of representative headless rooms to settle the input format and
+decision cadence, then check a live round. Difficulty and acceptable latency remain
+playtesting decisions; the decision to remove predictive search is settled.
 
 ## Tests and performance
 
-Delete tests with removed features in each checkpoint. Consolidate repeated loop scenarios
-across session, editor, round and Drilly suites. Drop incidental assertions about
-copy, phase names, prompt wording and exact authored coordinates. Keep a compact
-set covering physics/collisions, replay parity, edit/clear and scoring rules, stale
-AI results, invalid proofs, backend authentication and tutorial storage failure.
-Retain one tutorial-solvability check and useful headless runners. Tests must protect
-behaviour without freezing implementation details; ordinary tests use a stubbed model.
+Follow the lean test policy in [AGENTS.md](../AGENTS.md). Ordinary tests use a
+stubbed model; use the headless runners and playtesting to evaluate live AI quality.
 
 Keep pointer previews out of React state and avoid full-room clones or rebuilds
 while dragging. Publish HUD snapshots only when displayed values change. Use one

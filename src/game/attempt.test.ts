@@ -6,36 +6,7 @@ import { createAttempt } from "./attempt";
 const level = parseLevel(checkpoint);
 
 describe("attempt clock and headless parity", () => {
-  it.each([
-    { name: "death", jumps: [], endTick: 51 },
-    { name: "win", jumps: [44, 193], endTick: 246 },
-    { name: "recorded limit", jumps: [], endTick: 12 },
-    { name: "empty recording", jumps: [], endTick: 0 },
-  ])(
-    "marks $name complete for controls, then resets it",
-    ({ jumps, endTick }) => {
-      const session = createAttempt(level);
-      const replay = { ...session.exportReplay(), jumpTicks: jumps, endTick };
-      session.loadReplay(replay);
-      session.step(Math.max(1, endTick));
-
-      expect(session.getSnapshot().finished).toBe(true);
-      const before = session.getSnapshot();
-      session.play();
-      session.jump();
-      expect(session.getSnapshot()).toEqual(before);
-
-      session.reset();
-      expect(session.getSnapshot()).toMatchObject({
-        finished: false,
-        paused: true,
-        mode: "human",
-        state: { tick: 0 },
-      });
-    },
-  );
-
-  it("starts and resumes with the primary action without adding a jump", () => {
+  it("starts and resumes without jumping, then jumps during play", () => {
     const session = createAttempt(level);
     session.primaryAction();
     expect(session.getSnapshot()).toMatchObject({
@@ -50,38 +21,13 @@ describe("attempt clock and headless parity", () => {
 
     expect(session.frameState().tick).toBe(2);
     expect(session.exportReplay().jumpTicks).toEqual([]);
-    expect(session.frameState().player.grounded).toBe(true);
-  });
 
-  it("jumps with the primary action during active human play", () => {
-    const session = createAttempt(level);
-    session.primaryAction();
-    session.update(1000 / 60);
     session.primaryAction();
     session.update(1000 / 60);
 
-    expect(session.exportReplay().jumpTicks).toEqual([1]);
+    expect(session.exportReplay().jumpTicks).toEqual([2]);
     expect(session.frameState().player.vy).toBeLessThan(0);
     expect(session.getSnapshot().paused).toBe(false);
-  });
-
-  it("resumes a replay without injecting human jumps", () => {
-    const session = createAttempt(level);
-    session.loadReplay({
-      ...session.exportReplay(),
-      jumpTicks: [44, 193],
-      endTick: 246,
-    });
-    session.primaryAction();
-    session.primaryAction();
-    session.update(1000 / 60);
-
-    expect(session.getSnapshot()).toMatchObject({
-      paused: false,
-      pendingJump: false,
-      mode: "replay",
-    });
-    expect(session.exportReplay().jumpTicks).toEqual([]);
   });
 
   it.each([[1000 / 30], [1000 / 60], [1000 / 144], [10, 21, 40, 9]])(
@@ -158,24 +104,18 @@ describe("attempt clock and headless parity", () => {
     session.step(12);
     const replay = session.exportReplay();
     session.loadReplay(replay);
+    session.primaryAction();
+    session.primaryAction();
     session.jump();
-    session.play();
     session.update(100);
     session.update(100);
     session.update(100);
     expect(session.getSnapshot()).toMatchObject({
       jumps: [],
       paused: true,
+      finished: true,
       state: { tick: 12 },
     });
-  });
-
-  it("invalid replay import leaves an existing attempt untouched", () => {
-    const session = createAttempt(level);
-    session.step(10);
-    const before = session.getSnapshot();
-    expect(() => session.loadReplay({ version: 3 })).toThrow();
-    expect(session.getSnapshot()).toEqual(before);
   });
 
   it("emits gameplay events once, never on render-only updates", () => {

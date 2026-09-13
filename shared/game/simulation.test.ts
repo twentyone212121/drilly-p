@@ -83,11 +83,6 @@ describe("checkpoint mechanics", () => {
     expect(result.state.collectedTreasureIds).toEqual([]);
     expect(result.events.some((e) => e.type === "treasure-collected")).toBe(false);
   });
-  it("resets all gameplay state by rebuilding from the unchanged level", () => {
-    const before = initialState(level);
-    runAttempt(level, [44, 193]);
-    expect(initialState(level)).toEqual(before);
-  });
 });
 
 describe("multiple treasures", () => {

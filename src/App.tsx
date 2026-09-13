@@ -13,7 +13,7 @@ export default function App({ session }: { session: Session }) {
     volume: 0.6,
   });
   const copy = sessionView(view);
-  const building = view.phase === "building";
+  const building = view.phase === "build";
   const level = session.level;
 
   return (
@@ -25,16 +25,21 @@ export default function App({ session }: { session: Session }) {
         </span>
       </header>
       <ol className="flow-steps" aria-label="Game progress">
-        {["Escape", "Build", "Clear", "Raid", "Watch", "Results"].map(
-          (step, index) => (
-            <li
-              key={step}
-              aria-current={copy.step === index ? "step" : undefined}
-            >
-              <span>{String(index).padStart(2, "0")}</span> {step}
-            </li>
-          ),
-        )}
+        {[
+          "Escape",
+          "Build",
+          "Test",
+          "Your raid",
+          "Drilly’s raid",
+          "Results",
+        ].map((step, index) => (
+          <li
+            key={step}
+            aria-current={copy.step === index ? "step" : undefined}
+          >
+            <span>{String(index).padStart(2, "0")}</span> {step}
+          </li>
+        ))}
       </ol>
       <section className="intro">
         <div>
@@ -42,7 +47,9 @@ export default function App({ session }: { session: Session }) {
             DRILLY P{" "}
             <span>
               /{" "}
-              {view.prisonEscaped ? "YOUR FIRST RIVALRY" : "ESCAPE THE SYSTEM"}
+              {view.tutorialCompleted
+                ? "YOUR FIRST RIVALRY"
+                : "ESCAPE THE SYSTEM"}
             </span>
           </div>
           <h1>
@@ -74,7 +81,7 @@ export default function App({ session }: { session: Session }) {
               .map((attempt, index) => `${index + 1}: ${attempt.outcome}`)
               .join(" · ")}
           </p>
-          <button onClick={() => session.replayGhost()}>
+          <button onClick={() => session.replayDrilly()}>
             Replay Drilly’s attempts
           </button>
         </section>
@@ -82,52 +89,36 @@ export default function App({ session }: { session: Session }) {
       <div
         className={building ? "flow-controls build-actions" : "flow-controls"}
       >
-        {(view.phase === "preparing" || view.phase === "raid-complete") && (
-          <button onClick={() => session.editDungeon()}>
-            Return to your draft
-          </button>
-        )}
         {building ? (
           <>
             <button
-              className={view.canSubmit ? "" : "primary"}
               disabled={!view.editorLevel.treasures.length}
               onClick={() => session.testDungeon()}
             >
               Test dungeon
             </button>
             <button
-              className={view.canSubmit ? "primary" : ""}
-              disabled={!view.canSubmit}
-              onClick={() => session.submitDungeon()}
+              className="primary"
+              disabled={!view.canChallenge}
+              onClick={() => session.challengeDrilly()}
             >
-              Submit & raid
+              Challenge Drilly
+            </button>
+            <button onClick={() => session.replayTutorial()}>
+              Replay tutorial
             </button>
             <p className="hint" role="status">
-              {view.aiPending
-                ? "The previous AI request is finishing. You can keep editing."
-                : !view.editorLevel.treasures.length
-                  ? "Add a treasure before testing."
-                  : !view.liveDrilly
-                    ? "Connect Convex to challenge Drilly."
-                    : view.canSubmit
-                      ? "Dungeon beaten. Ready to submit."
-                      : "Beat your dungeon to unlock submission."}
+              {!view.liveDrilly
+                ? "Connect Convex to challenge Drilly."
+                : copy.status}
             </p>
           </>
-        ) : view.prisonEscaped &&
-          view.phase !== "escaped" &&
-          view.phase !== "raid-complete" &&
-          view.phase !== "results" ? (
-          <>
-            <button onClick={() => session.editDungeon()}>Edit dungeon</button>
-            {view.canSubmit && view.phase !== "cleared" && (
-              <button onClick={() => session.submitDungeon()}>
-                Submit & raid
-              </button>
-            )}
-            <p className="hint">Your draft stays intact while you play.</p>
-          </>
+        ) : view.tutorialCompleted &&
+          view.phase !== "results" &&
+          !(view.phase === "prison" && view.state.status === "won") ? (
+          <button onClick={() => session.editDungeon()}>
+            Back to your dungeon
+          </button>
         ) : null}
       </div>
       <div className="game-shell">
@@ -156,7 +147,7 @@ export default function App({ session }: { session: Session }) {
               "YOUR DUNGEON"
             ) : (
               <>
-                {view.phase === "ghost"
+                {view.phase === "watch"
                   ? "DRILLY GHOST"
                   : view.mode === "replay"
                     ? "REPLAY"
@@ -182,8 +173,8 @@ export default function App({ session }: { session: Session }) {
           : "Space or a tap starts and resumes, jumps during play, and retries after a failed attempt. Wall jumps reverse direction."}
       </p>
       <p className="control-help">
-        Your layout and progress stay in this tab. Reloading starts a fresh
-        game.
+        Tutorial completion is remembered. Your draft and current round stay in
+        this tab.
       </p>
     </main>
   );
