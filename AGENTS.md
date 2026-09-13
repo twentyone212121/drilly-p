@@ -14,6 +14,9 @@ The game is **Drilly P**: **Drilly** is the AI opponent, and **P** represents th
 - Validate external data in `shared/validation.ts`. Keep session coordination in
   `src/game/session.ts` and Phaser integration in `src/game/phaser/`; renderers
   and audio react to simulation state/events rather than deciding outcomes.
+- Keep one Phaser instance across editing and play. Keep pointer previews outside
+  React state and publish UI snapshots only for displayed changes. Let static
+  screens sleep; input, resize, and session changes must wake rendering.
 - Prefer small named functions and blank lines between logical steps. Extract
   modules around clear responsibilities, not one-line wrappers.
 - Keep durable development guidance here and gameplay decisions in the design doc.

@@ -54,7 +54,7 @@ button:disabled {
 }
 button:focus-visible,
 input:focus-visible,
-.editor-canvas:focus-visible,
+.game-host canvas:focus-visible,
 .game-host:focus-visible {
   outline: 3px solid var(--cream);
   outline-offset: 4px;
@@ -288,8 +288,7 @@ h2 {
   width: min(100cqw, calc(100cqh * var(--room-ratio)));
   aspect-ratio: var(--room-ratio);
 }
-.game-host,
-.editor-canvas {
+.game-host {
   display: block;
   width: 100%;
   height: 100%;
@@ -301,16 +300,6 @@ h2 {
 }
 .game-host canvas {
   display: block;
-}
-.editor-canvas {
-  touch-action: none;
-  user-select: none;
-}
-.editor-canvas.tool-select {
-  cursor: grab;
-}
-.editor-canvas:not(.tool-select) {
-  cursor: crosshair;
 }
 .build-footer,
 .play-footer {

@@ -11,7 +11,6 @@ describe("attempt clock and headless parity", () => {
     session.primaryAction();
     expect(session.getSnapshot()).toMatchObject({
       paused: false,
-      pendingJump: false,
     });
 
     session.update(1000 / 60);
@@ -76,7 +75,7 @@ describe("attempt clock and headless parity", () => {
     expect(session.frameState().tick).toBe(1);
   });
 
-  it("resets pending input, events, clock and terminal state", () => {
+  it("resets pending input, clock and terminal state", () => {
     const session = createAttempt(level);
     session.step(51);
     session.reset();
@@ -84,12 +83,10 @@ describe("attempt clock and headless parity", () => {
     session.reset();
     expect(session.getSnapshot()).toMatchObject({
       paused: true,
-      pendingJump: false,
-      events: [],
-      jumps: [],
       state: { tick: 0, status: "running" },
     });
     session.step();
+    expect(session.exportReplay().jumpTicks).toEqual([]);
     expect(session.frameState().player.grounded).toBe(true);
   });
 
@@ -105,11 +102,11 @@ describe("attempt clock and headless parity", () => {
     session.update(100);
     session.update(100);
     expect(session.getSnapshot()).toMatchObject({
-      jumps: [],
       paused: true,
       finished: true,
       state: { tick: 12 },
     });
+    expect(session.exportReplay().jumpTicks).toEqual([]);
   });
 
   it("emits gameplay events once, never on render-only updates", () => {

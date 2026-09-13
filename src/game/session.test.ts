@@ -61,7 +61,7 @@ it("requires a clear and only invalidates it for accepted geometry changes", () 
   finish(session);
   expect(session.getSnapshot().cleared).toBe(true);
   session.editDungeon();
-  const level = session.level;
+  const level = session.getSnapshot().level;
   session.edit({
     type: "put",
     object: { kind: "treasure", value: level.treasures[0] },
@@ -81,12 +81,12 @@ it("allows incomplete drafts but refuses to test without a treasure", () => {
   const session = editingSession();
   session.edit({
     type: "delete",
-    selection: { kind: "treasure", id: session.level.treasures[0].id },
+    selection: { kind: "treasure", id: session.getSnapshot().level.treasures[0].id },
   });
   expect(() => session.testDungeon()).toThrow();
   session.replayTutorial();
   session.editDungeon();
-  expect(session.level.treasures).toHaveLength(0);
+  expect(session.getSnapshot().level.treasures).toHaveLength(0);
 });
 
 it("never awards a clear for a failed test", () => {
@@ -110,7 +110,7 @@ it("counts each scored death or restart once, preserves the draft, and stops aft
   const draft = session.getSnapshot().editorLevel;
   session.challengeDrilly();
   for (let i = 0; i < 6; i++) await Promise.resolve();
-  expect(session.level).toEqual(getExampleRoom());
+  expect(session.getSnapshot().level).toEqual(getExampleRoom());
   finish(session);
   session.pause();
   session.step();
@@ -128,7 +128,7 @@ it("counts each scored death or restart once, preserves the draft, and stops aft
     "dead",
   ]);
   session.editDungeon();
-  expect(session.level).toEqual(draft);
+  expect(session.getSnapshot().level).toEqual(draft);
   session.edit({
     type: "delete",
     selection: { kind: "treasure", id: draft.treasures[0].id },

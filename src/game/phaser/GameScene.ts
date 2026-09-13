@@ -1,25 +1,30 @@
 import { OBSTACLE_TEXTURES } from "./obstacleArt";
 import Phaser from "phaser";
-import type { Level } from "../../../shared/game/types";
+import { initialState } from "../../../shared/game/simulation";
+import type { Level, State } from "../../../shared/game/types";
 import type { Session } from "../session";
 import { AUDIO } from "./assets";
 import { createAudio, type AudioSettings } from "./audio";
 import { createRoomArt } from "./roomArt";
+import { createEditorInput, type EditorOptions } from "./editorInput";
 
 export class GameScene extends Phaser.Scene {
   private roomArt?: ReturnType<typeof createRoomArt>;
   private audio?: ReturnType<typeof createAudio>;
   private lastTick = 0;
   private wasPaused = true;
-  private levelRevision = -1;
-  private level: Level;
+  private level?: Level;
+  private editor?: ReturnType<typeof createEditorInput>;
+  private draftState?: State;
+  private wakeFrame = 0;
+  private ready = false;
 
   constructor(
     private session: Session,
     private settings: AudioSettings,
+    private editorOptions: EditorOptions,
   ) {
     super("room");
-    this.level = session.level;
   }
 
   preload() {
@@ -43,17 +48,48 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.audio = createAudio(this, this.settings);
     this.connectAudio();
-    this.input.on("pointerdown", () => this.session.primaryAction());
+    this.editor = createEditorInput(
+      this.game.canvas,
+      this.session,
+      this.editorOptions,
+      (selected, preview, invalid) => this.roomArt?.editor(selected, preview, invalid),
+      () => this.requestRender(),
+    );
+    this.ready = true;
+    this.editor.setOptions(this.editorOptions);
   }
 
   update(_time: number, delta: number) {
+    this.syncLevel(this.session.getSnapshot().level);
     this.session.update(delta);
-    this.syncLevel();
-    this.roomArt?.update(
-      this.session.frameState(),
-      this.session.getSnapshot().mode === "replay",
+    const view = this.session.getSnapshot();
+    this.syncLevel(view.level);
+    this.editor?.flushPreview();
+    const editing = view.phase === "build";
+    const animating = this.roomArt?.update(
+      editing ? this.draftState! : this.session.frameState(),
+      !editing && view.mode === "replay",
       delta,
+      editing,
     );
+    if ((view.paused || !view.canPlay) && !animating) this.game.loop.sleep();
+  }
+
+  // Coalesce input/resize wakes; Phaser remains the only continuous frame loop.
+  requestRender() {
+    if (!this.ready || this.game.loop.running || this.wakeFrame) return;
+    this.wakeFrame = requestAnimationFrame(() => {
+      this.wakeFrame = 0;
+      if (this.ready) {
+        this.game.loop.resetDelta();
+        this.game.loop.wake();
+      }
+    });
+  }
+
+  setEditor(options: EditorOptions) {
+    this.editorOptions = options;
+    this.editor?.setOptions(options);
   }
 
   setAudio(settings: AudioSettings) {
@@ -61,14 +97,16 @@ export class GameScene extends Phaser.Scene {
     this.audio?.apply(settings);
   }
 
-  private syncLevel() {
-    if (this.levelRevision === this.session.levelRevision) return;
-
-    this.level = this.session.level;
-    this.levelRevision = this.session.levelRevision;
-    this.scale.resize(this.level.width, this.level.height);
+  private syncLevel(level: Level) {
+    if (this.level === level) return;
+    this.level = level;
+    this.draftState = initialState(level);
+    if (this.scale.width !== level.width || this.scale.height !== level.height)
+      this.scale.setGameSize(level.width, level.height);
     this.roomArt?.destroy();
-    this.roomArt = createRoomArt(this, this.level);
+    this.roomArt = createRoomArt(this, level);
+    this.editor?.setLevel(level);
+    this.editor?.setOptions(this.editorOptions);
   }
 
   private stopAudioOnTransition() {
@@ -87,13 +125,20 @@ export class GameScene extends Phaser.Scene {
       this.audio?.consume(events);
       this.roomArt?.consume(events);
     });
-    const offSession = this.session.subscribe(() => this.stopAudioOnTransition());
+    const offSession = this.session.subscribe(() => {
+      this.stopAudioOnTransition();
+      this.requestRender();
+    });
     let disposed = false;
 
     const cleanup = () => {
       if (disposed) return;
 
       disposed = true;
+      this.ready = false;
+      cancelAnimationFrame(this.wakeFrame);
+      this.editor?.destroy();
+      this.roomArt?.destroy();
       offEvents();
       offSession();
       this.audio?.destroy();

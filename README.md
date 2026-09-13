@@ -39,7 +39,11 @@ but the tutorial may return after reload.
 
 The five-step path at the top shows your progress through the round. Use the
 overlay buttons to start or retry; Space or tap jumps during play. Wall jumps
-reverse direction. Press Escape or the pause button to pause and open the menu.
+reverse direction. Use the pause button to open the menu. Escape cancels the
+current editor drag/tool, or opens the pause menu when nothing needs cancelling.
+Choose a preset to place objects; use Move to drag them or resize a platform from
+its corner. Arrow keys nudge the selection and Delete removes it. Edits commit on
+release; rejected or cancelled drags preserve the draft and its clear.
 Editing a cleared dungeon requires clearing the edited layout before submitting it.
 Layouts and the current round remain in the tab only. **Test room** is also
 available for practice. **Replay tutorial** is in the pause menu, accessible from
@@ -48,6 +52,9 @@ and its existing clear.
 
 Convex is the only AI backend. Without its connection you can escape and edit/test
 your room, but cannot submit a challenge.
+
+React renders the controls and overlays. One Phaser scene draws both editing and
+play, while the shared simulation owns movement and replay outcomes.
 
 ## Verification
 

@@ -308,11 +308,13 @@ describe("obstacle validation and replays", () => {
       const expected = replayAttempt(replay);
       const attempt = createAttempt(level);
       attempt.loadReplay(replay);
+      const events: typeof expected.events = [];
+      attempt.onEvents((next) => events.push(...next));
       attempt.play();
       for (let i = 0; i < 2000 && !attempt.getSnapshot().finished; i++)
         attempt.update(1000 / 60);
       expect(attempt.frameState()).toEqual(expected.state);
-      expect(attempt.getSnapshot().events).toEqual(expected.events);
+      expect(events).toEqual(expected.events);
     },
   );
 });

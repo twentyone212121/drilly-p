@@ -32,7 +32,7 @@ export function createSession(
   let editorLevel = parseEditorLevel(options.editorLevel ?? newPlayerDungeon(), newPlayerDungeon());
   let tutorialCompleted = options.tutorialCompleted ?? false;
   let phase: Phase = tutorialCompleted ? "build" : "prison";
-  let levelRevision = 0;
+  let attemptLevel = prison;
   // Edits replace the draft and invalidate its clear; no revision bookkeeping needed.
   let clearedLevel: Level | null = null;
   let opponent: Level | null = null;
@@ -61,6 +61,8 @@ export function createSession(
     return {
       ...view,
       phase,
+      // Read-only room references: accepted edits replace the draft.
+      level: phase === "build" ? editorLevel : attemptLevel,
       editorLevel,
       tutorialCompleted,
       cleared: clearedLevel !== null,
@@ -92,7 +94,7 @@ export function createSession(
   }
 
   function loadAttempt(level: Level) {
-    levelRevision++;
+    attemptLevel = level;
     recordedAttempt = false;
     attempt.loadLevel(level);
   }
@@ -111,7 +113,6 @@ export function createSession(
 
     leaveRound();
     phase = "build";
-    levelRevision++;
     attempt.pause();
     prepareRoom();
   }
@@ -129,9 +130,9 @@ export function createSession(
       throw new Error("Return to building before testing your dungeon.");
 
     // Validate before changing phase: unfinished drafts may have no treasures.
-    const level = parseLevel(editorLevel);
+    parseLevel(editorLevel);
     phase = "test";
-    loadAttempt(level);
+    loadAttempt(editorLevel);
   }
 
   function challengeDrilly() {
@@ -141,7 +142,7 @@ export function createSession(
       return;
     }
 
-    round = { level: structuredClone(clearedLevel), human: [], drilly: [] };
+    round = { level: clearedLevel, human: [], drilly: [] };
     result = null;
     opponent = null;
     phase = "raid";
@@ -276,7 +277,7 @@ export function createSession(
 
     phase = "watch";
     watchIndex = index;
-    levelRevision++;
+    attemptLevel = round.level;
     attempt.loadReplay(round.drilly[index].replay);
   }
 
@@ -306,12 +307,6 @@ export function createSession(
   });
 
   return {
-    get level() {
-      return phase === "build" ? structuredClone(editorLevel) : attempt.level;
-    },
-    get levelRevision() {
-      return levelRevision;
-    },
     frameState: attempt.frameState,
     getSnapshot: () => snapshot,
     onEvents: attempt.onEvents,
@@ -327,7 +322,6 @@ export function createSession(
       if (JSON.stringify(candidate) === JSON.stringify(editorLevel)) return;
 
       editorLevel = candidate;
-      levelRevision++;
       clearedLevel = null;
       notify();
     },

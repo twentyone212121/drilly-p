@@ -60,7 +60,7 @@ describe("live Drilly rivalry", () => {
     session.challengeDrilly();
     expect(session.getSnapshot().canPlay).toBe(false);
     await flush();
-    expect(session.level.name).toBe("AI room");
+    expect(session.getSnapshot().level.name).toBe("AI room");
     expect(session.getSnapshot().canPlay).toBe(true);
     session.step(RULES.maxTicks);
     await flush();
@@ -77,7 +77,7 @@ describe("live Drilly rivalry", () => {
     expect(source.raid).toHaveBeenCalledTimes(1);
 
     session.primaryAction();
-    const draft = session.level;
+    const draft = session.getSnapshot().level;
     session.challengeDrilly();
     await flush();
     expect(session.getSnapshot().editorLevel).toEqual(draft);
@@ -202,7 +202,7 @@ it("returns to the draft after tutorial replay and ignores the abandoned room re
   });
   session.step(RULES.maxTicks);
   session.primaryAction();
-  expect(session.level).toEqual(draft);
+  expect(session.getSnapshot().level).toEqual(draft);
   expect(session.getSnapshot().cleared).toBe(true);
 });
 

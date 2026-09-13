@@ -49,8 +49,8 @@ new components and new visual effects to the later redesign checkpoints.
 3. Extend the existing Phaser scene with `phaser/editorInput.ts`. Reuse room and
    obstacle art, handle scaled pointer coordinates, and commit edits on release.
    Preserve every existing hazard as an editor preset without settings forms.
-4. Delete `DungeonEditor.tsx`, `ObstacleShape.tsx` and `GameControls.tsx` once
-   replaced. Fold `platformPanels.ts` into `roomArt.ts`. Keep internal proof
+   Delete the replaced `DungeonEditor.tsx` and `ObstacleShape.tsx` in the same
+   checkpoint and fold `platformPanels.ts` into `roomArt.ts`. Keep internal proof
    validation and Drilly attempt playback. Update the README to match the new flow.
 
 ## Backend removal details

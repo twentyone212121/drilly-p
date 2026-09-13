@@ -1,8 +1,7 @@
 import type { ObstacleKind } from "../../shared/game/obstacleTypes";
-import type { ObjectKind } from "../game/editor";
+import type { Tool } from "../game/phaser/editorInput";
 import { GameIcon, GameSprite } from "./GameArt";
 
-export type Tool = "select" | ObjectKind;
 const tools: { tool: Tool; label: string; obstacleKind?: ObstacleKind }[] = [
   { tool: "select", label: "Move" },
   { tool: "platform", label: "Platform" },
