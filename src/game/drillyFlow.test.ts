@@ -34,11 +34,7 @@ async function flush() {
 }
 async function review(session: Session) {
   session.primaryAction();
-  for (
-    let i = 0;
-    i < RULES.raidAttempts && !session.getSnapshot().result;
-    i++
-  ) {
+  for (let i = 0; i < RULES.raidAttempts && !session.getSnapshot().result; i++) {
     session.step(RULES.maxTicks);
     session.primaryAction();
   }
@@ -139,10 +135,7 @@ describe("live Drilly rivalry", () => {
 
 it("retries room generation without consuming a human raid attempt", async () => {
   const source = {
-    build: vi
-      .fn()
-      .mockRejectedValueOnce(new Error("no proven room"))
-      .mockResolvedValue(built()),
+    build: vi.fn().mockRejectedValueOnce(new Error("no proven room")).mockResolvedValue(built()),
     raid: vi.fn(),
   };
   const session = ready(source);
@@ -158,8 +151,7 @@ it("retries room generation without consuming a human raid attempt", async () =>
 });
 
 it("ignores an abandoned raid response while a new round is waiting", async () => {
-  const responses: ((value: ReturnType<typeof runDrillyFixture>) => void)[] =
-    [];
+  const responses: ((value: ReturnType<typeof runDrillyFixture>) => void)[] = [];
   const source: DrillySource = {
     build: async () => built(),
     raid: () =>

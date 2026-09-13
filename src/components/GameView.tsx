@@ -3,13 +3,7 @@ import { createGame } from "../game/phaser/createGame";
 import type { AudioSettings } from "../game/phaser/audio";
 import type { Session } from "../game/session";
 
-export function GameView({
-  session,
-  audio,
-}: {
-  session: Session;
-  audio: AudioSettings;
-}) {
+export function GameView({ session, audio }: { session: Session; audio: AudioSettings }) {
   const host = useRef<HTMLDivElement>(null);
   const game = useRef<ReturnType<typeof createGame> | null>(null);
   const initialAudio = useRef(audio);
@@ -39,7 +33,7 @@ export function GameView({
       const target = event.target;
       if (
         target instanceof HTMLElement &&
-        (target.closest("input, textarea, select") || target.isContentEditable)
+        (target.closest("dialog, input, textarea, select") || target.isContentEditable)
       )
         return;
 
@@ -62,9 +56,6 @@ export function GameView({
     <div
       ref={host}
       className="game-host"
-      style={{
-        aspectRatio: `${session.level.width} / ${session.level.height}`,
-      }}
       role="region"
       aria-label="Dungeon game. Tap to start, jump, retry, or continue."
       tabIndex={0}

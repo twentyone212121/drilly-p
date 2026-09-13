@@ -37,11 +37,14 @@ but the tutorial may return after reload.
 4. Clear its room or finish your three attempts, then watch Drilly’s recordings
    and view the results. Return to your existing draft for another round.
 
-Space or tap starts/resumes play and jumps. Wall jumps reverse direction. Editing
-a cleared dungeon requires clearing the edited layout before submitting it.
-Layouts and the current round remain in the tab only. **Test dungeon** is also
-available for practice. **Replay tutorial** is available in the editor and while
-paused; it ends the current round and preserves your draft and its existing clear.
+The five-step path at the top shows your progress through the round. Use the
+overlay buttons to start or retry; Space or tap jumps during play. Wall jumps
+reverse direction. Press Escape or the pause button to pause and open the menu.
+Editing a cleared dungeon requires clearing the edited layout before submitting it.
+Layouts and the current round remain in the tab only. **Test room** is also
+available for practice. **Replay tutorial** is in the pause menu, accessible from
+the editor and during play; it ends the current round and preserves your draft
+and its existing clear.
 
 Convex is the only AI backend. Without its connection you can escape and edit/test
 your room, but cannot submit a challenge.

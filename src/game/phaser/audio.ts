@@ -22,8 +22,7 @@ export function createAudio(scene: Phaser.Scene, settings: AudioSettings) {
 
   function playEvent(event: GameEvent) {
     const key = EVENT_SOUNDS[event.type];
-    if (!key || scene.sound.locked || current.muted || current.volume <= 0)
-      return;
+    if (!key || scene.sound.locked || current.muted || current.volume <= 0) return;
     if (!scene.cache.audio.exists(key)) return;
 
     scene.sound.play(key);

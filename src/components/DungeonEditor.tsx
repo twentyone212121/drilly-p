@@ -1,6 +1,6 @@
 import type { ObstacleKind } from "../../shared/game/obstacleTypes";
 import { ObstacleShape, ObstacleGuides } from "./ObstacleShape";
-import { useRef, useState, type PointerEvent } from "react";
+import { useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { RULES } from "../../shared/game/rules";
 import type { Level } from "../../shared/game/types";
 import {
@@ -13,7 +13,6 @@ import {
   placementError,
   resizePlatform,
   type EditorObject,
-  type ObjectKind,
   type Point,
   type Selection,
 } from "../game/editor";
@@ -22,7 +21,7 @@ import propsAtlas from "../../public/assets/environment/computer-props.json";
 import { platformPanels } from "../game/art/platformPanels";
 import escAtlas from "../../public/assets/characters/esc.json";
 
-type Tool = "select" | ObjectKind;
+import { EditorTools, type Tool } from "./EditorTools";
 type Drag = {
   pointerId: number;
   origin: Point;
@@ -30,24 +29,14 @@ type Drag = {
   operation: "place" | "move" | "resize";
 };
 
-const TOOLS: { tool: Tool; label: string; obstacleKind?: ObstacleKind }[] = [
-  { tool: "select", label: "Select / move" },
-  { tool: "platform", label: "+ Platform" },
-  { tool: "saw", label: "+ Saw" },
-  { tool: "treasure", label: "+ Treasure" },
-  { tool: "obstacle", obstacleKind: "spikes", label: "+ Spikes" },
-  { tool: "obstacle", obstacleKind: "slider", label: "+ Sliding saw" },
-  { tool: "obstacle", obstacleKind: "turret", label: "+ Turret" },
-  { tool: "obstacle", obstacleKind: "drone", label: "+ Drone" },
-  { tool: "obstacle", obstacleKind: "pursuer", label: "+ Pursuer" },
-];
-
 export function DungeonEditor({
   session,
   level,
+  actions,
 }: {
   session: Session;
   level: Level;
+  actions: ReactNode;
 }) {
   const [obstacleKind, setObstacleKind] = useState<ObstacleKind>("spikes");
   const [tool, setTool] = useState<Tool>("select");
@@ -174,149 +163,114 @@ export function DungeonEditor({
   }
 
   return (
-    <div className="dungeon-editor">
-      <div
-        className="editor-toolbar"
-        role="toolbar"
-        aria-label="Dungeon objects"
-      >
-        {TOOLS.map(({ tool: next, label, obstacleKind: variant }) => (
-          <button
-            key={label}
-            aria-pressed={
-              tool === next && (!variant || obstacleKind === variant)
-            }
-            onClick={() => {
-              if (variant) setObstacleKind(variant);
-              chooseTool(next);
+    <>
+      <section className="playfield" aria-label="Room editor">
+        <div className="room-viewport">
+          <svg
+            className={"editor-canvas tool-" + tool}
+            viewBox={`0 0 ${level.width} ${level.height}`}
+            role="img"
+            aria-label="Dungeon editor. Select and drag objects. Drag the platform corner to resize. Arrow keys move the selected object; Delete removes it; Escape cancels."
+            tabIndex={0}
+            onPointerDown={pointerDown}
+            onPointerMove={pointerMove}
+            onPointerUp={pointerUp}
+            onPointerCancel={cancelDrag}
+            onLostPointerCapture={cancelDrag}
+            onPointerLeave={() => {
+              if (!drag.current) setPreview(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && (tool !== "select" || drag.current)) {
+                event.preventDefault();
+                event.stopPropagation();
+                cancelDrag();
+                chooseTool("select");
+                return;
+              }
+
+              if (event.key === "Delete" || event.key === "Backspace") {
+                event.preventDefault();
+                cancelDrag();
+                deleteSelected();
+                return;
+              }
+
+              const directions: Record<string, Point> = {
+                ArrowLeft: { x: -RULES.editor.gridSize, y: 0 },
+                ArrowRight: { x: RULES.editor.gridSize, y: 0 },
+                ArrowUp: { x: 0, y: -RULES.editor.gridSize },
+                ArrowDown: { x: 0, y: RULES.editor.gridSize },
+              };
+              if (selected && directions[event.key] && !drag.current) {
+                event.preventDefault();
+                commit(moveObject(selected, directions[event.key]));
+              }
             }}
           >
-            {label}
-          </button>
-        ))}
-        <button disabled={!selected} onClick={deleteSelected}>
-          Delete selected
-        </button>
-        <span className="hint">
-          {RULES.editor.gridSize} px grid · room & spawn fixed
-        </span>
-      </div>
-      <svg
-        className={"editor-canvas tool-" + tool}
-        viewBox={`0 0 ${level.width} ${level.height}`}
-        role="img"
-        aria-label="Dungeon editor. Select and drag objects. Drag the platform corner to resize. Arrow keys move the selected object; Delete removes it; Escape cancels."
-        tabIndex={0}
-        onPointerDown={pointerDown}
-        onPointerMove={pointerMove}
-        onPointerUp={pointerUp}
-        onPointerCancel={cancelDrag}
-        onLostPointerCapture={cancelDrag}
-        onPointerLeave={() => {
-          if (!drag.current) setPreview(null);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            cancelDrag();
-            chooseTool("select");
-            return;
-          }
-
-          if (event.key === "Delete" || event.key === "Backspace") {
-            event.preventDefault();
-            cancelDrag();
-            deleteSelected();
-            return;
-          }
-
-          const directions: Record<string, Point> = {
-            ArrowLeft: { x: -RULES.editor.gridSize, y: 0 },
-            ArrowRight: { x: RULES.editor.gridSize, y: 0 },
-            ArrowUp: { x: 0, y: -RULES.editor.gridSize },
-            ArrowDown: { x: 0, y: RULES.editor.gridSize },
-          };
-          if (selected && directions[event.key] && !drag.current) {
-            event.preventDefault();
-            commit(moveObject(selected, directions[event.key]));
-          }
-        }}
-      >
-        <defs>
-          <pattern
-            id="editor-grid"
-            width={RULES.editor.gridSize}
-            height={RULES.editor.gridSize}
-            patternUnits="userSpaceOnUse"
-          >
-            <path
-              d={`M ${RULES.editor.gridSize} 0 H 0 V ${RULES.editor.gridSize}`}
-              fill="none"
-              stroke="#45606f"
-              strokeWidth="0.5"
-              opacity="0.45"
+            <defs>
+              <pattern
+                id="editor-grid"
+                width={RULES.editor.gridSize}
+                height={RULES.editor.gridSize}
+                patternUnits="userSpaceOnUse"
+              >
+                <path
+                  d={`M ${RULES.editor.gridSize} 0 H 0 V ${RULES.editor.gridSize}`}
+                  fill="none"
+                  stroke="#45606f"
+                  strokeWidth="0.5"
+                  opacity="0.45"
+                />
+              </pattern>
+            </defs>
+            <rect width={level.width} height={level.height} fill="url(#editor-grid)" />
+            {objects.map((object) => (
+              <ObjectShape key={object.value.id} object={object} />
+            ))}
+            <AtlasFrame
+              atlas="characters/esc"
+              frame={escAtlas.frames.idle.frame}
+              x={level.spawn.x}
+              y={level.spawn.y}
+              width={RULES.playerWidth}
+              height={RULES.playerHeight}
             />
-          </pattern>
-        </defs>
-        <image
-          href="/assets/backgrounds/computer-interior.webp"
-          width={level.width}
-          height={level.height}
-          preserveAspectRatio="none"
-        />
-        <rect
-          width={level.width}
-          height={level.height}
-          fill="#07111e"
-          opacity="0.35"
-        />
-        <rect
-          width={level.width}
-          height={level.height}
-          fill="url(#editor-grid)"
-        />
-        {objects.map((object) => (
-          <ObjectShape key={object.value.id} object={object} />
-        ))}
-        <AtlasFrame
-          atlas="characters/esc"
-          frame={escAtlas.frames.idle.frame}
-          x={level.spawn.x}
-          y={level.spawn.y}
-          width={RULES.playerWidth}
-          height={RULES.playerHeight}
-        />
-        <text x={level.spawn.x} y={level.spawn.y - 10} className="spawn-label">
-          ESC START →
-        </text>
-        {selected?.kind === "obstacle" && (
-          <ObstacleGuides obstacle={selected.value} level={level} />
+            {selected?.kind === "obstacle" && (
+              <ObstacleGuides obstacle={selected.value} level={level} />
+            )}
+            {preview?.kind === "obstacle" && (
+              <ObstacleGuides obstacle={preview.value} level={level} />
+            )}
+            {selected && <ObjectOutline object={selected} resize={tool === "select"} />}
+            {preview && (
+              <g opacity="0.65" pointerEvents="none">
+                <ObjectShape object={preview} />
+                <ObjectOutline object={preview} invalid={error !== null} />
+              </g>
+            )}
+          </svg>
+        </div>
+        {(error || message) && (
+          <p className="editor-feedback" role="status">
+            {error ?? message}
+          </p>
         )}
-        {preview?.kind === "obstacle" && (
-          <ObstacleGuides obstacle={preview.value} level={level} />
-        )}
-        {selected && (
-          <ObjectOutline object={selected} resize={tool === "select"} />
-        )}
-        {preview && (
-          <g opacity="0.65" pointerEvents="none">
-            <ObjectShape object={preview} />
-            <ObjectOutline object={preview} invalid={error !== null} />
-          </g>
-        )}
-      </svg>
-      <p
-        className={
-          error || message ? "editor-feedback invalid" : "editor-feedback"
-        }
-        role="status"
-      >
-        {error ??
-          (message ||
-            (tool === "select"
-              ? "Drag to move. Drag a selected platform’s bottom-right corner to resize. Arrow keys nudge; Delete removes."
-              : "Move over the room to preview, then click to place. Escape returns to selection."))}
-      </p>
-    </div>
+      </section>
+      <footer className="build-footer">
+        <EditorTools
+          tool={tool}
+          obstacleKind={obstacleKind}
+          hasSelection={Boolean(selected)}
+          onChoose={(next, variant) => {
+            if (variant) setObstacleKind(variant);
+            chooseTool(next);
+          }}
+          onDelete={deleteSelected}
+        />
+        {actions}
+      </footer>
+    </>
   );
 }
 
@@ -338,8 +292,7 @@ function AtlasFrame({
   width: number;
   height: number;
 }) {
-  const size =
-    atlas === "characters/esc" ? escAtlas.meta.size : propsAtlas.meta.size;
+  const size = atlas === "characters/esc" ? escAtlas.meta.size : propsAtlas.meta.size;
 
   return (
     <svg
@@ -359,18 +312,13 @@ function AtlasFrame({
 }
 
 function ObjectShape({ object }: { object: EditorObject }) {
-  if (object.kind === "obstacle")
-    return <ObstacleShape obstacle={object.value} />;
+  if (object.kind === "obstacle") return <ObstacleShape obstacle={object.value} />;
   const bounds = objectBounds(object);
   if (object.kind === "platform") {
     return (
       <g pointerEvents="none" aria-hidden="true">
         {platformPanels(bounds).map(({ color, ...rect }, index) => (
-          <rect
-            key={index}
-            {...rect}
-            fill={`#${color.toString(16).padStart(6, "0")}`}
-          />
+          <rect key={index} {...rect} fill={`#${color.toString(16).padStart(6, "0")}`} />
         ))}
       </g>
     );
@@ -399,13 +347,7 @@ function ObjectOutline({
   const color = invalid ? "#ff568e" : "#50dcf3";
   return (
     <g pointerEvents="none">
-      <rect
-        {...bounds}
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeDasharray="6 3"
-      />
+      <rect {...bounds} fill="none" stroke={color} strokeWidth="2" strokeDasharray="6 3" />
       {resize && object.kind === "platform" && (
         <rect
           x={bounds.x + bounds.width - 6}

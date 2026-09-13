@@ -42,11 +42,7 @@ describe("attempt clock and headless parity", () => {
       const trajectory = [session.frameState()];
       session.onEvents(() => trajectory.push(session.frameState()));
       session.play();
-      for (
-        let frame = 0;
-        !session.getSnapshot().paused && frame < 5000;
-        frame++
-      )
+      for (let frame = 0; !session.getSnapshot().paused && frame < 5000; frame++)
         session.update(intervals[frame % intervals.length]);
       expect(session.frameState().status).toBe("won");
       expect(trajectory).toEqual(runAttempt(level, [44, 193]).trajectory);
@@ -62,9 +58,7 @@ describe("attempt clock and headless parity", () => {
     session.jump();
     session.step(53);
     expect(session.exportReplay().jumpTicks).toEqual([44, 45, 193]);
-    expect(replayAttempt(session.exportReplay()).state).toEqual(
-      session.frameState(),
-    );
+    expect(replayAttempt(session.exportReplay()).state).toEqual(session.frameState());
     expect(session.frameState().status).toBe("won");
   });
 

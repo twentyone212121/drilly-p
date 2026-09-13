@@ -8,7 +8,6 @@ import { createRoomArt } from "./roomArt";
 
 export class GameScene extends Phaser.Scene {
   private roomArt?: ReturnType<typeof createRoomArt>;
-  private background!: Phaser.GameObjects.Image;
   private audio?: ReturnType<typeof createAudio>;
   private lastTick = 0;
   private wasPaused = true;
@@ -25,25 +24,16 @@ export class GameScene extends Phaser.Scene {
 
   preload() {
     for (const name of OBSTACLE_TEXTURES) {
-      if (name === "turret")
-        this.load.image("obstacle-turret", "/assets/obstacles/turret.png");
+      if (name === "turret") this.load.image("obstacle-turret", "/assets/obstacles/turret.png");
       else this.load.svg(`obstacle-${name}`, `/assets/obstacles/${name}.svg`);
     }
     for (const name of ["esc", "esc-run", "drilly"]) {
-      this.load.atlas(
-        name,
-        `/assets/characters/${name}.png`,
-        `/assets/characters/${name}.json`,
-      );
+      this.load.atlas(name, `/assets/characters/${name}.png`, `/assets/characters/${name}.json`);
     }
     this.load.atlas(
       "computer-props",
       "/assets/environment/computer-props.png",
       "/assets/environment/computer-props.json",
-    );
-    this.load.image(
-      "computer-interior",
-      "/assets/backgrounds/computer-interior.webp",
     );
     for (const [key, path] of Object.entries(AUDIO)) {
       this.load.audio(key, path);
@@ -51,7 +41,6 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
-    this.background = this.add.image(0, 0, "computer-interior").setOrigin(0);
     this.audio = createAudio(this, this.settings);
     this.connectAudio();
     this.input.on("pointerdown", () => this.session.primaryAction());
@@ -78,7 +67,6 @@ export class GameScene extends Phaser.Scene {
     this.level = this.session.level;
     this.levelRevision = this.session.levelRevision;
     this.scale.resize(this.level.width, this.level.height);
-    this.background.setDisplaySize(this.level.width, this.level.height);
     this.roomArt?.destroy();
     this.roomArt = createRoomArt(this, this.level);
   }
@@ -86,8 +74,7 @@ export class GameScene extends Phaser.Scene {
   private stopAudioOnTransition() {
     const view = this.session.getSnapshot();
     const restarted = view.state.tick < this.lastTick;
-    const justPaused =
-      !this.wasPaused && view.paused && view.state.status === "running";
+    const justPaused = !this.wasPaused && view.paused && view.state.status === "running";
 
     if (restarted || justPaused) this.audio?.stop();
 
@@ -100,9 +87,7 @@ export class GameScene extends Phaser.Scene {
       this.audio?.consume(events);
       this.roomArt?.consume(events);
     });
-    const offSession = this.session.subscribe(() =>
-      this.stopAudioOnTransition(),
-    );
+    const offSession = this.session.subscribe(() => this.stopAudioOnTransition());
     let disposed = false;
 
     const cleanup = () => {

@@ -29,10 +29,7 @@ export function createSession(
 ) {
   const prison = parseLevel(options.prisonLevel ?? getPrison());
   const attempt = createAttempt(prison);
-  let editorLevel = parseEditorLevel(
-    options.editorLevel ?? newPlayerDungeon(),
-    newPlayerDungeon(),
-  );
+  let editorLevel = parseEditorLevel(options.editorLevel ?? newPlayerDungeon(), newPlayerDungeon());
   let tutorialCompleted = options.tutorialCompleted ?? false;
   let phase: Phase = tutorialCompleted ? "build" : "prison";
   let levelRevision = 0;
@@ -72,8 +69,7 @@ export function createSession(
         Boolean(options.drilly) &&
         editorLevel.treasures.length > 0,
       canReplayTutorial: tutorialCompleted && phase !== "prison" && view.paused,
-      canRestart:
-        isPlaying() && !(phase === "prison" && view.state.status === "won"),
+      canRestart: isPlaying() && !(phase === "prison" && view.state.status === "won"),
       canPlay: isPlaying(),
       watchIndex,
       round: round
@@ -111,8 +107,7 @@ export function createSession(
   }
 
   function editDungeon() {
-    if (!tutorialCompleted)
-      throw new Error("Escape the prison before building your dungeon.");
+    if (!tutorialCompleted) throw new Error("Escape the prison before building your dungeon.");
 
     leaveRound();
     phase = "build";
@@ -155,8 +150,7 @@ export function createSession(
   }
 
   async function prepareOpponent() {
-    if (!round || phase !== "raid" || opponent || aiStatus === "pending")
-      return;
+    if (!round || phase !== "raid" || opponent || aiStatus === "pending") return;
     const current = round;
     aiStatus = "pending";
     aiError = null;
@@ -186,12 +180,7 @@ export function createSession(
   }
 
   function prepareRoom() {
-    if (
-      !options.drilly ||
-      preparedRoom ||
-      !["build", "test", "raid"].includes(phase)
-    )
-      return;
+    if (!options.drilly || preparedRoom || !["build", "test", "raid"].includes(phase)) return;
 
     roomPreparation = "building";
     preparedRoom = options.drilly
@@ -199,10 +188,7 @@ export function createSession(
       .then((value) => {
         const built = parseBuiltDungeon(value);
         const verified = replayAttempt(built.proof);
-        if (
-          verified.stopReason !== "won" ||
-          verified.state.tick !== built.proof.endTick
-        )
+        if (verified.stopReason !== "won" || verified.state.tick !== built.proof.endTick)
           throw new Error("Drilly did not clear the generated room.");
 
         roomPreparation = "ready";
@@ -234,10 +220,7 @@ export function createSession(
     aiError = null;
     notify();
     try {
-      const attempts = parseDrillyAttempts(
-        await options.drilly.raid(level),
-        level,
-      );
+      const attempts = parseDrillyAttempts(await options.drilly.raid(level), level);
       if (round !== current) return;
       for (const recording of attempts) {
         const verified = replayAttempt(recording.replay);
@@ -272,9 +255,7 @@ export function createSession(
       recordRaid("restart");
       if (phase !== "raid") return;
     }
-    loadAttempt(
-      phase === "prison" ? prison : phase === "test" ? editorLevel : opponent!,
-    );
+    loadAttempt(phase === "prison" ? prison : phase === "test" ? editorLevel : opponent!);
   }
 
   function recordRaid(outcome: RaidAttempt["outcome"]) {
@@ -319,11 +300,7 @@ export function createSession(
     }
     if (phase === "raid" && opponent && view.mode === "human" && view.finished)
       recordRaid(
-        view.state.status === "won"
-          ? "won"
-          : view.state.status === "dead"
-            ? "dead"
-            : "tick-limit",
+        view.state.status === "won" ? "won" : view.state.status === "dead" ? "dead" : "tick-limit",
       );
     notify();
   });
@@ -345,8 +322,7 @@ export function createSession(
       };
     },
     edit(change: Edit) {
-      if (phase !== "build")
-        throw new Error("Return to editing before changing the dungeon.");
+      if (phase !== "build") throw new Error("Return to editing before changing the dungeon.");
       const candidate = applyEdit(editorLevel, change);
       if (JSON.stringify(candidate) === JSON.stringify(editorLevel)) return;
 
@@ -376,8 +352,7 @@ export function createSession(
           if (aiStatus === "error") void requestDrilly();
           else if (watchIndex !== null) {
             if (!attempt.getSnapshot().finished) attempt.play();
-            else if (round && watchIndex + 1 < round.drilly.length)
-              showAttempt(watchIndex + 1);
+            else if (round && watchIndex + 1 < round.drilly.length) showAttempt(watchIndex + 1);
             else showResults();
           }
           return;

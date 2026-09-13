@@ -45,18 +45,12 @@ export function ObstacleGuides({ obstacle: o, level }: { obstacle: Obstacle; lev
         <>
           <path d={`M${o.x} ${o.y}L${o.endX} ${o.endY}`} />
           <circle cx={o.endX} cy={o.endY} r={o.radius} />
-          <text x={o.endX + 8} y={o.endY - o.radius - 6} fill="#61e0eb" stroke="none" fontSize="11">
-            ROUTE END
-          </text>
         </>
       )}
       {o.kind === "pursuer" && (
         <>
           <circle cx={o.x} cy={o.y} r={o.detectionRange} />
           <circle cx={o.x} cy={o.y} r={o.chaseRange} stroke="#ee5fb9" />
-          <text x={o.x + 8} y={o.y - o.radius - 10} fill="#61e0eb" stroke="none" fontSize="11">
-            DETECT / ESCAPE
-          </text>
         </>
       )}
       {o.kind === "turret" &&

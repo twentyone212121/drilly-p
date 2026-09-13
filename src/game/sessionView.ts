@@ -2,142 +2,99 @@ import { RULES } from "../../shared/game/rules";
 import type { SessionSnapshot } from "./session";
 
 type ViewCopy = {
-  step: number;
   title: string;
   hint: string;
-  status: string;
   action: string;
   actionDisabled?: boolean;
 };
 
 // Presentation only: transitions and outcomes belong to the session.
 export function sessionView(view: SessionSnapshot): ViewCopy {
-  const { phase, state, paused, finished } = view;
+  const { phase, state, finished } = view;
   switch (phase) {
     case "prison":
-      return {
-        step: 0,
-        title: state.status === "won" ? "Prison escaped" : "Escape the prison",
-        hint: "Collect every treasure. Jump off walls to reverse direction.",
-        ...attemptCopy(view, "escape"),
-        ...(state.status === "won"
-          ? {
-              status: "Your dungeon is next.",
-              action: "Build your dungeon",
-            }
-          : {}),
-      };
+      return state.status === "won"
+        ? {
+            title: "You’re out!",
+            hint: "Build your dungeon next.",
+            action: "Build your dungeon",
+          }
+        : {
+            title: finished ? "Try again" : "Escape the prison",
+            hint: "Collect every treasure. Tap or Space to jump. Wall jumps turn you around.",
+            action: finished ? "Retry" : "Let’s go",
+          };
     case "build":
       return {
-        step: 1,
         title: "Your dungeon",
-        hint: "Edit the room or keep it. Clear it before raiding Drilly.",
-        status: !view.editorLevel.treasures.length
-          ? "Add a treasure before testing."
-          : view.cleared
-            ? "Room cleared. Challenge Drilly to raid its room."
-            : view.roomPreparation === "building"
-              ? "Drilly is building its room while you edit."
-              : "Challenge Drilly to test your room first.",
+        hint: "Edit the room or keep it.",
         action: "Challenge Drilly",
         actionDisabled: !view.canChallenge,
       };
     case "test":
-      return {
-        step: 2,
-        title: "Test your dungeon",
-        hint: "Collect every treasure. Retries are unlimited.",
-        ...attemptCopy(view, "test"),
-        ...(state.status === "won"
-          ? {
-              status: view.liveDrilly
-                ? "Room cleared. Ready to raid Drilly."
-                : "Connect Convex to challenge Drilly.",
-              action: "Raid Drilly",
-              actionDisabled: !view.canChallenge,
-            }
-          : {}),
-      };
+      return state.status === "won"
+        ? {
+            title: "Room cleared!",
+            hint: view.liveDrilly
+              ? "You’re ready to raid Drilly’s dungeon."
+              : "Connect Convex to challenge Drilly.",
+            action: "Raid Drilly",
+            actionDisabled: !view.canChallenge,
+          }
+        : {
+            title: finished ? "Try again" : "Test your room",
+            hint: "Collect every treasure. Retries are unlimited.",
+            action: finished ? "Retry" : "Start test",
+          };
     case "raid":
+      if (!view.canPlay)
+        return {
+          title: view.aiError ? "Couldn’t build the room" : "Drilly is building",
+          hint:
+            view.aiError ??
+            "Drilly must clear its room before you can enter. This can take a few minutes.",
+          action: view.aiError ? "Retry" : "Preparing room…",
+          actionDisabled: !view.aiError,
+        };
       return {
-        step: 3,
-        title: "Your raid",
-        hint: "Beat Drilly’s room within three attempts.",
-        ...attemptCopy(view, "raid"),
-        status: !view.canPlay
-          ? (view.aiError ??
-            "Drilly is building and testing its room. This may take up to 3 minutes.")
-          : `Attempt ${Math.min((view.round?.human.length ?? 0) + (finished ? 0 : 1), RULES.raidAttempts)}/${RULES.raidAttempts} · ${attemptCopy(view, "raid").status}`,
-        ...(!view.canPlay
-          ? {
-              action:
-                view.aiStatus === "error"
-                  ? "Retry building"
-                  : "Preparing room…",
-              actionDisabled: view.aiStatus !== "error",
-            }
-          : {}),
+        title: finished ? "Try again" : "Your raid",
+        hint: `${RULES.raidAttempts - (view.round?.human.length ?? 0)} tries left. Collect every treasure.`,
+        action: finished ? "Retry" : "Start raid",
       };
     case "watch": {
       const index = view.watchIndex;
+      if (index === null)
+        return {
+          title: view.aiError ? "Drilly couldn’t finish" : "Drilly’s turn",
+          hint:
+            view.aiError ?? "Drilly is attempting your dungeon. Its recordings will appear here.",
+          action: view.aiError ? "Retry" : "Thinking…",
+          actionDisabled: !view.aiError,
+        };
       return {
-        step: 4,
-        title: "Drilly’s raid",
-        hint: "Watch Drilly attempt your room.",
-        status:
-          index === null
-            ? (view.aiError ??
-              "Drilly is attempting your room. This may take up to 3 minutes.")
-            : `Attempt ${index + 1}/${view.round?.drilly.length}: ${finished ? (state.status === "won" ? "Cleared" : state.status === "dead" ? "Failed" : "Time ran out") : "Ready to watch"}`,
-        action:
-          index === null
-            ? view.aiStatus === "error"
-              ? "Retry Drilly"
-              : "Drilly is thinking…"
-            : finished
-              ? index + 1 < (view.round?.drilly.length ?? 0)
-                ? "Next attempt"
-                : "Show results"
-              : paused
-                ? "Watch Drilly"
-                : "Watching Drilly",
-        actionDisabled: index === null ? view.aiStatus !== "error" : !paused,
+        title: finished
+          ? state.status === "won"
+            ? "Drilly cleared it"
+            : "Drilly failed"
+          : "Drilly’s raid",
+        hint: `Attempt ${index + 1} of ${view.round?.drilly.length ?? 0}`,
+        action: finished
+          ? index + 1 < (view.round?.drilly.length ?? 0)
+            ? "Next attempt"
+            : "Show results"
+          : "Watch Drilly",
       };
     }
     case "results":
       return {
-        step: 5,
         title:
           view.result?.outcome === "win"
-            ? "You win"
+            ? "You win!"
             : view.result?.outcome === "draw"
-              ? "Draw"
+              ? "It’s a draw"
               : "Drilly wins",
-        hint: "Return to your room for another round.",
-        status: `${view.result?.total ?? 0}/6 medals`,
-        action: "Back to your dungeon",
+        hint: "",
+        action: "Your dungeon",
       };
   }
-}
-
-function attemptCopy(
-  { state, paused, finished }: SessionSnapshot,
-  activity: string,
-) {
-  return {
-    status: finished
-      ? "Attempt finished. Retry or return to your dungeon."
-      : paused
-        ? state.tick === 0
-          ? "Ready to start."
-          : "Paused."
-        : "Collect every treasure.",
-    action: finished
-      ? `Retry ${activity}`
-      : paused
-        ? state.tick === 0
-          ? `Start ${activity}`
-          : "Resume"
-        : "Jump",
-  };
 }

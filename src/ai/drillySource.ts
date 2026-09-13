@@ -1,8 +1,5 @@
 import { ConvexError } from "convex/values";
-import {
-  drillyErrorMessage,
-  DRILLY_ERRORS,
-} from "../../shared/game/drillyErrors";
+import { drillyErrorMessage, DRILLY_ERRORS } from "../../shared/game/drillyErrors";
 import type { ConvexReactClient } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { RULES } from "../../shared/game/rules";
@@ -19,10 +16,7 @@ async function boundedRequest<T>(
     return await Promise.race([
       request,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(DRILLY_ERRORS.timeout)),
-          timeoutMs,
-        );
+        timer = setTimeout(() => reject(new Error(DRILLY_ERRORS.timeout)), timeoutMs);
       }),
     ]);
   } catch (error) {
@@ -41,9 +35,6 @@ export function createDrillySource(client: ConvexReactClient): DrillySource {
   return {
     build: () => boundedRequest(client.action(api.drilly.build, {})),
     raid: (level) =>
-      boundedRequest(
-        client.action(api.drilly.raid, { level }),
-        RULES.drilly.raidClientTimeoutMs,
-      ),
+      boundedRequest(client.action(api.drilly.raid, { level }), RULES.drilly.raidClientTimeoutMs),
   };
 }
