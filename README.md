@@ -6,23 +6,22 @@ attempt yours. Both sides use the same simulation and recorded jump inputs.
 
 ## Start and test live AI
 
-Use Node.js **24.14.0** and npm with the committed lockfile.
+Use Node.js **24.14.0** (pinned in `.nvmrc`) and npm with the committed lockfile.
 
 ```sh
 npm ci
-npx convex dev
+npm run dev
 ```
 
-Use the existing development deployment. Convex writes its public URL to
+`npm run dev` starts Convex and Vite together. Use the existing development
+deployment; Convex writes its public URL to
 `.env.local`. The backend needs `OPENAI_API_KEY` and the existing Convex Auth
 `JWT_PRIVATE_KEY` / `JWKS`. Drilly defaults to `gpt-6-astra`; `DRILLY_MODEL` is an
 optional backend override. Never put API keys in `VITE_` variables.
 
-In another terminal:
-
-```sh
-npm run dev
-```
+Use `npm run dev:fe` to start only Vite when Convex is already running.
+Frontend-only mode still connects to Convex when `VITE_CONVEX_URL` is configured.
+Restart Vite after changing its environment.
 
 Guest authentication is automatic. The header shows **LIVE AI** when the game is
 connected. Each reload starts a fresh game; no old draft or save version blocks
@@ -40,7 +39,7 @@ a cleared dungeon requires clearing the edited layout before submitting it.
 Layouts, medals and learning history remain in the current tab only.
 
 Without Convex, local AI is available by setting `OPENAI_API_KEY` in ignored
-`.env.local` and restarting Vite. Without either AI connection, the game labels
+`.env.local` and running `npm run dev:fe`. Without either AI connection, the game labels
 itself **LOCAL PRACTICE**.
 
 ## Verification

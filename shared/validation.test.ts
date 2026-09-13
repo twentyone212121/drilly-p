@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ValiError } from "valibot";
-import checkpoint from "../public/levels/checkpoint.json";
+import checkpoint from "./levels/checkpoint.json";
 import { RULES } from "./game/rules";
 import { parseEditorLevel, parseJumpTicks, parseLevel, parseReplay } from "./validation";
 
