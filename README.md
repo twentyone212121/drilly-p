@@ -9,6 +9,7 @@ replay, and audio. Drilly's AI counter-raid and full scored rounds follow later.
 
 - Node.js **24.14.0**, pinned in `.nvmrc` and used by CI.
 - npm (included with Node.js); use the committed `package-lock.json`.
+- Access to the project's Convex development deployment for `npm run dev`.
 - No backend, account, API key, or environment file is needed for local play.
 
 ## Install and start
@@ -19,6 +20,10 @@ cd drilly-p
 npm ci
 npm run dev
 ```
+
+`npm run dev` starts Convex and Vite together. Use `npm run dev:fe` to start only
+Vite. Frontend-only mode still connects to Convex when `VITE_CONVEX_URL` is
+configured; without that variable, the game runs locally with saving disabled.
 
 Open the Vite URL. Tap the room or press Space to start the prison escape, then
 jump past the floor saw, collect the lower treasure, and jump back off the far wall
@@ -44,10 +49,10 @@ replay restores the original room for human play.
 
 ## Convex guest saves
 
-For backend development, run `npx convex dev` in a second terminal and select this
-project's personal **development** deployment. The CLI writes the deployment
-selection and public URL to the ignored `.env.local`; restart Vite after changing
-its environment. `.env.example` lists the optional configuration.
+The Convex CLI started by `npm run dev` watches and deploys backend changes. On
+first setup, select this project's personal **development** deployment. The CLI
+writes the deployment selection and public URL to the ignored `.env.local`;
+restart Vite after changing its environment. `.env.example` lists the configuration.
 
 Configure `JWT_PRIVATE_KEY` and `JWKS` once in that deployment's environment using
 the [Convex Auth manual setup](https://labs.convex.dev/auth/setup/manual#configure-environment-variables).

@@ -1,5 +1,5 @@
-import prison from "../../public/levels/prison.json";
-import firstVault from "../../public/levels/first-vault.json";
+import prison from "../levels/prison.json";
+import firstVault from "../levels/first-vault.json";
 import { parseLevel } from "../validation";
 import type { Level } from "./types";
 

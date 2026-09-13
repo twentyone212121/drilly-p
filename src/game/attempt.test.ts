@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import checkpoint from "../../public/levels/checkpoint.json";
+import checkpoint from "../../shared/levels/checkpoint.json";
 import { parseLevel } from "../../shared/validation";
 import { replayAttempt, runAttempt } from "../../shared/game/replay";
 import { createAttempt } from "./attempt";

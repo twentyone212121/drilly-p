@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import checkpoint from "../../public/levels/checkpoint.json";
+import checkpoint from "../levels/checkpoint.json";
 import { moveBody, overlaps, touchesCircle } from "./collision";
 import { parseLevel } from "../validation";
 import { RULES } from "./rules";
