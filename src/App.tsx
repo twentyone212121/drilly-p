@@ -9,7 +9,13 @@ import { DebugPanel } from "./components/DebugPanel";
 import { DungeonEditor } from "./components/DungeonEditor";
 import type { AudioSettings, AudioStatus } from "./game/phaser/audio";
 
-export default function App({ session, saving }: { session: Session; saving?: ReactNode }) {
+export default function App({
+  session,
+  saving,
+}: {
+  session: Session;
+  saving?: ReactNode;
+}) {
   const view = useSyncExternalStore(session.subscribe, session.getSnapshot);
   const [audio, setAudio] = useState<AudioSettings>({
     muted: false,
@@ -38,17 +44,25 @@ export default function App({ session, saving }: { session: Session; saving?: Re
         <small>{saving ? "GUEST PROFILE" : "LOCAL PLAY · SAVING OFF"}</small>
       </header>
       <ol className="flow-steps" aria-label="Game progress">
-        {["Escape", "Build", "Clear", "Raid", "Watch", "Results"].map((step, index) => (
-          <li key={step} aria-current={copy.step === index ? "step" : undefined}>
-            <span>{String(index).padStart(2, "0")}</span> {step}
-          </li>
-        ))}
+        {["Escape", "Build", "Clear", "Raid", "Watch", "Results"].map(
+          (step, index) => (
+            <li
+              key={step}
+              aria-current={copy.step === index ? "step" : undefined}
+            >
+              <span>{String(index).padStart(2, "0")}</span> {step}
+            </li>
+          ),
+        )}
       </ol>
       <section className="intro">
         <div>
           <div className="eyebrow">
             DRILLY P{" "}
-            <span>/ {view.prisonEscaped ? "YOUR FIRST RIVALRY" : "ESCAPE THE SYSTEM"}</span>
+            <span>
+              /{" "}
+              {view.prisonEscaped ? "YOUR FIRST RIVALRY" : "ESCAPE THE SYSTEM"}
+            </span>
           </div>
           <h1>
             {copy.title}
@@ -59,8 +73,12 @@ export default function App({ session, saving }: { session: Session; saving?: Re
       </section>
       {(view.phase === "prison" || view.phase === "escaped" || building) && (
         <div className="lab-entry">
-          <button onClick={() => session.openLab()}>Try the obstacle lab</button>
-          <p className="hint">Practice every trap. Your own dungeon stays untouched.</p>
+          <button onClick={() => session.openLab()}>
+            Try the obstacle lab
+          </button>
+          <p className="hint">
+            Practice every trap. Your own dungeon stays untouched.
+          </p>
         </div>
       )}
       {view.inLab && (
@@ -89,7 +107,11 @@ export default function App({ session, saving }: { session: Session; saving?: Re
               <span>
                 0{index + 1} / {dungeon.name}
               </span>
-              <small>{dungeon.available ? "CURRENT OPPONENT" : "COMING LATER · UNAVAILABLE"}</small>
+              <small>
+                {dungeon.available
+                  ? "CURRENT OPPONENT"
+                  : "COMING LATER · UNAVAILABLE"}
+              </small>
             </li>
           ))}
         </ol>
@@ -99,11 +121,21 @@ export default function App({ session, saving }: { session: Session; saving?: Re
           <input
             type="checkbox"
             checked={view.developmentFixture}
-            onChange={(event) => session.setDevelopmentFixture(event.target.checked)}
+            onChange={(event) =>
+              session.setDevelopmentFixture(event.target.checked)
+            }
           />
           Development fixture · Use scripted Drilly attempts for local testing
         </label>
       )}
+      {!view.liveDrilly &&
+        !view.developmentFixture &&
+        (building || view.phase === "cleared") && (
+          <p role="status">
+            Local practice · Live Drilly is not connected. You can test and
+            raid, but scored rivalry is unavailable.
+          </p>
+        )}
       {view.round?.fixture && (
         <p role="status">Development fixture · Scripted Drilly, not live AI</p>
       )}
@@ -118,7 +150,8 @@ export default function App({ session, saving }: { session: Session; saving?: Re
             Attack: {view.result.attack}/3 · Defense: {view.result.defense}/3
           </p>
           <p>
-            {view.result.improved ? "New best" : "Best unchanged"}: {view.result.best}/6
+            {view.result.improved ? "New best" : "Best unchanged"}:{" "}
+            {view.result.best}/6
           </p>
           <p>
             Your attempts:{" "}
@@ -132,10 +165,20 @@ export default function App({ session, saving }: { session: Session; saving?: Re
               .map((attempt, index) => `${index + 1}: ${attempt.outcome}`)
               .join(" · ")}
           </p>
-          <button onClick={() => session.replayGhost()}>Replay Drilly’s attempts</button>
+          <button onClick={() => session.replayGhost()}>
+            Replay Drilly’s attempts
+          </button>
         </section>
       )}
-      <div className={building ? "flow-controls build-actions" : "flow-controls"}>
+      <div
+        className={building ? "flow-controls build-actions" : "flow-controls"}
+      >
+        {(view.phase === "preparing" ||
+          (view.phase === "raid-complete" && view.liveDrilly)) && (
+          <button onClick={() => session.editDungeon()}>
+            Return to your draft
+          </button>
+        )}
         {building ? (
           <>
             <button
@@ -153,11 +196,13 @@ export default function App({ session, saving }: { session: Session; saving?: Re
               Submit & raid
             </button>
             <p className="hint" role="status">
-              {!view.editorLevel.treasures.length
-                ? "Add a treasure before testing."
-                : view.canSubmit
-                  ? "Dungeon beaten. Ready to submit."
-                  : "Beat your dungeon to unlock submission."}
+              {view.aiPending
+                ? "The previous AI request is finishing. You can keep editing."
+                : !view.editorLevel.treasures.length
+                  ? "Add a treasure before testing."
+                  : view.canSubmit
+                    ? "Dungeon beaten. Ready to submit."
+                    : "Beat your dungeon to unlock submission."}
             </p>
           </>
         ) : !view.inLab &&
@@ -168,7 +213,9 @@ export default function App({ session, saving }: { session: Session; saving?: Re
           <>
             <button onClick={() => session.editDungeon()}>Edit dungeon</button>
             {view.canSubmit && view.phase !== "cleared" && (
-              <button onClick={() => session.submitDungeon()}>Submit & raid</button>
+              <button onClick={() => session.submitDungeon()}>
+                Submit & raid
+              </button>
             )}
             <p className="hint">Your draft stays intact while you play.</p>
           </>
@@ -179,7 +226,9 @@ export default function App({ session, saving }: { session: Session; saving?: Re
           <span>
             <i /> {level.name}
           </span>
-          <span>{building ? "YOUR DRAFT · GRID SNAPPING" : "COLLECT ALL TREASURES"}</span>
+          <span>
+            {building ? "YOUR DRAFT · GRID SNAPPING" : "COLLECT ALL TREASURES"}
+          </span>
         </div>
         {building ? (
           <DungeonEditor session={session} level={view.editorLevel} />
@@ -187,7 +236,10 @@ export default function App({ session, saving }: { session: Session; saving?: Re
           <GameView session={session} audio={audio} onAudio={setAudioStatus} />
         )}
         <div className="room-footer">
-          <span className={"status " + (building ? "" : view.state.status)} role="status">
+          <span
+            className={"status " + (building ? "" : view.state.status)}
+            role="status"
+          >
             {copy.status}
           </span>
           <span>
@@ -200,7 +252,8 @@ export default function App({ session, saving }: { session: Session; saving?: Re
                   : view.mode === "replay"
                     ? "REPLAY"
                     : "PLAYER"}{" "}
-                <b>·</b> {view.state.collectedTreasureIds.length}/{level.treasures.length} TREASURES
+                <b>·</b> {view.state.collectedTreasureIds.length}/
+                {level.treasures.length} TREASURES
               </>
             )}
           </span>
@@ -208,7 +261,12 @@ export default function App({ session, saving }: { session: Session; saving?: Re
       </div>
       {saving}
       {!building && (
-        <GameControls session={session} view={view} audio={audio} onAudioChange={setAudio} />
+        <GameControls
+          session={session}
+          view={view}
+          audio={audio}
+          onAudioChange={setAudio}
+        />
       )}
       <p className="control-help">
         {building

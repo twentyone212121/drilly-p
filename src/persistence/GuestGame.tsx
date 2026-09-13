@@ -13,11 +13,21 @@ import {
 } from "react";
 import { api } from "../../convex/_generated/api";
 import App from "../App";
+import { createLocalDrillySource } from "../ai/localDrillySource";
+import { createDrillySource } from "../ai/drillySource";
 import { createSession } from "../game/session";
 import { createDraftSync, readDraft, type DraftSnapshot } from "./draftSync";
+import { drillyMemoryOptions } from "./drillyMemory";
 
 export function LocalGame() {
-  const [session] = useState(() => createSession());
+  const [session] = useState(() =>
+    createSession({
+      drilly: import.meta.env.VITE_LOCAL_DRILLY
+        ? createLocalDrillySource()
+        : undefined,
+      ...drillyMemoryOptions("local"),
+    }),
+  );
   return <App session={session} />;
 }
 
@@ -136,7 +146,13 @@ function SavedGame({
 }) {
   const client = useConvex();
   const [session] = useState(() =>
-    createSession({ editorLevel: readDraft(initial.draft) }),
+    createSession({
+      editorLevel: readDraft(initial.draft),
+      drilly: createDrillySource(client),
+      ...drillyMemoryOptions(
+        `${import.meta.env.VITE_CONVEX_URL}:${initial.ownerId}`,
+      ),
+    }),
   );
   const [sync] = useState(() =>
     createDraftSync(session, initial, (args) =>
