@@ -422,3 +422,53 @@ describe("draft placement validation", () => {
     },
   );
 });
+
+it("stores obstacle configuration intact and keeps it private to its owner", async () => {
+  const t = convexTest(schema, modules);
+  const { client } = await createGuest(t);
+  const { client: other } = await createGuest(t);
+  const level = newPlayerDungeon();
+  level.obstacles = [
+    { id: "spikes", kind: "spikes", x: 300, y: 300, width: 48, height: 20 },
+    { id: "slider", kind: "slider", x: 300, y: 200, endX: 400, endY: 200, radius: 18, speed: 90 },
+    { id: "drone", kind: "drone", x: 500, y: 200, endX: 600, endY: 200, radius: 18, speed: 90 },
+    {
+      id: "gun",
+      kind: "turret",
+      x: 700,
+      y: 180,
+      radius: 18,
+      mode: "aimed",
+      direction: -1,
+      intervalTicks: 150,
+      warmupTicks: 45,
+      activeTicks: 45,
+      range: 240,
+      projectileSpeed: 220,
+    },
+    {
+      id: "chase",
+      kind: "pursuer",
+      x: 200,
+      y: 120,
+      radius: 18,
+      speed: 150,
+      detectionRange: 160,
+      chaseRange: 320,
+      warningTicks: 30,
+    },
+  ];
+  const saved = await client.mutation(api.dungeons.saveMyDraft, saveArgs(level));
+  expect(saved.draft?.level.obstacles).toEqual(level.obstacles);
+  expect((await client.query(api.dungeons.getMyDraft, {})).draft?.level.obstacles).toEqual(
+    level.obstacles,
+  );
+  expect((await other.query(api.dungeons.getMyDraft, {})).draft).toBeNull();
+  const invalid = structuredClone(level);
+  const gun = invalid.obstacles![3];
+  if (gun.kind === "turret") gun.warmupTicks = gun.intervalTicks;
+  await expect(
+    client.mutation(api.dungeons.saveMyDraft, saveArgs(invalid, 1, "bad")),
+  ).rejects.toThrow();
+  expect((await client.query(api.dungeons.getMyDraft, {})).draft?.revision).toBe(1);
+});

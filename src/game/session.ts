@@ -1,3 +1,4 @@
+import { getObstacleLab, type LabRoomId } from "../../shared/game/obstacleLab";
 import { getDungeon, getPrison, newPlayerDungeon } from "../../shared/game/campaign";
 import { RULES } from "../../shared/game/rules";
 import type { Level, Replay } from "../../shared/game/types";
@@ -8,9 +9,10 @@ import { applyEdit, type Edit } from "./editor";
 import { scoreRound, type RaidAttempt } from "../../shared/game/round";
 import { runDrillyFixture } from "./drillyFixture";
 
-type Activity = "prison" | "testing" | "raiding";
+type Activity = "prison" | "testing" | "raiding" | "lab";
 type Flow =
   | { phase: "prison" }
+  | { phase: "lab" }
   | { phase: "escaped" }
   | { phase: "building" }
   | { phase: "testing"; revision: number }
@@ -37,6 +39,8 @@ export function createSession(
   const attempt = createAttempt(prison);
   let editorLevel = parseEditorLevel(options.editorLevel ?? newPlayerDungeon(), newPlayerDungeon());
   let flow: Flow = { phase: "prison" };
+  let labRoom: LabRoomId = "showcase";
+  let labReturn: "prison" | "escaped" | "building" = "prison";
   let layoutRevision = 0;
   let levelRevision = 0;
   let prisonClear: Replay | null = null;
@@ -79,6 +83,8 @@ export function createSession(
       result: structuredClone(result),
       best,
       developmentFixture: fixture,
+      labRoom,
+      inLab: flow.phase === "lab" || (flow.phase === "replay" && flow.returnTo === "lab"),
     };
   }
 
@@ -89,6 +95,7 @@ export function createSession(
 
   function isPlaying() {
     return (
+      flow.phase === "lab" ||
       flow.phase === "prison" ||
       flow.phase === "testing" ||
       flow.phase === "raiding" ||
@@ -99,6 +106,8 @@ export function createSession(
 
   function currentActivity(): Activity | null {
     switch (flow.phase) {
+      case "lab":
+        return "lab";
       case "prison":
       case "escaped":
         return "prison";
@@ -119,6 +128,8 @@ export function createSession(
 
   function activityLevel(activity: Activity) {
     switch (activity) {
+      case "lab":
+        return getObstacleLab(labRoom);
       case "prison":
         return prison;
       case "testing":
@@ -315,6 +326,27 @@ export function createSession(
       levelRevision++;
       clear = null;
       notify();
+    },
+    openLab(id: LabRoomId = "showcase") {
+      const inLab = flow.phase === "lab" || (flow.phase === "replay" && flow.returnTo === "lab");
+      if (!inLab) {
+        if (flow.phase !== "prison" && flow.phase !== "escaped" && flow.phase !== "building")
+          return;
+        labReturn = flow.phase;
+      }
+      // Validate before changing the selected room or attempt.
+      getObstacleLab(id);
+      labRoom = id;
+      startAttempt("lab");
+    },
+    exitLab() {
+      if (flow.phase !== "lab" && !(flow.phase === "replay" && flow.returnTo === "lab")) return;
+      if (labReturn === "prison") startAttempt("prison");
+      else {
+        flow = { phase: labReturn };
+        levelRevision++;
+        attempt.loadLevel(prison);
+      }
     },
     testDungeon,
     submitDungeon,

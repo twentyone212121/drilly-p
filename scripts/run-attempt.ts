@@ -1,21 +1,22 @@
+import { getObstacleLab, LAB_ROOMS, type LabRoomId } from "../shared/game/obstacleLab";
 import { readFileSync } from "node:fs";
 import { parseLevel, parseJumpTicks, parseReplay } from "../shared/validation";
 import { describeRules } from "../shared/game/rules";
-import {
-  replayAttempt,
-  runAttempt,
-} from "../shared/game/replay";
+import { replayAttempt, runAttempt } from "../shared/game/replay";
 try {
   const [command, path, ticks = "[]"] = process.argv.slice(2);
-  if (command === "--describe")
-    console.log(JSON.stringify(describeRules(), null, 2));
-  else if (command === "--replay" && path)
+  if (command === "--describe") console.log(JSON.stringify(describeRules(), null, 2));
+  else if (command === "--lab" && path && LAB_ROOMS.some((room) => room.id === path))
     console.log(
       JSON.stringify(
-        replayAttempt(parseReplay(JSON.parse(readFileSync(path, "utf8")))),
+        runAttempt(getObstacleLab(path as LabRoomId), parseJumpTicks(JSON.parse(ticks))),
         null,
         2,
       ),
+    );
+  else if (command === "--replay" && path)
+    console.log(
+      JSON.stringify(replayAttempt(parseReplay(JSON.parse(readFileSync(path, "utf8")))), null, 2),
     );
   else if (command === "--level" && path)
     console.log(
@@ -30,7 +31,7 @@ try {
     );
   else
     throw new Error(
-      "Usage: npm run run:attempt -- --describe | --replay <file> | --level <file> '[44, 193]'",
+      "Usage: npm run run:attempt -- --describe | --replay <file> | --lab <showcase|spikes|slider|fixed|flame|aimed|drone|pursuer> '[13,86,140]' | --level <file> '[44, 193]'",
     );
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));

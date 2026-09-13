@@ -54,8 +54,11 @@ no round result. Ghost review holds each ending for inspection, with next-attemp
 and replay controls.
 
 Guest authentication and private draft save/load remain the only backend work.
-Round persistence and runtime AI are separate subsequent work. Keep placeholder
-art and ordinary audio.
+Round persistence and runtime AI are separate subsequent work. Presentation uses
+the computer-interior art direction: ESC represents the human player and the drill
+virus represents Drilly in ghost review. Character animation and decorative lights
+and fans react to gameplay without changing simulation or collision rules. See
+[the art guide](../assets/README.md) for asset conventions and the setting.
 
 ## Dungeon gameplay — accepted
 
@@ -74,9 +77,10 @@ art and ordinary audio.
 
 - Start from a room template. Keep room dimensions and player spawn fixed.
 - Add, move, resize, and delete rectangular platforms, including the template's
-  platforms. Add, move, and delete stationary saws and treasures.
+  platforms. Add, move, and delete stationary saws, treasures, and the obstacle
+  types below. Configure obstacle behavior in the selection inspector.
 - Provide object selection, placement previews, and grid snapping. Only platforms
-  are resizable in the editor.
+  use corner resize handles; spike dimensions are editable in the inspector.
 - Validate placement bounds and spawn clearance before accepting an edit.
 - Switch freely between editing and testing. Tests use ordinary movement, input,
   replay, and audio; test state never changes the saved editor layout.
@@ -212,7 +216,7 @@ connecting it. AI dungeon building and adaptation across rounds come later.
 ## Open decisions
 
 - Movement tuning, wall contact, jump buffering, and whether airborne taps gain an effect.
-- New mechanics, trap types, and the designs of the two later dungeons.
+- Obstacle tuning and the designs of the two later dungeons; trap types beyond the accepted obstacle set.
 - Final editor budgets, grid spacing, default object sizes, and overlap policy.
 - Whether collecting all treasures remains the final win condition.
 - Optional account linking and AI provider/operational limits.
@@ -232,3 +236,47 @@ connecting it. AI dungeon building and adaptation across rounds come later.
 - Completing a fixture round reviews Drilly’s ghosts and results before returning
   to the draft. Without an AI source, show unavailability without awarding medals.
   Later dungeons remain unavailable.
+
+## Obstacle system — accepted scope, provisional tuning
+
+The storyboard's static spikes, sliding saws, firewall turrets, patrol drones,
+and pursuers are the accepted obstacle set. Every type is editable and participates
+in the same fixed-tick simulation for humans and Drilly, including ghost playback.
+These are lethal hazards, not enemies with health or player attacks.
+
+- **Spikes:** an upright strip with a lethal rectangular footprint. The tinted
+  backing marks its full bounds, including the gaps between teeth.
+- **Sliding saws and drones:** move at constant speed between two centers and
+  reverse at the endpoints. Move the starting object to translate the whole route;
+  edit the endpoint and speed in the inspector. The route and endpoints are visible.
+- **Turrets:** choose fixed horizontal shots, aimed shots, or horizontal flame
+  bursts. Each cycle starts with an amber warning. A shot fires once after the
+  warning; a flame stays on for its configured active duration. The remaining
+  cycle is cooldown. Aimed shots target the player's center when fired and then
+  travel straight. Shots expire at their configured reach; platforms block both
+  shots and flames. The turret body remains lethal throughout the cycle.
+- **Pursuers:** the player entering a detection circle around the home position
+  starts a warning. Leaving that circle during warning cancels activation. After
+  warning, chase the player until the player exits the larger escape circle around
+  home; then return home before detecting again. The body is always lethal.
+- **Provisional:** drones, sliding saws, and pursuers pass through platforms. They
+  do not pathfind or collide with each other. Pursuers stay inside the room. Warning
+  periods, speeds, ranges, size bounds, and object budgets are adjustable through
+  shared rules and bounded editor fields. They need human difficulty tuning.
+- New hazard motion and projectiles use swept contact checks so crossing a narrow
+  hazard or platform within one tick still counts. Walls block shots before player
+  contact, including ties. Hazard contact takes priority over treasure collection.
+- Routes must fit in the room and stay clear of spawn. Obstacle bodies must fit and
+  start clear of spawn. Range guides may extend beyond the room; actual effects are
+  bounded by the room and blocking platforms. Invalid settings preserve the draft.
+- Restart resets projectiles, paths, warnings, and pursuit. Pause and replay use
+  simulation ticks, never wall-clock time. The new rules version rejects older
+  recordings and saved drafts instead of silently changing their outcomes.
+
+The **Obstacle lab** is an unscored practice mode available from the tutorial,
+escape completion, and editor. It includes a combined showcase and individual
+rooms for every obstacle and turret mode. Switching rooms starts a new attempt.
+Leaving restores the prior stage (restarting a tutorial attempt if needed), while
+preserving the player's draft and any earned clear. Lab wins never unlock escape,
+submission, medals, or saved progression. Real AI service integration and completed
+round persistence remain separate work.

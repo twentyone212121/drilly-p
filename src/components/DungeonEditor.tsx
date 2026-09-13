@@ -1,3 +1,6 @@
+import type { ObstacleKind } from "../../shared/game/obstacleTypes";
+import { ObstacleInspector } from "./ObstacleInspector";
+import { ObstacleShape, ObstacleGuides } from "./ObstacleShape";
 import { useRef, useState, type PointerEvent } from "react";
 import { RULES } from "../../shared/game/rules";
 import type { Level } from "../../shared/game/types";
@@ -16,6 +19,9 @@ import {
   type Selection,
 } from "../game/editor";
 import type { Session } from "../game/session";
+import propsAtlas from "../../public/assets/environment/computer-props.json";
+import { platformPanels } from "../game/art/platformPanels";
+import escAtlas from "../../public/assets/characters/esc.json";
 
 type Tool = "select" | ObjectKind;
 type Drag = {
@@ -25,14 +31,20 @@ type Drag = {
   operation: "place" | "move" | "resize";
 };
 
-const TOOLS: { tool: Tool; label: string }[] = [
+const TOOLS: { tool: Tool; label: string; obstacleKind?: ObstacleKind }[] = [
   { tool: "select", label: "Select / move" },
   { tool: "platform", label: "+ Platform" },
   { tool: "saw", label: "+ Saw" },
   { tool: "treasure", label: "+ Treasure" },
+  { tool: "obstacle", obstacleKind: "spikes", label: "+ Spikes" },
+  { tool: "obstacle", obstacleKind: "slider", label: "+ Sliding saw" },
+  { tool: "obstacle", obstacleKind: "turret", label: "+ Turret" },
+  { tool: "obstacle", obstacleKind: "drone", label: "+ Drone" },
+  { tool: "obstacle", obstacleKind: "pursuer", label: "+ Pursuer" },
 ];
 
 export function DungeonEditor({ session, level }: { session: Session; level: Level }) {
+  const [obstacleKind, setObstacleKind] = useState<ObstacleKind>("spikes");
   const [tool, setTool] = useState<Tool>("select");
   const [selection, setSelection] = useState<Selection | null>(null);
   const [preview, setPreview] = useState<EditorObject | null>(null);
@@ -77,7 +89,8 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
   }
 
   function dragObject(point: Point, gesture: Drag): EditorObject {
-    if (gesture.operation === "place") return newObject(level, gesture.object.kind, point);
+    if (gesture.operation === "place")
+      return newObject(level, gesture.object.kind, point, obstacleKind);
 
     const delta = {
       x: point.x - gesture.origin.x,
@@ -95,7 +108,7 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
     event.currentTarget.focus();
     const point = pointAt(event);
     if (tool !== "select") {
-      const object = newObject(level, tool, point);
+      const object = newObject(level, tool, point, obstacleKind);
       drag.current = {
         pointerId: event.pointerId,
         origin: point,
@@ -136,7 +149,7 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
     if (gesture && gesture.pointerId === event.pointerId) {
       setPreview(dragObject(point, gesture));
     } else if (!gesture && tool !== "select") {
-      setPreview(newObject(level, tool, point));
+      setPreview(newObject(level, tool, point, obstacleKind));
     }
   }
 
@@ -158,8 +171,15 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
   return (
     <div className="dungeon-editor">
       <div className="editor-toolbar" role="toolbar" aria-label="Dungeon objects">
-        {TOOLS.map(({ tool: next, label }) => (
-          <button key={next} aria-pressed={tool === next} onClick={() => chooseTool(next)}>
+        {TOOLS.map(({ tool: next, label, obstacleKind: variant }) => (
+          <button
+            key={label}
+            aria-pressed={tool === next && (!variant || obstacleKind === variant)}
+            onClick={() => {
+              if (variant) setObstacleKind(variant);
+              chooseTool(next);
+            }}
+          >
             {label}
           </button>
         ))}
@@ -224,24 +244,32 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
             />
           </pattern>
         </defs>
-        <rect width={level.width} height={level.height} fill="#151c27" />
+        <image
+          href="/assets/backgrounds/computer-interior.webp"
+          width={level.width}
+          height={level.height}
+          preserveAspectRatio="none"
+        />
+        <rect width={level.width} height={level.height} fill="#07111e" opacity="0.35" />
         <rect width={level.width} height={level.height} fill="url(#editor-grid)" />
         {objects.map((object) => (
           <ObjectShape key={object.value.id} object={object} />
         ))}
-        <rect
+        <AtlasFrame
+          atlas="characters/esc"
+          frame={escAtlas.frames.idle.frame}
           x={level.spawn.x}
           y={level.spawn.y}
           width={RULES.playerWidth}
           height={RULES.playerHeight}
-          rx="6"
-          fill="#b7e9aa"
-          stroke="#e7eee9"
-          strokeDasharray="3 2"
         />
         <text x={level.spawn.x} y={level.spawn.y - 10} className="spawn-label">
-          FIXED SPAWN →
+          ESC START →
         </text>
+        {selected?.kind === "obstacle" && (
+          <ObstacleGuides obstacle={selected.value} level={level} />
+        )}
+        {preview?.kind === "obstacle" && <ObstacleGuides obstacle={preview.value} level={level} />}
         {selected && <ObjectOutline object={selected} resize={tool === "select"} />}
         {preview && (
           <g opacity="0.65" pointerEvents="none">
@@ -264,7 +292,7 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
             <option value="">None</option>
             {objects.map((object) => (
               <option key={object.value.id} value={object.value.id}>
-                {object.kind} · {object.value.id}
+                {object.kind === "obstacle" ? object.value.kind : object.kind} · {object.value.id}
               </option>
             ))}
           </select>
@@ -278,9 +306,24 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
         </p>
         <p className="hint object-counts">
           Platforms {level.platforms.length}/{RULES.editor.maxPlatforms} · Saws {level.traps.length}
-          /{RULES.editor.maxSaws} · Treasures {level.treasures.length}/{RULES.editor.maxTreasures}
+          /{RULES.editor.maxSaws} · Obstacles {(level.obstacles ?? []).length}/
+          {RULES.obstacles.maxCount} · Treasures {level.treasures.length}/
+          {RULES.editor.maxTreasures}
         </p>
       </div>
+      {selected?.kind === "obstacle" && (
+        <ObstacleInspector
+          key={JSON.stringify(selected.value)}
+          obstacle={selected.value}
+          onApply={(value) => {
+            const object: EditorObject = { kind: "obstacle", value };
+            const error = placementError(level, object);
+            if (error) return error;
+            commit(object);
+            return null;
+          }}
+        />
+      )}
       <p className={error || message ? "editor-feedback invalid" : "editor-feedback"} role="status">
         {error ??
           (message ||
@@ -292,47 +335,63 @@ export function DungeonEditor({ session, level }: { session: Session; level: Lev
   );
 }
 
+type AtlasRect = { x: number; y: number; w: number; h: number };
+
+// Crop the same atlas rectangles used by Phaser, keeping editor geometry intact.
+function AtlasFrame({
+  atlas,
+  frame,
+  x,
+  y,
+  width,
+  height,
+}: {
+  atlas: "characters/esc" | "environment/computer-props";
+  frame: AtlasRect;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}) {
+  const size = atlas === "characters/esc" ? escAtlas.meta.size : propsAtlas.meta.size;
+
+  return (
+    <svg
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      viewBox={`${frame.x} ${frame.y} ${frame.w} ${frame.h}`}
+      preserveAspectRatio="none"
+      overflow="hidden"
+      pointerEvents="none"
+      aria-hidden="true"
+    >
+      <image href={`/assets/${atlas}.png`} width={size.w} height={size.h} />
+    </svg>
+  );
+}
+
 function ObjectShape({ object }: { object: EditorObject }) {
-  const value = object.value;
-  if (object.kind === "saw") {
+  if (object.kind === "obstacle") return <ObstacleShape obstacle={object.value} />;
+  const bounds = objectBounds(object);
+  if (object.kind === "platform") {
     return (
-      <g>
-        <circle
-          cx={value.x}
-          cy={value.y}
-          r={object.value.radius}
-          fill="#e58e76"
-          stroke="#ffc0a6"
-          strokeWidth="4"
-          strokeDasharray="5 5"
-        />
-        <circle cx={value.x} cy={value.y} r="5" fill="#442e2d" />
+      <g pointerEvents="none" aria-hidden="true">
+        {platformPanels(bounds).map(({ color, ...rect }, index) => (
+          <rect key={index} {...rect} fill={`#${color.toString(16).padStart(6, "0")}`} />
+        ))}
       </g>
     );
   }
+  const frame = object.kind === "saw" ? "saw" : "data";
 
-  const rect = object.value;
   return (
-    <g>
-      <rect
-        x={rect.x}
-        y={rect.y}
-        width={rect.width}
-        height={rect.height}
-        rx="3"
-        fill={object.kind === "treasure" ? "#f1c76c" : "#34434f"}
-        stroke={object.kind === "treasure" ? "#ffe2a0" : "#687e8b"}
-      />
-      {object.kind === "treasure" && (
-        <rect
-          x={rect.x + rect.width / 2 - 3}
-          y={rect.y + rect.height / 2 - 5}
-          width="6"
-          height="10"
-          fill="#9e753d"
-        />
-      )}
-    </g>
+    <AtlasFrame
+      atlas="environment/computer-props"
+      frame={propsAtlas.frames[frame].frame}
+      {...bounds}
+    />
   );
 }
 
@@ -346,7 +405,7 @@ function ObjectOutline({
   resize?: boolean;
 }) {
   const bounds = objectBounds(object);
-  const color = invalid ? "#ff826e" : "#b7e9aa";
+  const color = invalid ? "#ff568e" : "#50dcf3";
   return (
     <g pointerEvents="none">
       <rect {...bounds} fill="none" stroke={color} strokeWidth="2" strokeDasharray="6 3" />

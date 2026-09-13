@@ -1,3 +1,4 @@
+import { advanceObstacles, initialObstacles } from "./obstacles";
 import { moveBody, overlaps, touchesCircle } from "./collision";
 import { RULES } from "./rules";
 import type { Level, State, Input, GameEvent, Rect } from "./types";
@@ -14,6 +15,8 @@ export function initialState(level: Level): State {
     tick: 0,
     status: "running",
     collectedTreasureIds: [],
+    obstacles: initialObstacles(level),
+    projectiles: [],
     player: {
       x,
       y,
@@ -43,9 +46,20 @@ export function step(
   if (input.jump) applyJump(player, state.tick, events);
   applyForces(player);
   movePlayer(player, level.platforms, tick, events);
-  const status = resolveOutcome(player, level, collectedTreasureIds, tick, events);
+  const hazards = advanceObstacles(level, state, playerBounds(player), tick);
+  const status = resolveOutcome(player, level, collectedTreasureIds, tick, events, hazards.hitId);
 
-  return { state: { tick, status, player, collectedTreasureIds }, events };
+  return {
+    state: {
+      tick,
+      status,
+      player,
+      collectedTreasureIds,
+      obstacles: hazards.obstacles,
+      projectiles: hazards.projectiles,
+    },
+    events,
+  };
 }
 
 function applyJump(player: Player, tick: number, events: GameEvent[]): void {
@@ -106,6 +120,7 @@ function resolveOutcome(
   collectedTreasureIds: string[],
   tick: number,
   events: GameEvent[],
+  hazardId: string | null,
 ): State["status"] {
   const body = playerBounds(player);
   const hit = level.traps.find((trap) => touchesCircle(body, trap));
@@ -113,8 +128,8 @@ function resolveOutcome(
     player.y > level.height || player.x < -RULES.playerWidth || player.x > level.width;
 
   // Lethal collision has priority over treasure contact on the same tick.
-  if (hit || outOfBounds) {
-    events.push({ type: "died", tick, trapId: hit?.id ?? "out-of-bounds" });
+  if (hit || hazardId || outOfBounds) {
+    events.push({ type: "died", tick, trapId: hit?.id ?? hazardId ?? "out-of-bounds" });
     return "dead";
   }
 

@@ -2,8 +2,8 @@
 
 :root {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
-  color: #e7eee9;
-  background: #10151c;
+  color: #eee9de;
+  background: #080f1b;
   font-synthesis: none;
   color-scheme: dark;
 }
@@ -39,17 +39,17 @@ header {
   font-size: 19px;
   letter-spacing: 0.08em;
   text-decoration: none;
-  color: #e7eee9;
+  color: #eee9de;
 }
 
 .wordmark b {
-  color: #b7e9aa;
+  color: #50dcf3;
 }
 
 .wordmark-dot {
   width: 5px;
   height: 5px;
-  background: #b7e9aa;
+  background: #50dcf3;
   border-radius: 50%;
   margin-left: 3px;
 }
@@ -85,7 +85,7 @@ small,
 }
 
 .eyebrow {
-  color: #b7e9aa;
+  color: #50dcf3;
 }
 
 .eyebrow span {
@@ -102,7 +102,7 @@ h1 {
 }
 
 h1 span {
-  color: #b7e9aa;
+  color: #50dcf3;
 }
 
 p {
@@ -145,7 +145,7 @@ p {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #b7e9aa;
+  background: #50dcf3;
 }
 
 .game-host {
@@ -172,7 +172,7 @@ p {
 
 .status {
   font-family: inherit;
-  color: #b7e9aa;
+  color: #50dcf3;
   letter-spacing: 0;
 }
 
@@ -199,16 +199,16 @@ button {
   background: #25313d;
   border: 1px solid #445362;
   border-radius: 6px;
-  color: #e7eee9;
+  color: #eee9de;
   padding: 10px 15px;
   white-space: nowrap;
 }
 
 button.primary {
   min-width: 78px;
-  background: #b7e9aa;
-  color: #182719;
-  border-color: #b7e9aa;
+  background: #50dcf3;
+  color: #071923;
+  border-color: #50dcf3;
   font-weight: 650;
 }
 
@@ -242,7 +242,7 @@ kbd {
 }
 
 .queue-note {
-  color: #b7e9aa;
+  color: #50dcf3;
   font-size: 10px;
 }
 
@@ -263,7 +263,7 @@ kbd {
 
 .audio-controls input {
   width: 65px;
-  accent-color: #b7e9aa;
+  accent-color: #50dcf3;
 }
 
 .audio-controls button {
@@ -283,7 +283,7 @@ kbd {
 
 .instructions span {
   font-family: monospace;
-  color: #b7e9aa;
+  color: #50dcf3;
   margin-right: 7px;
 }
 
@@ -423,9 +423,9 @@ footer {
 }
 
 .editor-toolbar button[aria-pressed="true"] {
-  border-color: #b7e9aa;
-  color: #b7e9aa;
-  background: #263e36;
+  border-color: #50dcf3;
+  color: #50dcf3;
+  background: #113344;
 }
 
 .editor-canvas {
@@ -449,7 +449,7 @@ footer {
   font:
     10px ui-monospace,
     monospace;
-  fill: #b7e9aa;
+  fill: #50dcf3;
 }
 
 .editor-inspector {
@@ -462,7 +462,7 @@ footer {
   max-width: 230px;
   margin-top: 5px;
   padding: 6px;
-  color: #e7eee9;
+  color: #eee9de;
   background: #10171f;
   border: 1px solid #445362;
   border-radius: 5px;
@@ -484,7 +484,8 @@ footer {
 
 .flow-steps {
   display: flex;
-  gap: 20px;
+  gap: 12px;
+  flex-wrap: wrap;
   list-style: none;
   padding: 0;
   margin: 24px 0 0;
@@ -498,8 +499,8 @@ footer {
 }
 
 .flow-steps [aria-current="step"] {
-  color: #b7e9aa;
-  border-bottom: 2px solid #b7e9aa;
+  color: #50dcf3;
+  border-bottom: 2px solid #50dcf3;
   padding-bottom: 6px;
 }
 
@@ -627,4 +628,101 @@ footer {
 }
 .guest-loading button {
   margin: 0.8rem 0.8rem 0.8rem 0;
+}
+
+/* Quiet hardware panels keep the room and its primary action in focus. */
+.game-shell {
+  box-shadow: 0 12px 40px #0005;
+  border-color: #294454;
+}
+
+.build-actions {
+  padding: 14px;
+  border: 1px solid #294454;
+  border-left: 3px solid #50dcf3;
+  border-radius: 8px;
+  background: #101e2d;
+}
+
+.build-actions button.primary {
+  box-shadow: 0 0 18px #50dcf31a;
+}
+
+.build-actions .hint {
+  flex-basis: 100%;
+  margin-left: 0;
+  color: #bdcdd7;
+}
+
+.editor-toolbar {
+  border-bottom: 1px solid #294454;
+  background: #101e2d;
+}
+
+.dungeon-list li:not([aria-disabled="true"]) {
+  border-color: #795078;
+  background: #21182b;
+}
+
+.dungeon-list li:not([aria-disabled="true"]) small {
+  color: #f38ad1;
+}
+
+.round-results {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  margin-bottom: 18px;
+  border: 1px solid #806739;
+  border-radius: 10px;
+  background: #201e21;
+}
+
+.round-results strong {
+  color: #f1c76c;
+  font-size: 22px;
+}
+
+.round-results button {
+  justify-self: start;
+}
+
+input[type="checkbox"] {
+  accent-color: #50dcf3;
+}
+
+.obstacle-inspector,
+.lab-controls {
+  padding: 14px;
+  background: #111d2e;
+  border-top: 1px solid #344b61;
+}
+.obstacle-inspector strong {
+  display: block;
+  margin-bottom: 12px;
+  text-transform: capitalize;
+  color: #f397d4;
+  font-size: 13px;
+}
+.obstacle-inspector select,
+.lab-controls select {
+  display: block;
+  margin-top: 5px;
+  padding: 8px;
+  background: #0b1422;
+  color: #eee9de;
+  border: 1px solid #4c6580;
+  border-radius: 5px;
+}
+.lab-entry,
+.lab-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.lab-controls {
+  border: 1px solid #725170;
+  border-radius: 8px;
 }

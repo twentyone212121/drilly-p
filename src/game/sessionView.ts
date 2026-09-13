@@ -1,3 +1,4 @@
+import { LAB_ROOMS } from "../../shared/game/obstacleLab";
 import { RULES } from "../../shared/game/rules";
 import type { SessionSnapshot } from "./session";
 
@@ -6,6 +7,24 @@ export function sessionView(view: SessionSnapshot) {
   const { phase, state, paused, finished } = view;
   const replayActivity = view.flow.phase === "replay" ? view.flow.returnTo : null;
   switch (phase) {
+    case "lab":
+      return {
+        step: -1,
+        title: "Obstacle lab",
+        hint: LAB_ROOMS.find((room) => room.id === view.labRoom)!.hint,
+        status: finished
+          ? state.status === "won"
+            ? "Lab cleared. Try another obstacle or replay this room."
+            : "Try again: every attempt resets the obstacles."
+          : "Practice only — your dungeon and progression are safe.",
+        action: finished
+          ? "Try again"
+          : paused
+            ? state.tick === 0
+              ? "Start practice"
+              : "Resume"
+            : "Jump",
+      };
     case "prison":
       return {
         step: 0,
@@ -34,7 +53,7 @@ export function sessionView(view: SessionSnapshot) {
         title: "Make it yours",
         hint: "Place platforms, saws, and treasure. You must clear every treasure yourself before raiding Drilly.",
         status: view.canSubmit
-          ? "This version is cleared and ready to submit."
+          ? "Your dungeon is beaten and ready to submit."
           : "Build something you can beat.",
         action: "Test dungeon",
       };
@@ -49,7 +68,7 @@ export function sessionView(view: SessionSnapshot) {
             ? state.tick === 0
               ? "Ready to test your dungeon."
               : "Test paused."
-            : "Collect every treasure to clear this version.",
+            : "Collect every treasure to beat your dungeon.",
         action: finished
           ? "Retry test"
           : paused
@@ -63,7 +82,7 @@ export function sessionView(view: SessionSnapshot) {
         step: 2,
         title: "Your vault is ready",
         hint: "You proved this layout can be beaten. Submit it to enter Drilly’s first dungeon.",
-        status: `Version ${view.layoutRevision + 1} cleared. Editing it requires a new clear.`,
+        status: "Dungeon beaten. If you change it, beat it again before submitting.",
         action: "Submit & raid",
       };
     case "raiding":
@@ -133,7 +152,14 @@ export function sessionView(view: SessionSnapshot) {
       };
     case "replay":
       return {
-        step: replayActivity === "prison" ? 0 : replayActivity === "testing" ? 2 : 3,
+        step:
+          replayActivity === "lab"
+            ? -1
+            : replayActivity === "prison"
+              ? 0
+              : replayActivity === "testing"
+                ? 2
+                : 3,
         title: "Review an attempt",
         hint: "Developer replay. Playback does not advance the prison, clear your draft, or complete a raid.",
         status: finished

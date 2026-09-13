@@ -14,7 +14,7 @@ export function GameControls({
   onAudioChange: (settings: AudioSettings) => void;
 }) {
   const copy = sessionView(view);
-  const canRestart = ["prison", "testing", "cleared", "raiding", "replay", "ghost"].includes(
+  const canRestart = ["lab", "prison", "testing", "cleared", "raiding", "replay", "ghost"].includes(
     view.phase,
   );
 

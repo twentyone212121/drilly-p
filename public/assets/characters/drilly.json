@@ -1,0 +1,85 @@
+{
+  "frames": {
+    "hover": {
+      "frame": {
+        "x": 25,
+        "y": 12,
+        "w": 78,
+        "h": 104
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 78,
+        "h": 104
+      },
+      "sourceSize": {
+        "w": 78,
+        "h": 104
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 1
+      }
+    },
+    "active": {
+      "frame": {
+        "x": 154,
+        "y": 18,
+        "w": 76,
+        "h": 98
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 76,
+        "h": 98
+      },
+      "sourceSize": {
+        "w": 76,
+        "h": 98
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 1
+      }
+    },
+    "defeated": {
+      "frame": {
+        "x": 281,
+        "y": 12,
+        "w": 78,
+        "h": 104
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 78,
+        "h": 104
+      },
+      "sourceSize": {
+        "w": 78,
+        "h": 104
+      },
+      "pivot": {
+        "x": 0.5,
+        "y": 1
+      }
+    }
+  },
+  "meta": {
+    "image": "drilly.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 384,
+      "h": 128
+    },
+    "scale": "1"
+  }
+}

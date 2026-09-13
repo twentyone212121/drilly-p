@@ -1,3 +1,4 @@
+import { LAB_ROOMS, type LabRoomId } from "../shared/game/obstacleLab";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { DUNGEONS } from "../shared/game/campaign";
 import type { Session } from "./game/session";
@@ -33,7 +34,7 @@ export default function App({ session, saving }: { session: Session; saving?: Re
           DRILLY <b>P</b>
           <span className="wordmark-dot" />
         </span>
-        <span className="header-note">A LITTLE THIEF. A BIG RIVAL.</span>
+        <span className="header-note">ONE SMALL KEY. A WHOLE SYSTEM.</span>
         <small>{saving ? "GUEST PROFILE" : "LOCAL PLAY · SAVING OFF"}</small>
       </header>
       <ol className="flow-steps" aria-label="Game progress">
@@ -46,7 +47,8 @@ export default function App({ session, saving }: { session: Session; saving?: Re
       <section className="intro">
         <div>
           <div className="eyebrow">
-            DRILLY P <span>/ {view.prisonEscaped ? "YOUR FIRST RIVALRY" : "THE PRISON"}</span>
+            DRILLY P{" "}
+            <span>/ {view.prisonEscaped ? "YOUR FIRST RIVALRY" : "ESCAPE THE SYSTEM"}</span>
           </div>
           <h1>
             {copy.title}
@@ -55,6 +57,31 @@ export default function App({ session, saving }: { session: Session; saving?: Re
         </div>
         <p>{copy.hint}</p>
       </section>
+      {(view.phase === "prison" || view.phase === "escaped" || building) && (
+        <div className="lab-entry">
+          <button onClick={() => session.openLab()}>Try the obstacle lab</button>
+          <p className="hint">Practice every trap. Your own dungeon stays untouched.</p>
+        </div>
+      )}
+      {view.inLab && (
+        <section className="lab-controls" aria-label="Obstacle lab">
+          <label>
+            Practice room{" "}
+            <select
+              value={view.labRoom}
+              onChange={(e) => session.openLab(e.target.value as LabRoomId)}
+            >
+              {LAB_ROOMS.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button onClick={() => session.exitLab()}>Leave obstacle lab</button>
+          <span className="hint">No medals · unlimited retries</span>
+        </section>
+      )}
       {building && (
         <ol className="dungeon-list" aria-label="Opponent dungeons">
           {DUNGEONS.map((dungeon, index) => (
@@ -108,7 +135,7 @@ export default function App({ session, saving }: { session: Session; saving?: Re
           <button onClick={() => session.replayGhost()}>Replay Drilly’s attempts</button>
         </section>
       )}
-      <div className="flow-controls">
+      <div className={building ? "flow-controls build-actions" : "flow-controls"}>
         {building ? (
           <>
             <button
@@ -129,11 +156,12 @@ export default function App({ session, saving }: { session: Session; saving?: Re
               {!view.editorLevel.treasures.length
                 ? "Add a treasure before testing."
                 : view.canSubmit
-                  ? `Version ${view.layoutRevision + 1} is cleared.`
-                  : `Clear version ${view.layoutRevision + 1} to unlock submission.`}
+                  ? "Dungeon beaten. Ready to submit."
+                  : "Beat your dungeon to unlock submission."}
             </p>
           </>
-        ) : view.prisonEscaped &&
+        ) : !view.inLab &&
+          view.prisonEscaped &&
           view.phase !== "escaped" &&
           view.phase !== "raid-complete" &&
           view.phase !== "results" ? (
@@ -164,7 +192,7 @@ export default function App({ session, saving }: { session: Session; saving?: Re
           </span>
           <span>
             {building ? (
-              `DRAFT V${view.layoutRevision + 1}`
+              "YOUR DUNGEON"
             ) : (
               <>
                 {view.phase === "ghost"
