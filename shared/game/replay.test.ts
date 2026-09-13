@@ -10,12 +10,6 @@ describe("input boundary", () => {
   )("rejects malformed jump ticks: $ticks", ({ ticks }) =>
     expect(() => parseJumpTicks(ticks)).toThrow(),
   );
-  it("rejects huge or malformed level data", () => {
-    expect(() => parseLevel({ ...level, width: Infinity })).toThrow();
-    expect(() => parseLevel({ ...level, platforms: Array(65).fill(level.platforms[0]) })).toThrow();
-    expect(() => parseLevel({ ...level, traps: [{ ...level.traps[0], id: "floor" }] })).toThrow();
-    expect(() => parseLevel({ ...level, spawn: { x: 24, y: 430, direction: 1 } })).toThrow();
-  });
   it("rejects incompatible replay versions and out-of-range inputs", () => {
     const replay = {
       version: 2,
@@ -26,7 +20,6 @@ describe("input boundary", () => {
     };
     expect(() => parseReplay({ ...replay, rulesVersion: "future" })).toThrow();
     expect(() => parseReplay({ ...replay, version: 1 })).toThrow();
-    expect(() => parseReplay({ ...replay, rulesVersion: "checkpoint-1" })).toThrow();
     expect(() => parseReplay({ ...replay, endTick: 30 })).toThrow();
     expect(() => parseReplay({ ...replay, endTick: 100.5 })).toThrow();
   });

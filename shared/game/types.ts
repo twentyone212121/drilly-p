@@ -60,3 +60,9 @@ export type AttemptResult = {
   trajectory: State[];
   stopReason: "dead" | "won" | "tick-limit";
 };
+
+export type EditorObject =
+  | { kind: "platform"; value: Platform }
+  | { kind: "saw"; value: Saw }
+  | { kind: "obstacle"; value: Obstacle }
+  | { kind: "treasure"; value: Treasure };

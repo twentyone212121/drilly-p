@@ -1,15 +1,11 @@
-import {
-  HAZARD_KINDS,
-  type BuildContext,
-  type BuildBudget,
-} from "./game/drilly";
+import type { BuildBudget } from "./game/drilly";
 import { obstacleBounds } from "./game/obstacles";
 import { segmentRect, sweptCircle } from "./game/sweep";
 import * as v from "valibot";
 import { overlaps, touchesCircle } from "./game/collision";
 import { RULES } from "./game/rules";
 import { isRoomSideWall, roomSideWalls } from "./game/roomBoundary";
-import type { Level, Rect, Replay } from "./game/types";
+import type { EditorObject, Level, Rect, Replay } from "./game/types";
 
 const NameSchema = v.pipe(v.string(), v.minLength(1), v.maxLength(100));
 const CoordinateSchema = v.pipe(v.number(), v.finite(), v.minValue(0));
@@ -232,6 +228,54 @@ export function parseEditorLevel(value: unknown, template: Level): Level {
   );
 }
 
+// Previews come from a validated draft and editor presets. Validate just the changed
+// object; the complete draft is still validated when the user commits the edit.
+export function editorPlacementError(level: Level, object: EditorObject): string | null {
+  const key =
+    object.kind === "platform"
+      ? "platforms"
+      : object.kind === "saw"
+        ? "traps"
+        : object.kind === "treasure"
+          ? "treasures"
+          : "obstacles";
+  const objects = level[key] ?? [];
+  const limit =
+    object.kind === "platform"
+      ? RULES.editor.maxPlatforms
+      : object.kind === "saw"
+        ? RULES.editor.maxSaws
+        : object.kind === "treasure"
+          ? RULES.editor.maxTreasures
+          : RULES.obstacles.maxCount;
+  if (objects.length >= limit && !objects.some((item) => item.id === object.value.id))
+    return "Object limit reached.";
+  if (
+    object.kind === "obstacle" &&
+    (level.obstacles ?? []).filter(
+      (item) => item.id !== object.value.id && item.kind === object.value.kind,
+    ).length >= RULES.obstacles.maxPerKind
+  )
+    return "Obstacle limit reached.";
+
+  try {
+    parseEditorLevel(
+      {
+        ...level,
+        platforms: [],
+        traps: [],
+        treasures: [],
+        obstacles: [],
+        [key]: [object.value],
+      },
+      level,
+    );
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
 export function parseReplay(value: unknown): Replay {
   return v.parse(ReplaySchema, value);
 }
@@ -425,53 +469,6 @@ export function parseDrillyAttempts(value: unknown, level: Level) {
   )
     throw new Error("Drilly has not finished its attempts.");
   return attempts;
-}
-
-export function parseBuildContext(value: unknown): BuildContext {
-  const count = v.pipe(
-    v.number(),
-    v.integer(),
-    v.minValue(0),
-    v.maxValue(RULES.maxTicks * RULES.raidAttempts),
-  );
-  return v.parse(
-    v.object({
-      recentRaids: v.pipe(
-        v.array(
-          v.object({
-            level: LevelSchema,
-            attempts: v.pipe(
-              v.number(),
-              v.integer(),
-              v.minValue(1),
-              v.maxValue(RULES.raidAttempts),
-            ),
-            cleared: v.boolean(),
-            ignoredJumps: count,
-            wallJumps: count,
-            deaths: v.pipe(
-              v.array(
-                v.object({
-                  kind: v.picklist(HAZARD_KINDS),
-                  tick: TickLimitSchema,
-                  // An out-of-bounds death can legitimately be outside the room.
-                  x: v.pipe(v.number(), v.finite()),
-                  y: v.pipe(v.number(), v.finite()),
-                }),
-              ),
-              v.maxLength(RULES.raidAttempts),
-            ),
-          }),
-        ),
-        v.maxLength(RULES.drilly.recentRaidLimit),
-      ),
-      recentRooms: v.optional(
-        v.pipe(v.array(LevelSchema), v.maxLength(RULES.drilly.recentRoomLimit)),
-        [],
-      ),
-    }),
-    value,
-  );
 }
 
 export function parseDrillyStrategy(value: unknown, level: Level) {

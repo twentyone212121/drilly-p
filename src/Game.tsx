@@ -2,16 +2,16 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvex, useConvexAuth } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import App from "./App";
+import { GameSprite } from "./components/GameArt";
 import { createDrillySource } from "./ai/drillySource";
-import { createLocalDrillySource } from "./ai/localDrillySource";
 import { createSession } from "./game/session";
+import { loadTutorialCompleted, saveTutorialCompleted } from "./persistence/tutorial";
 
 export function LocalGame() {
   const [session] = useState(() =>
     createSession({
-      drilly: import.meta.env.VITE_LOCAL_DRILLY
-        ? createLocalDrillySource()
-        : undefined,
+      tutorialCompleted: loadTutorialCompleted(),
+      onTutorialCompleted: saveTutorialCompleted,
     }),
   );
   return <App session={session} />;
@@ -29,9 +29,7 @@ export function GuestGame() {
     try {
       await signIn("anonymous");
     } catch {
-      setError(
-        "Could not connect to Drilly. Check that Convex is running and retry.",
-      );
+      setError("Could not connect to Drilly. Check that Convex is running and retry.");
     }
   }, [signIn]);
 
@@ -42,14 +40,14 @@ export function GuestGame() {
   if (isAuthenticated) return <ConnectedGame />;
 
   return (
-    <main className="guest-loading">
-      <span className="wordmark">
-        DRILLY <b>P</b>
-      </span>
+    <main className="connection-screen">
+      <GameSprite name="drilly" />
       <h1>Connecting to Drilly.</h1>
       <p role="status">{error ?? "Opening your game…"}</p>
       {error && (
-        <button onClick={() => void connect()}>Retry connection</button>
+        <button className="game-button primary" onClick={() => void connect()}>
+          Retry connection
+        </button>
       )}
     </main>
   );
@@ -58,7 +56,14 @@ export function GuestGame() {
 function ConnectedGame() {
   const client = useConvex();
   const [session] = useState(() =>
-    createSession({ drilly: createDrillySource(client) }),
+    createSession({
+      drilly: createDrillySource(client),
+      tutorialCompleted: loadTutorialCompleted(),
+      onTutorialCompleted: saveTutorialCompleted,
+    }),
   );
+  useEffect(() => {
+    session.prepareRoom();
+  }, [session]);
   return <App session={session} />;
 }

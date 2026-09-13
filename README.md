@@ -23,24 +23,38 @@ Use `npm run dev:fe` to start only Vite when Convex is already running.
 Frontend-only mode still connects to Convex when `VITE_CONVEX_URL` is configured.
 Restart Vite after changing its environment.
 
-Guest authentication is automatic. The header shows **LIVE AI** when the game is
-connected. Each reload starts a fresh game; no old draft or save version blocks
-startup.
+Guest authentication is automatic. Tutorial completion is remembered in localStorage;
+later visits open your dungeon. If storage is unavailable, the game still works,
+but the tutorial may return after reload.
 
-1. Click **Skip tutorial** in development, or escape the prison normally.
-2. Build your room, click **Test dungeon**, and collect every treasure.
-3. Click **Submit & raid** to enter Drilly’s generated room. Building can take up
-   to three minutes; provider errors appear with a retry button.
-4. Clear its room or finish your three attempts, then click **Watch Drilly** to
-   see its attempts on your submitted layout.
+1. Escape the prison on your first visit.
+2. Edit your room or keep it, then click **Challenge Drilly**. If the room needs a
+   clear, this opens Test; collect every treasure and click **Raid Drilly**. An
+   unchanged, previously cleared room goes straight to the raid.
+3. Drilly prepares its room while you build. If it is still working when you
+   challenge, wait for the room or retry a provider error; building can take up
+   to three minutes.
+4. Clear its room or finish your three attempts, then watch Drilly’s recordings
+   and view the results. Return to your existing draft for another round.
 
-Space or tap starts/resumes play and jumps. Wall jumps reverse direction. Editing
-a cleared dungeon requires clearing the edited layout before submitting it.
-Layouts, medals and learning history remain in the current tab only.
+The five-step path at the top shows your progress through the round. Use the
+overlay buttons to start or retry; Space or tap jumps during play. Wall jumps
+reverse direction. Use the pause button to open the menu. Escape cancels the
+current editor drag/tool, or opens the pause menu when nothing needs cancelling.
+Choose a preset to place objects; use Move to drag them or resize a platform from
+its corner. Arrow keys nudge the selection and Delete removes it. Edits commit on
+release; rejected or cancelled drags preserve the draft and its clear.
+Editing a cleared dungeon requires clearing the edited layout before submitting it.
+Layouts and the current round remain in the tab only. **Test room** is also
+available for practice. **Replay tutorial** is in the pause menu, accessible from
+the editor and during play; it ends the current round and preserves your draft
+and its existing clear.
 
-Without Convex, local AI is available by setting `OPENAI_API_KEY` in ignored
-`.env.local` and running `npm run dev:fe`. Without either AI connection, the game labels
-itself **LOCAL PRACTICE**.
+Convex is the only AI backend. Without its connection you can escape and edit/test
+your room, but cannot submit a challenge.
+
+React renders the controls and overlays. One Phaser scene draws both editing and
+play, while the shared simulation owns movement and replay outcomes.
 
 ## Verification
 

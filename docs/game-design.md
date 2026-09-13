@@ -13,7 +13,8 @@ P is the player, represented by ESC; Drilly is the AI opponent inside an old com
 
 First visit: escape the prison to learn running, jumping, wall reversal, and treasure
 collection. Remember completion in localStorage; later visits open your dungeon.
-Replay the tutorial from pause without losing the current draft.
+Replay the tutorial from pause or the editor without losing the current draft or
+its clear. This ends the current round; return to the draft after the tutorial.
 
 **Build → Test → Your raid → Drilly’s raid → Results → Build**
 
@@ -47,6 +48,9 @@ Full-screen Arcade presentation: existing computer art, chunky controls, compact
 editor tools, minimal HUD, and in-game overlays. Keep the five-step path visible;
 highlight the current step, check completed steps, and name the next action.
 
+Keep all existing hazards available in the editor as presets. Remove their settings
+forms; placing and moving hazards should not require configuring numbers.
+
 Use functional copy only. No slogans, taunts, decorative labels, or developer panels.
 Respond immediately to input; avoid scene rebuilds, expensive full-screen effects,
 idle rendering, and artificial waits. Mockup motion never becomes game logic.
@@ -58,6 +62,13 @@ OpenAI SDK, Astra, server-side credentials, validated outputs, bounded retries,
 retryable errors, and protection against stale responses. Replays make no AI calls
 and cannot award medals twice.
 
+Replace the predictive physics search with model-chosen game inputs. During a raid,
+execute those inputs forward through the shared simulation; do not search alternate
+futures or discard failed runs without spending an attempt. The model may receive
+the room, current state, and feedback from its own scored attempts, never the
+player's clear inputs. Keep simulation for execution, replay checks, and Drilly's
+own-room proof. Input format and decision cadence still need a small headless trial.
+
 Cut story/level selection, locked slots, mastery, cloud drafts, save/version UI,
 round history, account screens, adaptive history, novelty scoring, and duplicate
 runtime backends. Remove player-facing fixtures, obstacle lab, and replay imports;
@@ -66,12 +77,13 @@ keep useful headless tests. Add no new hazards or AI framework.
 ## Work order
 
 1. Ship the Arcade loop and tutorial persistence; delete replaced screens and state.
-2. Trim AI orchestration while retaining the working movement controller.
-3. Compare direct model inputs on representative rooms before replacing it.
+2. Replace predictive movement search with direct model inputs; trim the route and
+   controller machinery it makes unnecessary. Check representative rooms to tune
+   the input format, decision cadence, and latency, not to retain hidden search.
 
 Keep each step playable and verify simulation, replays, UI, and live integration.
-Starter layout, advanced trap controls, difficulty, and acceptable AI latency remain
-open to playtesting.
+Starter layout, preset tuning, difficulty, and acceptable AI latency remain open
+to playtesting. Follow the [cleanup plan](cleanup-plan.md) for implementation.
 
 Engineering: [AGENTS.md](../AGENTS.md). Current setup and architecture:
 [README](../README.md), [backend notes](../convex/README.md).

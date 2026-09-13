@@ -1,22 +1,38 @@
-import { getObstacleLab, LAB_ROOMS, type LabRoomId } from "../shared/game/obstacleLab";
+import {
+  obstacleRoom,
+  OBSTACLE_CASES,
+  type ObstacleCase,
+} from "../shared/testing/obstacles";
 import { readFileSync } from "node:fs";
 import { parseLevel, parseJumpTicks, parseReplay } from "../shared/validation";
 import { describeRules } from "../shared/game/rules";
 import { replayAttempt, runAttempt } from "../shared/game/replay";
 try {
   const [command, path, ticks = "[]"] = process.argv.slice(2);
-  if (command === "--describe") console.log(JSON.stringify(describeRules(), null, 2));
-  else if (command === "--lab" && path && LAB_ROOMS.some((room) => room.id === path))
+  if (command === "--describe")
+    console.log(JSON.stringify(describeRules(), null, 2));
+  else if (
+    command === "--lab" &&
+    path &&
+    OBSTACLE_CASES.some((room) => room === path)
+  )
     console.log(
       JSON.stringify(
-        runAttempt(getObstacleLab(path as LabRoomId), parseJumpTicks(JSON.parse(ticks))),
+        runAttempt(
+          obstacleRoom(path as ObstacleCase),
+          parseJumpTicks(JSON.parse(ticks)),
+        ),
         null,
         2,
       ),
     );
   else if (command === "--replay" && path)
     console.log(
-      JSON.stringify(replayAttempt(parseReplay(JSON.parse(readFileSync(path, "utf8")))), null, 2),
+      JSON.stringify(
+        replayAttempt(parseReplay(JSON.parse(readFileSync(path, "utf8")))),
+        null,
+        2,
+      ),
     );
   else if (command === "--level" && path)
     console.log(

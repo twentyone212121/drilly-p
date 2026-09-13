@@ -1,22 +1,18 @@
 import { RULES } from "../../shared/game/rules";
 import { initialState, step } from "../../shared/game/simulation";
-import { parseLevel, parseJumpTicks, parseReplay } from "../../shared/validation";
-import type { GameEvent, Level, Replay, State } from "../../shared/game/types";
+import { parseLevel, parseReplay } from "../../shared/validation";
+import type { GameEvent, Level, Replay } from "../../shared/game/types";
 
 const TICK_DURATION_MS = 1000 / RULES.tickRate;
 const MAX_FRAME_DELTA_MS = 100;
-const SNAPSHOT_INTERVAL_TICKS = 6;
 
 export function createAttempt(initialLevel: Level) {
   let level = parseLevel(initialLevel);
   let state = initialState(level);
-  let levelRevision = 0;
   let paused = true;
   let accumulator = 0;
   let pendingJump = false;
   let jumps: number[] = [];
-  let events: GameEvent[] = [];
-  let trajectory: State[] = [state];
   let mode: "human" | "replay" = "human";
   let schedule = new Set<number>();
   let endTick: number = RULES.maxTicks;
@@ -30,9 +26,6 @@ export function createAttempt(initialLevel: Level) {
       state,
       paused,
       mode,
-      pendingJump,
-      jumps: [...jumps],
-      events: [...events],
       endTick,
       finished: isFinished(),
     };
@@ -49,8 +42,6 @@ export function createAttempt(initialLevel: Level) {
     accumulator = 0;
     pendingJump = false;
     jumps = [];
-    events = [];
-    trajectory = [state];
   }
 
   function resetToHuman() {
@@ -76,26 +67,14 @@ export function createAttempt(initialLevel: Level) {
     const result = step(level, state, { jump });
     pendingJump = false;
     state = result.state;
-    events.push(...result.events);
-    trajectory.push(state);
 
     eventListeners.forEach((fn) => fn(result.events));
     if (isFinished()) paused = true;
   }
 
   return {
-    get level() {
-      return structuredClone(level);
-    },
-
-    get levelRevision() {
-      return levelRevision;
-    },
-
     frameState: () => state,
     getSnapshot: () => snapshot,
-    observe: () => structuredClone(makeSnapshot()),
-    trajectory: () => structuredClone(trajectory),
     exportReplay: (): Replay => ({
       version: 2,
       rulesVersion: RULES.version,
@@ -126,6 +105,7 @@ export function createAttempt(initialLevel: Level) {
         accumulator = 0;
       } else if (mode === "human") {
         pendingJump = true;
+        return;
       } else {
         return;
       }
@@ -137,7 +117,6 @@ export function createAttempt(initialLevel: Level) {
       if (isFinished() || mode !== "human") return;
 
       pendingJump = true;
-      notify();
     },
 
     play() {
@@ -166,7 +145,6 @@ export function createAttempt(initialLevel: Level) {
 
     loadLevel(value: unknown) {
       level = parseLevel(value);
-      levelRevision++;
       resetToHuman();
       notify();
     },
@@ -176,22 +154,11 @@ export function createAttempt(initialLevel: Level) {
       notify();
     },
 
-    loadSchedule(ticks: unknown) {
-      const validated = parseJumpTicks(ticks);
-
-      mode = "replay";
-      endTick = RULES.maxTicks;
-      schedule = new Set(validated);
-      resetAttempt();
-      notify();
-    },
-
     loadReplay(value: unknown) {
       // Validate completely before modifying the live session.
       const replay = parseReplay(value);
 
       level = replay.level;
-      levelRevision++;
       mode = "replay";
       endTick = replay.endTick;
       schedule = new Set(replay.jumpTicks);
@@ -204,21 +171,15 @@ export function createAttempt(initialLevel: Level) {
 
       // Cap catch-up after a stall; simulation never skips ticks. Hidden tabs pause separately.
       accumulator += Math.min(deltaMs, MAX_FRAME_DELTA_MS);
-      const previousEventCount = events.length;
-      const previousTick = state.tick;
+      const collected = state.collectedTreasureIds.length;
 
       while (accumulator + 1e-8 >= TICK_DURATION_MS && !paused) {
         accumulator -= TICK_DURATION_MS;
         advanceTick();
       }
 
-      if (
-        paused ||
-        events.length !== previousEventCount ||
-        Math.floor(previousTick / SNAPSHOT_INTERVAL_TICKS) !==
-          Math.floor(state.tick / SNAPSHOT_INTERVAL_TICKS)
-      )
-        notify();
+      // Phaser reads frameState directly. React only needs visible changes.
+      if (paused || state.collectedTreasureIds.length !== collected) notify();
     },
   };
 }

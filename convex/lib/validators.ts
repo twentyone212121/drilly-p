@@ -90,24 +90,3 @@ export const raidAttemptValidator = v.object({
   ),
   replay: replayValidator,
 });
-
-export const buildContextValidator = v.object({
-  recentRooms: v.optional(v.array(levelValidator)),
-  recentRaids: v.array(
-    v.object({
-      level: levelValidator,
-      attempts: v.number(),
-      cleared: v.boolean(),
-      ignoredJumps: v.number(),
-      wallJumps: v.number(),
-      deaths: v.array(
-        v.object({
-          kind: v.string(),
-          tick: v.number(),
-          x: v.number(),
-          y: v.number(),
-        }),
-      ),
-    }),
-  ),
-});

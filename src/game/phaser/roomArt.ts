@@ -1,8 +1,9 @@
-import { createObstacleArt } from "./obstacleArt";
+import { createObstacleArt, setObstacleImage } from "./obstacleArt";
 import type Phaser from "phaser";
-import type { GameEvent, Level, State } from "../../../shared/game/types";
+import type { EditorObject, GameEvent, Level, State } from "../../../shared/game/types";
 import { RULES } from "../../../shared/game/rules";
-import { platformPanels } from "../art/platformPanels";
+import { objectBounds } from "../editor";
+import { flameBounds } from "../../../shared/game/obstacles";
 
 export function createRoomArt(scene: Phaser.Scene, level: Level) {
   const objects: Phaser.GameObjects.Image[] = [];
@@ -13,6 +14,15 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
     return image;
   };
 
+  const grid = scene.add.graphics().setDepth(-1).setVisible(false);
+  grid.lineStyle(0.5, 0x45606f, 0.45);
+  for (let x = 0; x <= level.width; x += RULES.editor.gridSize)
+    grid.lineBetween(x, 0, x, level.height);
+  for (let y = 0; y <= level.height; y += RULES.editor.gridSize)
+    grid.lineBetween(0, y, level.width, y);
+  const guides = scene.add.graphics().setDepth(60);
+  const previewPanels = scene.add.graphics().setDepth(70).setAlpha(0.65);
+  const previewImage = props("saw", 0, 0, 1, 1).setDepth(70).setAlpha(0.65).setVisible(false);
   const platforms = scene.add.graphics();
   for (const platform of level.platforms) {
     for (const panel of platformPanels(platform)) {
@@ -22,22 +32,52 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
   }
   const saws = level.traps.map((trap) => {
     const image = props("saw", trap.x, trap.y, trap.radius * 2, trap.radius * 2);
-    return image.setOrigin(0.5);
+    return image.setOrigin(0.5).setDepth(20);
   });
   const treasures = level.treasures.map((treasure) =>
-    props("data", treasure.x, treasure.y, treasure.width, treasure.height),
+    props("data", treasure.x, treasure.y, treasure.width, treasure.height).setDepth(30),
   );
   const obstacleArt = createObstacleArt(scene, level);
-  const player = scene.add.image(0, 0, "esc", "idle").setOrigin(0.5, 1);
+  const player = scene.add.image(0, 0, "esc", "idle").setOrigin(0.5, 1).setDepth(40);
   objects.push(player);
-  const fragments = scene.add.graphics();
+  const fragments = scene.add.graphics().setDepth(50);
   let jumpTick = -100;
   let wallJumpTick = -100;
   let deathMs = 0;
   let lastTick = -1;
   let landingTick = -100;
+  let lastState: State | null = null;
+  let lastGhost = false;
+  let lastEditing = false;
 
   return {
+    editor(selected: EditorObject | undefined, preview: EditorObject | null, invalid: boolean) {
+      guides.clear();
+      previewPanels.clear();
+      previewImage.setVisible(false);
+      if (selected) drawGuides(guides, selected, level, false, true);
+      if (!preview) return;
+      drawGuides(guides, preview, level, invalid, false);
+      if (preview.kind === "platform") {
+        for (const panel of platformPanels(preview.value)) {
+          previewPanels.fillStyle(panel.color);
+          previewPanels.fillRect(panel.x, panel.y, panel.width, panel.height);
+        }
+      } else {
+        previewImage.setVisible(true);
+        if (preview.kind === "obstacle") setObstacleImage(previewImage, preview.value);
+        else {
+          const b = objectBounds(preview);
+          previewImage
+            .setTexture("computer-props", preview.kind === "saw" ? "saw" : "data")
+            .setOrigin(0)
+            .setPosition(b.x, b.y)
+            .setDisplaySize(b.width, b.height)
+            .setRotation(0)
+            .setFlipY(false);
+        }
+      }
+    },
     consume(events: GameEvent[]) {
       for (const event of events) {
         if (event.type === "landed") landingTick = event.tick;
@@ -47,9 +87,16 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
         }
       }
     },
-    update(state: State, ghost: boolean, delta: number) {
+    update(state: State, ghost: boolean, delta: number, editing = false) {
+      const dying = !editing && !ghost && state.status === "dead" && deathMs < 500;
+      if (state === lastState && ghost === lastGhost && editing === lastEditing && !dying)
+        return false;
+      lastState = state;
+      lastGhost = ghost;
+      lastEditing = editing;
+      grid.setVisible(editing);
       obstacleArt.update(state);
-      if (state.tick < lastTick) {
+      if (state.tick === 0 || state.tick < lastTick) {
         landingTick = jumpTick = wallJumpTick = -100;
         deathMs = 0;
       }
@@ -59,23 +106,26 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
       fragments.clear();
       const landed = state.tick - landingTick < 6;
       const running =
+        !editing &&
         !ghost &&
         state.status === "running" &&
         state.tick > 0 &&
         state.player.grounded &&
         !landed &&
         Math.abs(state.player.vx) > 0;
-      const frame = ghost
-        ? state.status === "dead"
-          ? "defeated"
-          : state.player.grounded
-            ? "hover"
-            : "active"
-        : !state.player.grounded
-          ? "jump"
-          : landed
-            ? "land"
-            : "idle";
+      const frame = editing
+        ? "idle"
+        : ghost
+          ? state.status === "dead"
+            ? "defeated"
+            : state.player.grounded
+              ? "hover"
+              : "active"
+          : !state.player.grounded
+            ? "jump"
+            : landed
+              ? "land"
+              : "idle";
       const texture = ghost ? "drilly" : running ? "esc-run" : "esc";
       const runFrame = `run-${Math.floor(state.tick / 5) % 6}`;
       player.setTexture(texture, running ? runFrame : frame).setOrigin(0.5, 1);
@@ -100,7 +150,7 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
       );
       // A small visual lean communicates direction without mirroring the ESC label.
       player.setRotation(
-        state.status === "running"
+        !editing && state.status === "running"
           ? state.player.direction *
               (0.04 + (!ghost ? Math.max(0, 1 - (state.tick - wallJumpTick) / 10) * 0.16 : 0))
           : 0,
@@ -124,12 +174,105 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
       treasures.forEach((image, index) =>
         image.setVisible(!state.collectedTreasureIds.includes(level.treasures[index].id)),
       );
+      return !editing && !ghost && state.status === "dead" && deathMs < 500;
     },
     destroy() {
+      grid.destroy();
+      guides.destroy();
+      previewPanels.destroy();
       platforms.destroy();
       obstacleArt.destroy();
       fragments.destroy();
       objects.forEach((image) => image.destroy());
     },
   };
+}
+
+function drawGuides(
+  graphics: Phaser.GameObjects.Graphics,
+  object: EditorObject,
+  level: Level,
+  invalid: boolean,
+  resize: boolean,
+) {
+  const b = objectBounds(object);
+  graphics.lineStyle(2, invalid ? 0xff568e : 0x50dcf3);
+  graphics.strokeRect(b.x, b.y, b.width, b.height);
+  if (resize && object.kind === "platform") {
+    graphics.fillStyle(0x50dcf3);
+    graphics.fillRect(b.x + b.width - 6, b.y + b.height - 6, 12, 12);
+  }
+  if (object.kind !== "obstacle") return;
+  const o = object.value;
+  graphics.lineStyle(1.5, 0x61e0eb);
+  if (o.kind === "slider" || o.kind === "drone") {
+    graphics.lineBetween(o.x, o.y, o.endX, o.endY);
+    graphics.strokeCircle(o.endX, o.endY, o.radius);
+  }
+  if (o.kind === "pursuer") {
+    graphics.strokeCircle(o.x, o.y, o.detectionRange);
+    graphics.lineStyle(1.5, 0xee5fb9);
+    graphics.strokeCircle(o.x, o.y, o.chaseRange);
+  }
+  if (o.kind === "turret") {
+    if (o.mode === "aimed") graphics.strokeCircle(o.x, o.y, o.range);
+    else if (o.mode === "flame") {
+      const flame = flameBounds(o, level);
+      graphics.strokeRect(flame.x, flame.y, flame.width, flame.height);
+    } else graphics.lineBetween(o.x, o.y, o.x + o.direction * o.range, o.y);
+  }
+}
+
+type Bounds = { x: number; y: number; width: number; height: number };
+type PanelRect = Bounds & { color: number };
+
+/** Size-aware hardware panels for the room and its editor preview. */
+function platformPanels(bounds: Bounds): PanelRect[] {
+  const result: PanelRect[] = [];
+  const add = (x: number, y: number, width: number, height: number, color: number) => {
+    if (width > 0 && height > 0) result.push({ x, y, width, height, color });
+  };
+  const { x, y, width, height } = bounds;
+  const vertical = height > width;
+  const columns = Math.max(1, Math.ceil(width / 96));
+  const rows = Math.max(1, Math.ceil(height / 96));
+  const w = width / columns;
+  const h = height / rows;
+  const bevel = Math.min(2, width / 8, height / 8);
+
+  // A continuous dark backing keeps every solid edge aligned with its collider.
+  add(x, y, width, height, 0x101b29);
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      const px = x + column * w;
+      const py = y + row * h;
+      add(px + bevel, py + bevel, w - bevel * 2, h - bevel * 2, 0x2b3c50);
+      add(px + bevel, py + bevel, w - bevel * 2, bevel, 0x61758a);
+      add(px + bevel, py + bevel * 2, bevel, h - bevel * 4, 0x41566c);
+      add(px + w - bevel * 2, py + bevel * 2, bevel, h - bevel * 3, 0x1a293a);
+      add(px + bevel * 2, py + h - bevel * 3, w - bevel * 4, bevel, 0x1b2a3c);
+
+      // Recessed face plate and short status light; never scale a bolt or a bevel.
+      if (w >= 12 && h >= 12) {
+        add(px + 5, py + 5, w - 10, h - 10, 0x223246);
+        if (vertical && h >= 28) {
+          add(px + w / 2 - 1, py + 9, 2, Math.min(14, h - 18), 0x142233);
+          add(px + w / 2 - 1, py + h - 14, 2, 6, 0x51bbc7);
+        } else if (!vertical && w >= 28) {
+          add(px + 9, py + h / 2 - 1, Math.min(18, w - 18), 2, 0x142233);
+          add(px + w - 15, py + h / 2 - 1, 6, 2, 0x51bbc7);
+        }
+      }
+    }
+  }
+
+  // Continuous edge rails separate playable surfaces from the dark background.
+  if (vertical) {
+    add(x, y, bevel, height, 0x526c80);
+    add(x + width - bevel, y, bevel, height, 0x526c80);
+  } else {
+    add(x, y, width, bevel, 0x91a6b8);
+    add(x, y + bevel, width, bevel, 0x526c80);
+  }
+  return result;
 }

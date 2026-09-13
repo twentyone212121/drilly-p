@@ -8,24 +8,19 @@ import {
   levelValidator,
   builtDungeonValidator,
   raidAttemptValidator,
-  buildContextValidator,
 } from "./lib/validators";
-import { buildDungeon, playDungeon } from "../server/drilly/planner";
-import { openAIPlanner } from "../server/drilly/provider";
+import { buildDungeon, playDungeon } from "./lib/drilly/planner";
+import { openAIPlanner } from "./lib/drilly/provider";
 
 export const build = action({
-  args: {
-    rulesVersion: v.optional(v.string()),
-    context: v.optional(buildContextValidator),
-  },
+  args: {},
   returns: builtDungeonValidator,
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     if (!(await getAuthUserId(ctx)))
       throw new ConvexError("Sign in as a guest to play Drilly.");
     try {
       return await buildDungeon(
         openAIPlanner(env.OPENAI_API_KEY, env.DRILLY_MODEL),
-        args.context,
         (progress) => console.info("drilly.build", progress),
       );
     } catch (error) {
@@ -37,7 +32,7 @@ export const build = action({
 });
 
 export const raid = action({
-  args: { level: levelValidator, rulesVersion: v.optional(v.string()) },
+  args: { level: levelValidator },
   returns: v.array(raidAttemptValidator),
   handler: async (ctx, args) => {
     if (!(await getAuthUserId(ctx)))

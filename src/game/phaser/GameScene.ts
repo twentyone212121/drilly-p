@@ -1,54 +1,44 @@
 import { OBSTACLE_TEXTURES } from "./obstacleArt";
 import Phaser from "phaser";
-import type { Level } from "../../../shared/game/types";
+import { initialState } from "../../../shared/game/simulation";
+import type { Level, State } from "../../../shared/game/types";
 import type { Session } from "../session";
 import { AUDIO } from "./assets";
-import { createAudio, type AudioSettings, type AudioStatus } from "./audio";
+import { createAudio, type AudioSettings } from "./audio";
 import { createRoomArt } from "./roomArt";
-import { drawAmbience } from "./ambience";
+import { createEditorInput, type EditorOptions } from "./editorInput";
 
 export class GameScene extends Phaser.Scene {
   private roomArt?: ReturnType<typeof createRoomArt>;
-  private background!: Phaser.GameObjects.Image;
-  private ambience!: Phaser.GameObjects.Graphics;
-  private ambientSeconds = 0;
   private audio?: ReturnType<typeof createAudio>;
-  private label?: Phaser.GameObjects.Text;
   private lastTick = 0;
   private wasPaused = true;
-  private levelRevision = -1;
-  private level: Level;
+  private level?: Level;
+  private editor?: ReturnType<typeof createEditorInput>;
+  private draftState?: State;
+  private wakeFrame = 0;
+  private ready = false;
 
   constructor(
     private session: Session,
     private settings: AudioSettings,
-    private reportAudio: (status: AudioStatus) => void,
+    private editorOptions: EditorOptions,
   ) {
     super("room");
-    this.level = session.level;
   }
 
   preload() {
     for (const name of OBSTACLE_TEXTURES) {
-      if (name === "turret")
-        this.load.image("obstacle-turret", "/assets/obstacles/turret.png");
+      if (name === "turret") this.load.image("obstacle-turret", "/assets/obstacles/turret.png");
       else this.load.svg(`obstacle-${name}`, `/assets/obstacles/${name}.svg`);
     }
     for (const name of ["esc", "esc-run", "drilly"]) {
-      this.load.atlas(
-        name,
-        `/assets/characters/${name}.png`,
-        `/assets/characters/${name}.json`,
-      );
+      this.load.atlas(name, `/assets/characters/${name}.png`, `/assets/characters/${name}.json`);
     }
     this.load.atlas(
       "computer-props",
       "/assets/environment/computer-props.png",
       "/assets/environment/computer-props.json",
-    );
-    this.load.image(
-      "computer-interior",
-      "/assets/backgrounds/computer-interior.webp",
     );
     for (const [key, path] of Object.entries(AUDIO)) {
       this.load.audio(key, path);
@@ -56,29 +46,50 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
-    this.background = this.add.image(0, 0, "computer-interior").setOrigin(0);
-    this.ambience = this.add.graphics();
-    this.audio = createAudio(this, this.settings, this.reportAudio);
+    this.audio = createAudio(this, this.settings);
     this.connectAudio();
-    this.input.on("pointerdown", () => this.session.primaryAction());
+    this.editor = createEditorInput(
+      this.game.canvas,
+      this.session,
+      this.editorOptions,
+      (selected, preview, invalid) => this.roomArt?.editor(selected, preview, invalid),
+      () => this.requestRender(),
+    );
+    this.ready = true;
+    this.editor.setOptions(this.editorOptions);
   }
 
   update(_time: number, delta: number) {
+    this.syncLevel(this.session.getSnapshot().level);
     this.session.update(delta);
-    this.syncLevel();
-    if (!this.session.getSnapshot().paused)
-      this.ambientSeconds += Math.min(delta, 100) / 1000;
-    drawAmbience(
-      this.ambience,
-      this.level.width,
-      this.level.height,
-      this.ambientSeconds,
-    );
-    this.roomArt?.update(
-      this.session.frameState(),
-      ["ghost", "proof"].includes(this.session.getSnapshot().phase),
+    const view = this.session.getSnapshot();
+    this.syncLevel(view.level);
+    this.editor?.flushPreview();
+    const editing = view.phase === "build";
+    const animating = this.roomArt?.update(
+      editing ? this.draftState! : this.session.frameState(),
+      !editing && view.mode === "replay",
       delta,
+      editing,
     );
+    if ((view.paused || !view.canPlay) && !animating) this.game.loop.sleep();
+  }
+
+  // Coalesce input/resize wakes; Phaser remains the only continuous frame loop.
+  requestRender() {
+    if (!this.ready || this.game.loop.running || this.wakeFrame) return;
+    this.wakeFrame = requestAnimationFrame(() => {
+      this.wakeFrame = 0;
+      if (this.ready) {
+        this.game.loop.resetDelta();
+        this.game.loop.wake();
+      }
+    });
+  }
+
+  setEditor(options: EditorOptions) {
+    this.editorOptions = options;
+    this.editor?.setOptions(options);
   }
 
   setAudio(settings: AudioSettings) {
@@ -86,30 +97,22 @@ export class GameScene extends Phaser.Scene {
     this.audio?.apply(settings);
   }
 
-  private syncLevel() {
-    if (this.levelRevision === this.session.levelRevision) return;
-
-    this.level = this.session.level;
-    this.levelRevision = this.session.levelRevision;
-    this.scale.resize(this.level.width, this.level.height);
-    this.background.setDisplaySize(this.level.width, this.level.height);
-    this.ambientSeconds = 0;
+  private syncLevel(level: Level) {
+    if (this.level === level) return;
+    this.level = level;
+    this.draftState = initialState(level);
+    if (this.scale.width !== level.width || this.scale.height !== level.height)
+      this.scale.setGameSize(level.width, level.height);
     this.roomArt?.destroy();
-    this.roomArt = createRoomArt(this, this.level);
-
-    this.label?.destroy();
-    this.label = this.add.text(56, 52, this.level.name.toUpperCase(), {
-      fontFamily: "monospace",
-      fontSize: "12px",
-      color: "#7d929e",
-    });
+    this.roomArt = createRoomArt(this, level);
+    this.editor?.setLevel(level);
+    this.editor?.setOptions(this.editorOptions);
   }
 
   private stopAudioOnTransition() {
     const view = this.session.getSnapshot();
     const restarted = view.state.tick < this.lastTick;
-    const justPaused =
-      !this.wasPaused && view.paused && view.state.status === "running";
+    const justPaused = !this.wasPaused && view.paused && view.state.status === "running";
 
     if (restarted || justPaused) this.audio?.stop();
 
@@ -122,15 +125,20 @@ export class GameScene extends Phaser.Scene {
       this.audio?.consume(events);
       this.roomArt?.consume(events);
     });
-    const offSession = this.session.subscribe(() =>
-      this.stopAudioOnTransition(),
-    );
+    const offSession = this.session.subscribe(() => {
+      this.stopAudioOnTransition();
+      this.requestRender();
+    });
     let disposed = false;
 
     const cleanup = () => {
       if (disposed) return;
 
       disposed = true;
+      this.ready = false;
+      cancelAnimationFrame(this.wakeFrame);
+      this.editor?.destroy();
+      this.roomArt?.destroy();
       offEvents();
       offSession();
       this.audio?.destroy();

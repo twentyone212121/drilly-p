@@ -1,20 +1,28 @@
 import type Phaser from "phaser";
+import type { Obstacle } from "../../../shared/game/obstacleTypes";
 import type { Level, State } from "../../../shared/game/types";
 import { flameBounds, obstacleBounds } from "../../../shared/game/obstacles";
 import { RULES } from "../../../shared/game/rules";
 
 export const OBSTACLE_TEXTURES = ["spikes", "turret", "drone", "pursuer"] as const;
 
+export function setObstacleImage(image: Phaser.GameObjects.Image, obstacle: Obstacle) {
+  const bounds = obstacleBounds(obstacle);
+  image.setTexture(
+    obstacle.kind === "slider" ? "computer-props" : `obstacle-${obstacle.kind}`,
+    obstacle.kind === "slider" ? "saw" : undefined,
+  );
+  image.setOrigin(0.5).setDisplaySize(bounds.width, bounds.height);
+  image.setPosition(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  const left = obstacle.kind === "turret" && obstacle.direction === -1;
+  image.setRotation(left ? Math.PI : 0).setFlipY(left);
+}
+
 export function createObstacleArt(scene: Phaser.Scene, level: Level) {
-  const routes = scene.add.graphics();
+  const routes = scene.add.graphics().setDepth(9);
   const sprites = (level.obstacles ?? []).map((o) => {
-    const bounds = obstacleBounds(o);
-    const image =
-      o.kind === "slider"
-        ? scene.add.image(o.x, o.y, "computer-props", "saw")
-        : scene.add.image(0, 0, `obstacle-${o.kind}`);
-    image.setDisplaySize(bounds.width, bounds.height);
-    image.setPosition(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    const image = scene.add.image(0, 0, "computer-props", "saw").setDepth(10);
+    setObstacleImage(image, o);
     if (o.kind === "slider" || o.kind === "drone") {
       routes.lineStyle(2, o.kind === "slider" ? 0xa13278 : 0x327c89, 0.7);
       routes.lineBetween(o.x, o.y, o.endX, o.endY);
@@ -23,7 +31,7 @@ export function createObstacleArt(scene: Phaser.Scene, level: Level) {
     }
     return image;
   });
-  const effects = scene.add.graphics();
+  const effects = scene.add.graphics().setDepth(11);
   return {
     update(state: State) {
       effects.clear();

@@ -1,14 +1,10 @@
 import type { Obstacle, ObstacleKind } from "../../shared/game/obstacleTypes";
 import { obstacleBounds } from "../../shared/game/obstacles";
 import { RULES } from "../../shared/game/rules";
-import type { Level, Platform, Rect, Saw, Treasure } from "../../shared/game/types";
-import { parseEditorLevel } from "../../shared/validation";
+import type { EditorObject, Level, Rect } from "../../shared/game/types";
+import { editorPlacementError, parseEditorLevel } from "../../shared/validation";
 
-export type EditorObject =
-  | { kind: "platform"; value: Platform }
-  | { kind: "saw"; value: Saw }
-  | { kind: "obstacle"; value: Obstacle }
-  | { kind: "treasure"; value: Treasure };
+export type { EditorObject } from "../../shared/game/types";
 
 export type ObjectKind = EditorObject["kind"];
 export type Selection = { kind: ObjectKind; id: string };
@@ -207,14 +203,7 @@ function putObject<T extends { id: string }>(objects: T[], value: T) {
   else objects[index] = value;
 }
 
-export function placementError(level: Level, object: EditorObject): string | null {
-  try {
-    applyEdit(level, { type: "put", object });
-    return null;
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error);
-  }
-}
+export const placementError = editorPlacementError;
 
 export function newObstacle(
   kind: ObstacleKind,
