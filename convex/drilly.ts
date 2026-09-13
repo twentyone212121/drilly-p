@@ -1,3 +1,5 @@
+"use node";
+
 import { drillyErrorMessage, DRILLY_ERRORS } from "../shared/game/drillyErrors";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";

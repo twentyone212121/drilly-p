@@ -37,10 +37,10 @@ function setting(name: string) {
         "npx",
         ["convex", "env", "get", name, "--deployment", deployment],
         { encoding: "utf8" },
-      ).trim()
+      ).trim() || undefined
     : process.env[name];
 }
-const model = setting("DRILLY_MODEL");
+const model = setting("DRILLY_MODEL") ?? RULES.drilly.defaultModel;
 const base = openAIPlanner(setting("OPENAI_API_KEY"), model);
 const selected = (option("--cases") ?? "saws,wall,spikes").split(",");
 if (

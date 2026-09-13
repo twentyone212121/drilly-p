@@ -40,10 +40,11 @@ it("runs authenticated build and raid actions through the real simulation with a
     issuer: "https://test",
   });
   vi.stubEnv("OPENAI_API_KEY", "test-only");
-  vi.stubEnv("DRILLY_MODEL", "test-model");
+  vi.stubEnv("DRILLY_MODEL", undefined);
   const response = (value: unknown) =>
     new Response(
       JSON.stringify({
+        object: "response",
         status: "completed",
         output: [
           {
@@ -52,9 +53,12 @@ it("runs authenticated build and raid actions through the real simulation with a
           },
         ],
       }),
+      { headers: { "Content-Type": "application/json" } },
     );
   const fetch = vi.fn(async (_url: unknown, init: RequestInit) => {
     const body = JSON.parse(init.body as string);
+    expect(body.model).toBe("gpt-6-astra");
+    expect(body.reasoning).toEqual({ effort: "low" });
     const data = JSON.parse(body.input.slice(body.input.indexOf("\n") + 1));
     return response(await buildPlan("", data));
   });

@@ -12,7 +12,7 @@ export default defineConfig(({ mode, command }) => {
   return {
     define: {
       "import.meta.env.VITE_LOCAL_DRILLY": JSON.stringify(
-        command === "serve" && Boolean(key && model),
+        command === "serve" && Boolean(key),
       ),
     },
     plugins: [react(), tailwindcss(), localDrillyPlugin(key, model)],

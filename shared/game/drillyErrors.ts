@@ -2,7 +2,7 @@
 export const DRILLY_ERRORS = {
   unproven:
     "Drilly could not finish testing its room within the building budget. Retry; your draft and medals are unchanged.",
-  configuration: "Drilly is not configured. Set the backend API key and model.",
+  configuration: "Drilly is not configured. Set the backend OpenAI API key.",
   credentials: "Drilly’s API key was rejected. Check the backend OpenAI key.",
   quota:
     "Drilly’s OpenAI account has no available API quota. Check API billing and credits.",

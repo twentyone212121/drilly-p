@@ -3,6 +3,7 @@ export const RULES = Object.freeze({
   version: "obstacles-1",
   raidAttempts: 3,
   drilly: Object.freeze({
+    defaultModel: "gpt-6-astra",
     buildEdits: 6,
     strategyIntervalTicks: 300,
     maxDecisionsPerAttempt: 6,
