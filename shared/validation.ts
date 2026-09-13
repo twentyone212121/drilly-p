@@ -1,14 +1,25 @@
+import {
+  HAZARD_KINDS,
+  type BuildContext,
+  type BuildBudget,
+} from "./game/drilly";
 import { obstacleBounds } from "./game/obstacles";
 import { segmentRect, sweptCircle } from "./game/sweep";
 import * as v from "valibot";
 import { overlaps, touchesCircle } from "./game/collision";
 import { RULES } from "./game/rules";
+import { isRoomSideWall, roomSideWalls } from "./game/roomBoundary";
 import type { Level, Rect, Replay } from "./game/types";
 
 const NameSchema = v.pipe(v.string(), v.minLength(1), v.maxLength(100));
 const CoordinateSchema = v.pipe(v.number(), v.finite(), v.minValue(0));
 const SizeSchema = v.pipe(v.number(), v.finite(), v.minValue(1));
-const RoomSizeSchema = v.pipe(v.number(), v.finite(), v.minValue(160), v.maxValue(2000));
+const RoomSizeSchema = v.pipe(
+  v.number(),
+  v.finite(),
+  v.minValue(160),
+  v.maxValue(2000),
+);
 
 const RectSchema = v.object({
   x: CoordinateSchema,
@@ -17,7 +28,10 @@ const RectSchema = v.object({
   height: SizeSchema,
 });
 
-const PlatformSizeSchema = v.pipe(SizeSchema, v.minValue(RULES.editor.minPlatformSize));
+const PlatformSizeSchema = v.pipe(
+  SizeSchema,
+  v.minValue(RULES.editor.minPlatformSize),
+);
 const PlatformSchema = v.object({
   ...RectSchema.entries,
   id: NameSchema,
@@ -70,7 +84,11 @@ const PathFields = {
   speed: SpeedSchema,
 };
 const ObstacleSchema = v.variant("kind", [
-  v.object({ ...RectSchema.entries, id: NameSchema, kind: v.literal("spikes") }),
+  v.object({
+    ...RectSchema.entries,
+    id: NameSchema,
+    kind: v.literal("spikes"),
+  }),
   v.object({ ...PathFields, kind: v.literal("slider") }),
   v.object({ ...PathFields, kind: v.literal("drone") }),
   v.object({
@@ -117,25 +135,39 @@ const EditorLevelSchema = v.pipe(
       v.array(PlatformSchema),
       v.maxLength(RULES.editor.maxPlatforms, "Platform limit reached."),
     ),
-    traps: v.pipe(v.array(TrapSchema), v.maxLength(RULES.editor.maxSaws, "Saw limit reached.")),
-    obstacles: v.optional(v.pipe(v.array(ObstacleSchema), v.maxLength(RULES.obstacles.maxCount))),
+    traps: v.pipe(
+      v.array(TrapSchema),
+      v.maxLength(RULES.editor.maxSaws, "Saw limit reached."),
+    ),
+    obstacles: v.optional(
+      v.pipe(v.array(ObstacleSchema), v.maxLength(RULES.obstacles.maxCount)),
+    ),
     treasures: v.pipe(
       v.array(TreasureSchema),
       v.maxLength(RULES.editor.maxTreasures, "Treasure limit reached."),
     ),
   }),
-  v.check(validObstacles, "Check obstacle routes, timing, ranges, and per-kind limits."),
+  v.check(
+    validObstacles,
+    "Check obstacle routes, timing, ranges, and per-kind limits.",
+  ),
   v.check(
     objectsFitRoom,
     "Every object, including the full hazard bounds, must fit inside the room.",
   ),
   v.check(hasUniqueIds, "Object ids must be unique."),
-  v.check(hasClearSpawn, "Keep the fixed spawn clear of platforms, hazards, and treasures."),
+  v.check(
+    hasClearSpawn,
+    "Keep the fixed spawn clear of platforms, hazards, and treasures.",
+  ),
 );
 
 const LevelSchema = v.pipe(
   EditorLevelSchema,
-  v.check((level) => level.treasures.length > 0, "Add at least one treasure before testing."),
+  v.check(
+    (level) => level.treasures.length > 0,
+    "Add at least one treasure before testing.",
+  ),
 );
 
 const TickLimitSchema = v.pipe(
@@ -148,7 +180,13 @@ const TickLimitSchema = v.pipe(
 
 const JumpTicksSchema = v.pipe(
   v.array(
-    v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0), v.maxValue(RULES.maxTicks - 1)),
+    v.pipe(
+      v.number(),
+      v.finite(),
+      v.integer(),
+      v.minValue(0),
+      v.maxValue(RULES.maxTicks - 1),
+    ),
   ),
   v.maxLength(RULES.maxTicks),
   v.check(
@@ -198,18 +236,26 @@ export function parseReplay(value: unknown): Replay {
   return v.parse(ReplaySchema, value);
 }
 
-export function parseJumpTicks(value: unknown, endTick: number = RULES.maxTicks): number[] {
+export function parseJumpTicks(
+  value: unknown,
+  endTick: number = RULES.maxTicks,
+): number[] {
   const limit = v.parse(TickLimitSchema, endTick);
   const schema = v.pipe(
     JumpTicksSchema,
-    v.check((ticks) => ticks.every((tick) => tick < limit), "Jump ticks must be before endTick."),
+    v.check(
+      (ticks) => ticks.every((tick) => tick < limit),
+      "Jump ticks must be before endTick.",
+    ),
   );
 
   return v.parse(schema, value);
 }
 
 function fitsRoom(rect: Rect, level: Level): boolean {
-  return rect.width <= level.width - rect.x && rect.height <= level.height - rect.y;
+  return (
+    rect.width <= level.width - rect.x && rect.height <= level.height - rect.y
+  );
 }
 
 function spawnBounds(level: Level): Rect {
@@ -282,13 +328,224 @@ function hasClearSpawn(level: Level): boolean {
 function validObstacles(level: Level): boolean {
   const obstacles = level.obstacles ?? [];
   return obstacles.every((o) => {
-    if (obstacles.filter((other) => other.kind === o.kind).length > RULES.obstacles.maxPerKind)
+    if (
+      obstacles.filter((other) => other.kind === o.kind).length >
+      RULES.obstacles.maxPerKind
+    )
       return false;
     if (o.kind === "slider" || o.kind === "drone")
       return Math.hypot(o.endX - o.x, o.endY - o.y) >= RULES.editor.gridSize;
     if (o.kind === "turret")
-      return o.warmupTicks + (o.mode === "flame" ? o.activeTicks : 1) < o.intervalTicks;
+      return (
+        o.warmupTicks + (o.mode === "flame" ? o.activeTicks : 1) <
+        o.intervalTicks
+      );
     if (o.kind === "pursuer") return o.chaseRange >= o.detectionRange;
     return true;
   });
+}
+
+export function parseDrillyBuild(
+  value: unknown,
+  room: Level,
+  budget?: BuildBudget,
+) {
+  const envelope = v.parse(
+    v.object({
+      level: v.record(v.string(), v.unknown()),
+    }),
+    value,
+  );
+  const level = parseEditorLevel(
+    v.parse(LevelSchema, {
+      version: room.version,
+      width: room.width,
+      height: room.height,
+      spawn: room.spawn,
+      ...envelope.level,
+    }),
+    room,
+  );
+  const hazards = level.traps.length + (level.obstacles?.length ?? 0);
+  const interiorPlatforms = level.platforms.filter(
+    (platform) => !isRoomSideWall(platform, room),
+  );
+  if (
+    hazards > RULES.drilly.maxGeneratedHazards ||
+    level.treasures.length > RULES.drilly.maxGeneratedTreasures ||
+    interiorPlatforms.length > RULES.drilly.maxGeneratedPlatforms ||
+    (budget &&
+      (hazards > budget.hazards ||
+        level.treasures.length > budget.treasures ||
+        interiorPlatforms.length > budget.platforms))
+  )
+    throw new Error(
+      "Generated room exceeds its introductory difficulty budget.",
+    );
+  const walls = roomSideWalls(room);
+  if (
+    level.treasures.some((treasure) =>
+      walls.some((wall) => overlaps(treasure, wall)),
+    )
+  )
+    throw new Error("Keep treasure inside the side walls.");
+
+  // Add boundaries before either proof or LLM practice. Revalidating also catches
+  // reserved-ID collisions; repeated parsing must never duplicate the walls.
+  return parseEditorLevel(
+    { ...level, platforms: [...interiorPlatforms, ...walls] },
+    room,
+  );
+}
+
+export function parseDrillyAttempts(value: unknown, level: Level) {
+  const attempts = v.parse(
+    v.pipe(
+      v.array(
+        v.object({
+          replay: ReplaySchema,
+          outcome: v.picklist(["won", "dead", "tick-limit"]),
+        }),
+      ),
+      v.minLength(1),
+      v.maxLength(RULES.raidAttempts),
+    ),
+    value,
+  );
+  const expectedLevel = JSON.stringify(parseLevel(level));
+  for (const [index, attempt] of attempts.entries()) {
+    if (JSON.stringify(attempt.replay.level) !== expectedLevel)
+      throw new Error("Drilly recording belongs to another room.");
+    if (attempt.outcome === "won" && index !== attempts.length - 1)
+      throw new Error("Drilly must stop after its first clear.");
+  }
+  if (
+    attempts[attempts.length - 1]?.outcome !== "won" &&
+    attempts.length !== RULES.raidAttempts
+  )
+    throw new Error("Drilly has not finished its attempts.");
+  return attempts;
+}
+
+export function parseBuildContext(value: unknown): BuildContext {
+  const count = v.pipe(
+    v.number(),
+    v.integer(),
+    v.minValue(0),
+    v.maxValue(RULES.maxTicks * RULES.raidAttempts),
+  );
+  return v.parse(
+    v.object({
+      recentRaids: v.pipe(
+        v.array(
+          v.object({
+            level: LevelSchema,
+            attempts: v.pipe(
+              v.number(),
+              v.integer(),
+              v.minValue(1),
+              v.maxValue(RULES.raidAttempts),
+            ),
+            cleared: v.boolean(),
+            ignoredJumps: count,
+            wallJumps: count,
+            deaths: v.pipe(
+              v.array(
+                v.object({
+                  kind: v.picklist(HAZARD_KINDS),
+                  tick: TickLimitSchema,
+                  // An out-of-bounds death can legitimately be outside the room.
+                  x: v.pipe(v.number(), v.finite()),
+                  y: v.pipe(v.number(), v.finite()),
+                }),
+              ),
+              v.maxLength(RULES.raidAttempts),
+            ),
+          }),
+        ),
+        v.maxLength(RULES.drilly.recentRaidLimit),
+      ),
+      recentRooms: v.optional(
+        v.pipe(v.array(LevelSchema), v.maxLength(RULES.drilly.recentRoomLimit)),
+        [],
+      ),
+    }),
+    value,
+  );
+}
+
+export function parseDrillyStrategy(value: unknown, level: Level) {
+  const strategy = v.parse(
+    v.object({
+      objective: v.pipe(v.string(), v.minLength(1), v.maxLength(240)),
+      route: v.pipe(
+        v.array(
+          v.object({
+            kind: v.picklist(["treasure", "platform", "wall"]),
+            id: v.pipe(v.string(), v.minLength(1), v.maxLength(100)),
+          }),
+        ),
+        v.minLength(1),
+        v.maxLength(RULES.drilly.maxRouteWaypoints),
+      ),
+    }),
+    value,
+  );
+  for (const target of strategy.route) {
+    const objects =
+      target.kind === "treasure" ? level.treasures : level.platforms;
+    if (!objects.some((object) => object.id === target.id))
+      throw new Error("Unknown route target.");
+  }
+  if (
+    !level.treasures.every((treasure) =>
+      strategy.route.some(
+        (target) => target.kind === "treasure" && target.id === treasure.id,
+      ),
+    )
+  )
+    throw new Error("The route must include every treasure.");
+  return strategy;
+}
+
+export function parseDrillyEdit(value: unknown) {
+  return v.parse(
+    v.object({
+      action: v.picklist(["edit", "finish"]),
+      base: v.picklist(["working", "checkpoint"]),
+      name: NameSchema,
+      idea: v.pipe(v.string(), v.minLength(1), v.maxLength(240)),
+      strategy: v.unknown(),
+      removeIds: v.pipe(v.array(NameSchema), v.maxLength(24)),
+      edit: v.object({
+        platforms: v.pipe(
+          v.array(PlatformSchema),
+          v.maxLength(RULES.drilly.maxGeneratedPlatforms),
+        ),
+        traps: v.pipe(
+          v.array(TrapSchema),
+          v.maxLength(RULES.drilly.maxGeneratedHazards),
+        ),
+        treasures: v.pipe(
+          v.array(TreasureSchema),
+          v.maxLength(RULES.drilly.maxGeneratedTreasures),
+        ),
+        obstacles: v.pipe(
+          v.array(ObstacleSchema),
+          v.maxLength(RULES.drilly.maxGeneratedHazards),
+        ),
+      }),
+    }),
+    value,
+  );
+}
+
+export function parseBuiltDungeon(value: unknown) {
+  const built = v.parse(
+    v.object({ level: LevelSchema, proof: ReplaySchema }),
+    value,
+  );
+  if (JSON.stringify(built.level) !== JSON.stringify(built.proof.level))
+    throw new Error("Room proof belongs to different geometry.");
+  return built;
 }
