@@ -7,7 +7,11 @@ export default defineConfig({
         test: {
           name: "game",
           environment: "node",
-          include: ["src/**/*.test.ts", "shared/**/*.test.ts"],
+          include: [
+            "src/**/*.test.ts",
+            "shared/**/*.test.ts",
+            "server/**/*.test.ts",
+          ],
         },
       },
       {
