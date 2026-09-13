@@ -29,12 +29,12 @@ The game is **Drilly P**: **Drilly** is the AI opponent, and **P** represents th
   replay determinism.
   Documentation-only changes need link and formatting checks, not a full build.
 - Keep secrets in backend configuration, never in browser code or `VITE_` variables.
-- Group Convex entry points by feature (`convex/dungeons.ts` is the first example).
+- Group Convex entry points by feature (`convex/drilly.ts` contains AI actions).
   Keep ordinary shared helpers in `convex/lib/`; do not add service/repository layers.
   Validate arguments and returns, derive ownership from authentication, and query
   through indexes. Wire-shape validators belong in `convex/lib/validators.ts`;
-  gameplay validation stays in `shared/validation.ts`. Keep browser save timing in
-  `src/persistence/` and test authenticated functions with `convex-test`.
+  gameplay validation stays in `shared/validation.ts`. Test authenticated functions
+  with `convex-test`.
 
 <!-- convex-ai-start -->
 

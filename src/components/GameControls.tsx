@@ -14,27 +14,46 @@ export function GameControls({
   onAudioChange: (settings: AudioSettings) => void;
 }) {
   const copy = sessionView(view);
-  const canRestart = ["lab", "prison", "testing", "cleared", "raiding", "replay", "ghost"].includes(
-    view.phase,
-  );
+  const canRestart = [
+    "lab",
+    "prison",
+    "testing",
+    "cleared",
+    "raiding",
+    "replay",
+    "ghost",
+    "proof",
+  ].includes(view.phase);
 
   return (
     <div className="controls">
       <button
         className="primary"
-        disabled={(view.phase === "replay" || view.phase === "ghost") && !view.paused}
+        disabled={
+          (view.aiPending &&
+            (view.phase === "preparing" || view.phase === "raid-complete")) ||
+          ((view.phase === "replay" ||
+            view.phase === "ghost" ||
+            view.phase === "proof") &&
+            !view.paused)
+        }
         onClick={() => session.primaryAction()}
       >
         {copy.action} <kbd>SPACE</kbd>
       </button>
       {!view.paused && <button onClick={() => session.pause()}>Pause</button>}
+      {view.canWatchProof && (
+        <button onClick={() => session.watchBuildProof()}>
+          Watch Drilly clear this room
+        </button>
+      )}
       {canRestart && (
         <button onClick={() => session.reset()}>
           {view.phase === "cleared"
             ? "Test again"
             : view.phase === "replay"
               ? "Exit replay"
-              : view.phase === "ghost"
+              : view.phase === "ghost" || view.phase === "proof"
                 ? "Replay attempt"
                 : "Restart"}
         </button>
@@ -55,7 +74,9 @@ export function GameControls({
             max="1"
             step="0.1"
             value={audio.volume}
-            onChange={(e) => onAudioChange({ ...audio, volume: Number(e.target.value) })}
+            onChange={(e) =>
+              onAudioChange({ ...audio, volume: Number(e.target.value) })
+            }
           />
           <span>{Math.round(audio.volume * 100)}%</span>
         </label>

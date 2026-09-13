@@ -8,8 +8,18 @@ const rectangle = {
   height: v.number(),
 };
 
-const center = { id: v.string(), x: v.number(), y: v.number(), radius: v.number() };
-const patrol = { ...center, endX: v.number(), endY: v.number(), speed: v.number() };
+const center = {
+  id: v.string(),
+  x: v.number(),
+  y: v.number(),
+  radius: v.number(),
+};
+const patrol = {
+  ...center,
+  endX: v.number(),
+  endY: v.number(),
+  speed: v.number(),
+};
 const obstacleValidator = v.union(
   v.object({ ...rectangle, kind: v.literal("spikes") }),
   v.object({ ...patrol, kind: v.literal("slider") }),
@@ -60,11 +70,44 @@ export const levelValidator = v.object({
   treasures: v.array(v.object(rectangle)),
 });
 
-export const draftFields = {
-  ownerId: v.id("users"),
-  level: levelValidator,
+export const replayValidator = v.object({
+  version: v.literal(2),
   rulesVersion: v.string(),
-  revision: v.number(),
-  updatedAt: v.number(),
-  lastSaveId: v.string(),
-};
+  level: levelValidator,
+  jumpTicks: v.array(v.number()),
+  endTick: v.number(),
+});
+
+export const builtDungeonValidator = v.object({
+  level: levelValidator,
+  proof: replayValidator,
+});
+export const raidAttemptValidator = v.object({
+  outcome: v.union(
+    v.literal("won"),
+    v.literal("dead"),
+    v.literal("tick-limit"),
+  ),
+  replay: replayValidator,
+});
+
+export const buildContextValidator = v.object({
+  recentRooms: v.optional(v.array(levelValidator)),
+  recentRaids: v.array(
+    v.object({
+      level: levelValidator,
+      attempts: v.number(),
+      cleared: v.boolean(),
+      ignoredJumps: v.number(),
+      wallJumps: v.number(),
+      deaths: v.array(
+        v.object({
+          kind: v.string(),
+          tick: v.number(),
+          x: v.number(),
+          y: v.number(),
+        }),
+      ),
+    }),
+  ),
+});

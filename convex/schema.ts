@@ -1,8 +1,6 @@
 import { authTables } from "@convex-dev/auth/server";
-import { defineSchema, defineTable } from "convex/server";
-import { draftFields } from "./lib/validators";
+import { defineSchema } from "convex/server";
 
 export default defineSchema({
   ...authTables,
-  drafts: defineTable(draftFields).index("by_ownerId", ["ownerId"]),
 });
