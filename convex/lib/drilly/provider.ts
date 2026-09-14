@@ -15,7 +15,11 @@ export function openAIPlanner(
   const client = new OpenAI({
     apiKey,
     maxRetries: 0,
-    timeout: RULES.drilly.providerTimeoutMs,
+    // The caller's deadline cancels each operation; don't cut thinking short here.
+    timeout: Math.max(
+      RULES.drilly.buildThinkingTimeoutMs,
+      RULES.drilly.raidThinkingTimeoutMs,
+    ),
     logLevel: "off",
   });
 

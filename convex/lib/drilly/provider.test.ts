@@ -1,11 +1,12 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { openAIPlanner } from "./provider";
-import { testStrategy } from "../../../shared/testing/planner";
-import { strategySchema } from "./protocol";
+import { withDeadline } from "./deadline";
 import { RULES } from "../../../shared/game/rules";
 import { DRILLY_ERRORS } from "../../../shared/game/drillyErrors";
 
-function completed(text = JSON.stringify(testStrategy)) {
+const schema = { type: "object", additionalProperties: false, properties: {}, required: [] };
+
+function completed(text = "{}") {
   return {
     object: "response",
     status: "completed",
@@ -44,13 +45,13 @@ describe("Drilly OpenAI SDK adapter", () => {
       "Act",
       { room: "test" },
       {
-        schema: strategySchema,
-        schemaName: "drilly_strategy",
+        schema: schema,
+        schemaName: "test_output",
         reasoning: "low",
       },
     );
 
-    expect(result).toEqual(testStrategy);
+    expect(result).toEqual({});
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url, init] = fetch.mock.calls[0];
     expect(url).toBe("https://api.openai.com/v1/responses");
@@ -65,8 +66,8 @@ describe("Drilly OpenAI SDK adapter", () => {
         format: {
           type: "json_schema",
           strict: true,
-          name: "drilly_strategy",
-          schema: strategySchema,
+          name: "test_output",
+          schema: schema,
         },
       },
     });
@@ -153,26 +154,37 @@ describe("Drilly OpenAI SDK adapter", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  it("aborts a slow request at the SDK timeout without retrying", async () => {
+  it("allows a response beyond 25 seconds within the attempt deadline", async () => {
     vi.useFakeTimers();
     const fetch = vi.fn<typeof globalThis.fetch>(
       (_url, init) =>
-        new Promise<Response>((_resolve, reject) => {
-          init!.signal!.addEventListener("abort", () =>
+        new Promise<Response>((resolve, reject) => {
+          const timer = setTimeout(
+            () =>
+              resolve(
+                new Response(JSON.stringify(completed()), {
+                  headers: { "Content-Type": "application/json" },
+                }),
+              ),
+            30_000,
+          );
+          init!.signal!.addEventListener("abort", () => {
+            clearTimeout(timer);
             reject(
               new DOMException("The operation was aborted.", "AbortError"),
-            ),
-          );
+            );
+          });
         }),
     );
     vi.stubGlobal("fetch", fetch);
-    const pending = expect(openAIPlanner("key")("JSON", {})).rejects.toThrow(
-      DRILLY_ERRORS.timeout,
+    const plan = withDeadline(
+      openAIPlanner("key"),
+      RULES.drilly.raidThinkingTimeoutMs,
     );
-    await vi.advanceTimersByTimeAsync(RULES.drilly.providerTimeoutMs);
-    await pending;
+    const pending = expect(plan("JSON", {})).resolves.toEqual({});
+    await Promise.all([pending, vi.advanceTimersByTimeAsync(30_000)]);
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(fetch.mock.calls[0][1]!.signal!.aborted).toBe(true);
+    expect(fetch.mock.calls[0][1]!.signal!.aborted).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
   });
 

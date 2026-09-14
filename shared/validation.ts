@@ -1,4 +1,4 @@
-import type { BuildBudget } from "./game/drilly";
+import type { BuildBudget, DrillyModel } from "./game/drilly";
 import { obstacleBounds } from "./game/obstacles";
 import { segmentRect, sweptCircle } from "./game/sweep";
 import * as v from "valibot";
@@ -209,6 +209,10 @@ export function parseLevel(value: unknown): Level {
   return v.parse(LevelSchema, value);
 }
 
+export function parseDrillyModel(value: unknown): DrillyModel {
+  return v.parse(v.picklist(RULES.drilly.models.map((model) => model.id)), value);
+}
+
 // Drafts may have no treasure; room dimensions and spawn belong to the fixed template.
 export function parseEditorLevel(value: unknown, template: Level): Level {
   return v.parse(
@@ -300,6 +304,10 @@ export function parseJumpTicks(
   );
 
   return v.parse(schema, value);
+}
+
+export function parseDrillyInputs(value: unknown): number[] {
+  return v.parse(v.strictObject({ jumpTicks: JumpTicksSchema }), value).jumpTicks;
 }
 
 function fitsRoom(rect: Rect, level: Level): boolean {
@@ -448,6 +456,7 @@ export function parseDrillyBuild(
   );
 }
 
+// Accept a recorded prefix; the session owns completion and scoring.
 export function parseDrillyAttempts(value: unknown, level: Level) {
   const attempts = v.parse(
     v.pipe(
@@ -457,7 +466,6 @@ export function parseDrillyAttempts(value: unknown, level: Level) {
           outcome: v.picklist(["won", "dead", "tick-limit"]),
         }),
       ),
-      v.minLength(1),
       v.maxLength(RULES.raidAttempts),
     ),
     value,
@@ -468,47 +476,10 @@ export function parseDrillyAttempts(value: unknown, level: Level) {
       throw new Error("Drilly recording belongs to another room.");
     if (attempt.outcome === "won" && index !== attempts.length - 1)
       throw new Error("Drilly must stop after its first clear.");
+    if (attempt.outcome === "tick-limit" && attempt.replay.endTick !== RULES.maxTicks)
+      throw new Error("A timed-out attempt must reach the game tick limit.");
   }
-  if (
-    attempts[attempts.length - 1]?.outcome !== "won" &&
-    attempts.length !== RULES.raidAttempts
-  )
-    throw new Error("Drilly has not finished its attempts.");
   return attempts;
-}
-
-export function parseDrillyStrategy(value: unknown, level: Level) {
-  const strategy = v.parse(
-    v.object({
-      objective: v.pipe(v.string(), v.minLength(1), v.maxLength(240)),
-      route: v.pipe(
-        v.array(
-          v.object({
-            kind: v.picklist(["treasure", "platform", "wall"]),
-            id: v.pipe(v.string(), v.minLength(1), v.maxLength(100)),
-          }),
-        ),
-        v.minLength(1),
-        v.maxLength(RULES.drilly.maxRouteWaypoints),
-      ),
-    }),
-    value,
-  );
-  for (const target of strategy.route) {
-    const objects =
-      target.kind === "treasure" ? level.treasures : collisionPlatforms(level);
-    if (!objects.some((object) => object.id === target.id))
-      throw new Error("Unknown route target.");
-  }
-  if (
-    !level.treasures.every((treasure) =>
-      strategy.route.some(
-        (target) => target.kind === "treasure" && target.id === treasure.id,
-      ),
-    )
-  )
-    throw new Error("The route must include every treasure.");
-  return strategy;
 }
 
 export function parseDrillyEdit(value: unknown) {
@@ -518,7 +489,6 @@ export function parseDrillyEdit(value: unknown) {
       base: v.picklist(["working", "checkpoint"]),
       name: NameSchema,
       idea: v.pipe(v.string(), v.minLength(1), v.maxLength(240)),
-      strategy: v.unknown(),
       removeIds: v.pipe(v.array(NameSchema), v.maxLength(24)),
       edit: v.object({
         platforms: v.pipe(

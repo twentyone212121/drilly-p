@@ -1,11 +1,8 @@
 import { getExampleRoom } from "../../../shared/testing/rooms";
-import { expect, it, vi } from "vitest";
-import { replayAttempt, runAttempt } from "../../../shared/game/replay";
+import { expect, it } from "vitest";
+import { runAttempt } from "../../../shared/game/replay";
 import { RULES } from "../../../shared/game/rules";
-import type { Level } from "../../../shared/game/types";
 import { parseDrillyBuild } from "../../../shared/validation";
-import { buildDungeon } from "./build";
-import { roomEdit } from "../../../shared/testing/planner";
 
 function openRoom() {
   const room = getExampleRoom();
@@ -64,38 +61,6 @@ it.each([-1, 1] as const)(
     expect(runAttempt(room, [jump, jump + 1], jump + 8)).toEqual(reversed);
   },
 );
-
-it("proves a return route using the workspace wall ID even when the edit omits both walls", async () => {
-  const proposal = openRoom();
-  proposal.traps = [];
-  proposal.treasures = [{ id: "behind", x: 40, y: 392, width: 24, height: 28 }];
-  let calls = 0;
-  const plan = vi.fn(async (_instructions: string, input: unknown) => {
-    const { workspace } = input as { workspace: Level };
-    const wall = workspace.platforms.find(
-      (platform) =>
-        platform.x + platform.width === workspace.width && platform.height === workspace.height,
-    )!;
-
-    return {
-      ...roomEdit(proposal),
-      action: ++calls > 1 ? "finish" : "edit",
-      strategy: {
-        objective: "Reverse at the right wall and collect the treasure behind spawn",
-        route: [
-          { kind: "wall", id: wall.id },
-          { kind: "treasure", id: "behind" },
-        ],
-      },
-    };
-  });
-  const built = await buildDungeon(plan);
-  expect(built.level.platforms).toHaveLength(3);
-  expect(built.proof.level).toEqual(built.level);
-  const replay = replayAttempt(built.proof);
-  expect(replay.stopReason).toBe("won");
-  expect(replay.events).toContainEqual(expect.objectContaining({ type: "jumped", kind: "wall" }));
-});
 
 it("rejects treasure buried in a fixed wall", () => {
   const room = openRoom();
