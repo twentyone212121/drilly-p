@@ -21,8 +21,8 @@ it("adds full-height sides outside the interior budget without mutating or dupli
   const room = parseDrillyBuild({ level: original }, original, budget);
   expect(room.platforms).toEqual([
     original.platforms[0],
-    { id: "boundary-left", x: 0, y: 0, width: 24, height: 480 },
-    { id: "boundary-right", x: 876, y: 0, width: 24, height: 480 },
+    { id: "boundary-left", x: 0, y: 0, width: 12, height: 480 },
+    { id: "boundary-right", x: 888, y: 0, width: 12, height: 480 },
   ]);
   expect(original).toEqual(snapshot);
   expect(parseDrillyBuild({ level: room }, original, budget)).toEqual(room);
@@ -49,14 +49,18 @@ it.each([-1, 1] as const)(
       (event) => event.type === "wall-contact",
     )!;
     const jump = contact.tick + 3;
-    const reversed = runAttempt(room, [jump], jump + 8);
+    const upward = runAttempt(room, [jump], jump + 1);
+    expect(upward.state.player).toMatchObject({ direction, wall: direction, grounded: false });
+    expect(upward.state.player.y).toBeLessThan(waiting.state.player.y);
+    expect(upward.events).toContainEqual({ type: "jumped", kind: "ground", tick: jump });
+    const reversed = runAttempt(room, [jump, jump + 1], jump + 8);
     expect(reversed.state.player.direction).toBe(-direction);
     expect(reversed.events).toContainEqual({
       type: "jumped",
       kind: "wall",
-      tick: jump,
+      tick: jump + 1,
     });
-    expect(runAttempt(room, [jump], jump + 8)).toEqual(reversed);
+    expect(runAttempt(room, [jump, jump + 1], jump + 8)).toEqual(reversed);
   },
 );
 

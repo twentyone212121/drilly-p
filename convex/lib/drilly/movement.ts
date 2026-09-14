@@ -1,3 +1,4 @@
+import { collisionPlatforms } from "../../../shared/game/roomBoundary";
 import { step } from "../../../shared/game/simulation";
 import { RULES } from "../../../shared/game/rules";
 import type { Level, State } from "../../../shared/game/types";
@@ -18,7 +19,7 @@ export function advanceWaypoint(
 function reached(level: Level, state: State, target: DrillyRoute[number]) {
   if (target.kind === "treasure")
     return state.collectedTreasureIds.includes(target.id);
-  const platform = level.platforms.find((p) => p.id === target.id)!;
+  const platform = collisionPlatforms(level).find((p) => p.id === target.id)!;
   const p = state.player;
   if (target.kind === "wall") {
     return (
@@ -127,7 +128,7 @@ function score(level: Level, branch: Branch, route: DrillyRoute) {
   const object =
     target.kind === "treasure"
       ? level.treasures.find((t) => t.id === target.id)!
-      : level.platforms.find((p) => p.id === target.id)!;
+      : collisionPlatforms(level).find((p) => p.id === target.id)!;
   const p = state.player;
   const targetX = Math.max(
     object.x,
@@ -143,7 +144,7 @@ function score(level: Level, branch: Branch, route: DrillyRoute) {
   // An objective behind us requires a real wall reversal. Reward approaching the
   // nearest blocking face instead of standing still because direct distance grows.
   if ((targetX - p.x) * p.direction < -RULES.playerWidth) {
-    const faces = level.platforms.filter(
+    const faces = collisionPlatforms(level).filter(
       (wall) =>
         wall.y < p.y + RULES.playerHeight &&
         wall.y + wall.height > p.y &&

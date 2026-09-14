@@ -47,7 +47,7 @@ try {
     );
   else
     throw new Error(
-      "Usage: npm run run:attempt -- --describe | --replay <file> | --lab <showcase|spikes|slider|fixed|flame|aimed|drone|pursuer> '[13,86,140]' | --level <file> '[44, 193]'",
+      "Usage: npm run run:attempt -- --describe | --replay <file> | --lab <showcase|spikes|slider|fixed|flame|aimed|drone|pursuer> '[13,86,140]' | --level <file> '[44, 199, 200]'",
     );
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));

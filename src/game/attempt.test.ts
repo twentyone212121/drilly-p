@@ -1,3 +1,4 @@
+import { interpolateFrame } from "./phaser/interpolateFrame";
 import { describe, expect, it } from "vitest";
 import checkpoint from "../../shared/levels/checkpoint.json";
 import { parseLevel } from "../../shared/validation";
@@ -35,28 +36,52 @@ describe("attempt clock and headless parity", () => {
       const session = createAttempt(level);
       session.loadReplay({
         ...session.exportReplay(),
-        jumpTicks: [44, 193],
-        endTick: 246,
+        jumpTicks: [44, 199, 200],
+        endTick: 259,
       });
       const trajectory = [session.frameState()];
       session.onEvents(() => trajectory.push(session.frameState()));
       session.play();
-      for (let frame = 0; !session.getSnapshot().paused && frame < 5000; frame++)
+      for (let frame = 0; !session.getSnapshot().paused && frame < 5000; frame++) {
         session.update(intervals[frame % intervals.length]);
+        interpolateFrame(session.renderFrame());
+      }
+      expect(interpolateFrame(session.renderFrame())).toBe(session.frameState());
       expect(session.frameState().status).toBe("won");
-      expect(trajectory).toEqual(runAttempt(level, [44, 193]).trajectory);
+      expect(trajectory).toEqual(runAttempt(level, [44, 199, 200]).trajectory);
     },
   );
+  it("smooths render-only frames without advancing physics, and snaps on pause or reset", () => {
+    const attempt = createAttempt(level);
+    attempt.play();
+    attempt.update(20);
+    const physical = structuredClone(attempt.frameState());
+    const replay = attempt.exportReplay();
+    const first = interpolateFrame(attempt.renderFrame());
+    attempt.update(5);
+    const second = interpolateFrame(attempt.renderFrame());
+    expect(second.player.x).toBeGreaterThan(first.player.x);
+    expect(second.player.x).toBeLessThan(physical.player.x);
+    expect(attempt.frameState()).toEqual(physical);
+    expect(attempt.exportReplay()).toEqual(replay);
+    attempt.pause();
+    expect(interpolateFrame(attempt.renderFrame())).toBe(attempt.frameState());
+    attempt.reset();
+    expect(interpolateFrame(attempt.renderFrame())).toBe(attempt.frameState());
+  });
+
   it("records manual inputs and replays exactly, including ignored inputs", () => {
     const session = createAttempt(level);
     session.step(44);
     session.jump();
     session.step(1);
     session.jump();
-    session.step(148);
+    session.step(154);
     session.jump();
-    session.step(53);
-    expect(session.exportReplay().jumpTicks).toEqual([44, 45, 193]);
+    session.step(1);
+    session.jump();
+    session.step(59);
+    expect(session.exportReplay().jumpTicks).toEqual([44, 45, 199, 200]);
     expect(replayAttempt(session.exportReplay()).state).toEqual(session.frameState());
     expect(session.frameState().status).toBe("won");
   });

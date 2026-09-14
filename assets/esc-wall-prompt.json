@@ -1,0 +1,8 @@
+{
+  "tool": "built-in image_gen",
+  "reference": "public/assets/characters/esc.png",
+  "prompt": "Matching transparent ESC wall-slide sprite: preserve ivory keycap robot, cyan eyes and rim, ESC label, chunky shaded style. Face right with two short mechanical arms and ivory palms braced on the same invisible vertical wall line, hands at different heights, bent elbows, feet raised slightly. One full-body sprite; no wall, floor, background, shadow, sparks, or redesign.",
+  "runtime": "public/assets/characters/esc-wall.png",
+  "atlas": "public/assets/characters/esc-wall.json",
+  "notes": "Original transparent PNG preserved. Atlas bounds select the visible silhouette; runtime anchors palms to the collision wall and mirrors for left contact."
+}

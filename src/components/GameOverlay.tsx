@@ -20,7 +20,8 @@ export function GameOverlay({
   onCloseMenu: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const visible = menuOpen || (view.phase !== "build" && (view.paused || !view.canPlay));
+  const visible =
+    menuOpen || (!view.presentingDeath && view.phase !== "build" && (view.paused || !view.canPlay));
   const paused = menuOpen || (view.canPlay && view.paused && !view.finished && view.state.tick > 0);
   const copy = sessionView(view);
 

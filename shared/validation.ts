@@ -4,7 +4,7 @@ import { segmentRect, sweptCircle } from "./game/sweep";
 import * as v from "valibot";
 import { overlaps, touchesCircle } from "./game/collision";
 import { RULES } from "./game/rules";
-import { isRoomSideWall, roomSideWalls } from "./game/roomBoundary";
+import { collisionPlatforms, roomBorders, isRoomSideWall, roomSideWalls } from "./game/roomBoundary";
 import type { EditorObject, Level, Rect, Replay } from "./game/types";
 
 const NameSchema = v.pipe(v.string(), v.minLength(1), v.maxLength(100));
@@ -223,6 +223,7 @@ export function parseEditorLevel(value: unknown, template: Level): Level {
           level.spawn.direction === template.spawn.direction,
         "Room dimensions and player spawn are fixed.",
       ),
+
     ),
     value,
   );
@@ -231,6 +232,11 @@ export function parseEditorLevel(value: unknown, template: Level): Level {
 // Previews come from a validated draft and editor presets. Validate just the changed
 // object; the complete draft is still validated when the user commits the edit.
 export function editorPlacementError(level: Level, object: EditorObject): string | null {
+  const bounds = object.kind === "obstacle" ? obstacleBounds(object.value)
+    : object.kind === "saw" ? { x: object.value.x - object.value.radius, y: object.value.y - object.value.radius, width: object.value.radius * 2, height: object.value.radius * 2 }
+    : object.value;
+  if (roomBorders(level).some((border) => overlaps(bounds, border)))
+    return "Keep objects inside the room frame.";
   const key =
     object.kind === "platform"
       ? "platforms"
@@ -363,7 +369,7 @@ function hasClearSpawn(level: Level): boolean {
           ? sweptCircle(o, { x: o.endX, y: o.endY }, o.radius, spawn) === null
           : !touchesCircle(spawn, o),
     ) &&
-    level.platforms.every((platform) => !overlaps(spawn, platform)) &&
+    collisionPlatforms(level).every((platform) => !overlaps(spawn, platform)) &&
     level.traps.every((trap) => !touchesCircle(spawn, trap)) &&
     level.treasures.every((treasure) => !overlaps(spawn, treasure))
   );
@@ -490,7 +496,7 @@ export function parseDrillyStrategy(value: unknown, level: Level) {
   );
   for (const target of strategy.route) {
     const objects =
-      target.kind === "treasure" ? level.treasures : level.platforms;
+      target.kind === "treasure" ? level.treasures : collisionPlatforms(level);
     if (!objects.some((object) => object.id === target.id))
       throw new Error("Unknown route target.");
   }

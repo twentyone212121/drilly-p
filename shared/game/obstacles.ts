@@ -1,6 +1,7 @@
+import { collisionPlatforms } from "./roomBoundary";
 import { RULES } from "./rules";
 import { movingCircleHit, segmentRect, sweptCircle } from "./sweep";
-import type { Level, Rect, State } from "./types";
+import type { GameEvent, Level, Rect, State } from "./types";
 import type { Obstacle, ObstacleState, Patrol, Projectile, Turret } from "./obstacleTypes";
 
 export function obstacleBounds(obstacle: Obstacle): Rect {
@@ -42,7 +43,7 @@ export function turretPhase(o: Turret, tick: number): ObstacleState["phase"] {
 export function flameBounds(o: Turret, level: Level): Rect {
   const half = RULES.obstacles.flameHalfHeight;
   let distance = Math.min(o.range, o.direction === 1 ? level.width - o.x : o.x);
-  for (const p of level.platforms) {
+  for (const p of collisionPlatforms(level)) {
     if (p.y >= o.y + half || p.y + p.height <= o.y - half) continue;
     if (o.x >= p.x && o.x <= p.x + p.width) distance = 0;
     else if (o.direction === 1 && p.x >= o.x) distance = Math.min(distance, p.x - o.x);
@@ -68,6 +69,7 @@ export function advanceObstacles(level: Level, state: State, body: Rect, tick: n
   const oldBody = { ...state.player, width: RULES.playerWidth, height: RULES.playerHeight };
   const target = { x: body.x + body.width / 2, y: body.y + body.height / 2 };
   let hitId: string | null = null;
+  const events: GameEvent[] = [];
   const emitted: Projectile[] = [];
   const obstacles = (level.obstacles ?? []).map((o, index): ObstacleState => {
     const previous = state.obstacles[index];
@@ -107,6 +109,7 @@ export function advanceObstacles(level: Level, state: State, body: Rect, tick: n
         tick % o.intervalTicks === o.warmupTicks &&
         (o.mode !== "aimed" || Math.hypot(target.x - o.x, target.y - o.y) <= o.range)
       ) {
+        events.push({ type: "turret-fired", tick, turretId: o.id });
         emitted.push({
           id: `${o.id}:${tick}`,
           ownerId: o.id,
@@ -114,7 +117,6 @@ export function advanceObstacles(level: Level, state: State, body: Rect, tick: n
           y: o.y,
           vx: Math.cos(next.angle) * o.projectileSpeed,
           vy: Math.sin(next.angle) * o.projectileSpeed,
-          remaining: o.range,
         });
       }
       if (o.mode === "flame" && next.phase === "active") {
@@ -143,21 +145,19 @@ export function advanceObstacles(level: Level, state: State, body: Rect, tick: n
         hitId ??= o.id;
     } else if (o.kind === "slider" || o.kind === "drone") {
       if (patrolHit(o, state.tick, previous, next, oldBody, body)) hitId ??= o.id;
-    } else if (movingCircleHit(previous, next, o.radius, oldBody, body) !== null) hitId ??= o.id;
+    } else if (o.kind === "pursuer" && movingCircleHit(previous, next, o.radius, oldBody, body) !== null)
+      hitId ??= o.id;
     return next;
   });
 
   const projectiles: Projectile[] = [];
   for (const shot of [...state.projectiles, ...emitted]) {
-    const distance = Math.min(shot.remaining, Math.hypot(shot.vx, shot.vy) / RULES.tickRate);
-    const magnitude = Math.hypot(shot.vx, shot.vy);
     const next = {
       ...shot,
-      x: shot.x + (shot.vx / magnitude) * distance,
-      y: shot.y + (shot.vy / magnitude) * distance,
-      remaining: shot.remaining - distance,
+      x: shot.x + shot.vx / RULES.tickRate,
+      y: shot.y + shot.vy / RULES.tickRate,
     };
-    const walls = level.platforms
+    const walls = collisionPlatforms(level)
       .map((p) => sweptCircle(shot, next, RULES.obstacles.projectileRadius, p))
       .filter((t): t is number => t !== null);
     const wallTime = walls.length ? Math.min(...walls) : Infinity;
@@ -165,7 +165,6 @@ export function advanceObstacles(level: Level, state: State, body: Rect, tick: n
     if (playerTime !== null && playerTime < wallTime) hitId ??= shot.ownerId;
     if (
       wallTime === Infinity &&
-      next.remaining > 0 &&
       next.x >= 0 &&
       next.x <= level.width &&
       next.y >= 0 &&
@@ -173,7 +172,7 @@ export function advanceObstacles(level: Level, state: State, body: Rect, tick: n
     )
       projectiles.push(next);
   }
-  return { obstacles, projectiles, hitId };
+  return { obstacles, projectiles, hitId, events };
 }
 
 // A route may turn within a tick: sweep both legs instead of cutting the corner.

@@ -1,3 +1,4 @@
+import { collisionPlatforms } from "./roomBoundary";
 import { advanceObstacles, initialObstacles } from "./obstacles";
 import { moveBody, overlaps, touchesCircle } from "./collision";
 import { RULES } from "./rules";
@@ -7,7 +8,7 @@ type Player = State["player"];
 
 export function initialState(level: Level): State {
   const { x, y, direction } = level.spawn;
-  const grounded = level.platforms.some(
+  const grounded = collisionPlatforms(level).some(
     (p) => y + RULES.playerHeight === p.y && x < p.x + p.width && x + RULES.playerWidth > p.x,
   );
 
@@ -45,8 +46,9 @@ export function step(
 
   if (input.jump) applyJump(player, state.tick, events);
   applyForces(player);
-  movePlayer(player, level.platforms, tick, events);
+  movePlayer(player, collisionPlatforms(level), tick, events);
   const hazards = advanceObstacles(level, state, playerBounds(player), tick);
+  events.push(...hazards.events);
   const status = resolveOutcome(player, level, collectedTreasureIds, tick, events, hazards.hitId);
 
   return {
@@ -68,8 +70,8 @@ function applyJump(player: Player, tick: number, events: GameEvent[]): void {
     return;
   }
 
-  const kind = player.wall !== 0 ? "wall" : "ground";
-  if (player.wall !== 0) player.direction = -player.wall as -1 | 1;
+  const kind = player.grounded ? "ground" : "wall";
+  if (kind === "wall") player.direction = -player.wall as -1 | 1;
 
   player.vy = -RULES.jumpSpeed;
   events.push({ type: "jumped", tick, kind });

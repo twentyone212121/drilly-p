@@ -1,0 +1,165 @@
+.computer-background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fan-rotor {
+  transform-origin: 0 0;
+  animation: fan-spin 3.2s linear infinite;
+}
+@keyframes fan-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Small, local opacity/transform animations; no full-screen blur or JS frame loop. */
+.ambient-breathe {
+  animation: ambient-breathe 8s ease-in-out infinite alternate;
+}
+.ambient-slow {
+  animation-duration: 11s;
+  animation-delay: -4s;
+}
+.ambient-medium {
+  animation-duration: 6.5s;
+  animation-delay: -2s;
+}
+.ambient-fast {
+  animation-duration: 4s;
+  animation-delay: -1s;
+}
+.circuit-pulse {
+  stroke-width: 2;
+  opacity: 0.12;
+  animation: circuit-charge 7s ease-in-out infinite;
+}
+.circuit-cyan {
+  stroke: #56c8dd;
+}
+.circuit-violet {
+  stroke: #9c77d8;
+  animation-duration: 9.3s;
+  animation-delay: -3s;
+}
+.circuit-amber {
+  stroke: #cc945c;
+  animation-duration: 4.7s;
+  animation-delay: -2s;
+}
+.circuit-offset {
+  animation-delay: -5s;
+  animation-duration: 12s;
+}
+.status-lights {
+  animation: status-blink 7s steps(1, end) infinite;
+}
+.status-lights-1 {
+  animation-duration: 4.9s;
+  animation-delay: -2s;
+}
+.status-lights-2 {
+  animation-duration: 10.3s;
+  animation-delay: -6s;
+}
+.wire-discharge {
+  opacity: 0;
+  animation: wire-spark 5.8s linear infinite;
+}
+.wire-filings {
+  opacity: 0;
+  animation: wire-filings 5.8s ease-out infinite;
+}
+
+@keyframes ambient-breathe {
+  from {
+    opacity: 0.18;
+  }
+  to {
+    opacity: 0.85;
+  }
+}
+@keyframes circuit-charge {
+  0%,
+  28%,
+  100% {
+    opacity: 0.04;
+  }
+  43% {
+    opacity: 0.55;
+  }
+  65% {
+    opacity: 0.12;
+  }
+}
+@keyframes status-blink {
+  0%,
+  33%,
+  64%,
+  100% {
+    opacity: 0.8;
+  }
+  30%,
+  61% {
+    opacity: 0.1;
+  }
+  84% {
+    opacity: 0.35;
+  }
+}
+@keyframes wire-spark {
+  0%,
+  65%,
+  69%,
+  74%,
+  100% {
+    opacity: 0;
+  }
+  66%,
+  70% {
+    opacity: 0.95;
+  }
+  68%,
+  73% {
+    opacity: 0.25;
+  }
+}
+@keyframes wire-filings {
+  0%,
+  66% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  67% {
+    opacity: 0.85;
+    transform: translateY(0);
+  }
+  79%,
+  100% {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+}
+.computer-background[data-hidden="true"] * {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .computer-background * {
+    animation: none;
+  }
+  .ambient-breathe {
+    opacity: 0.35;
+  }
+  .status-lights {
+    opacity: 0.65;
+  }
+  .wire-discharge,
+  .wire-filings {
+    opacity: 0;
+  }
+}

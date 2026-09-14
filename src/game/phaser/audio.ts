@@ -1,30 +1,105 @@
+import { isWallSliding } from "../presentation";
 import type Phaser from "phaser";
-import type { GameEvent } from "../../../shared/game/types";
+import type { GameEvent, State } from "../../../shared/game/types";
 import { AUDIO } from "./assets";
 
 export type AudioSettings = { muted: boolean; volume: number };
 
 const EVENT_SOUNDS: Partial<Record<GameEvent["type"], keyof typeof AUDIO>> = {
   jumped: "jump",
+  "turret-fired": "shot",
   landed: "land",
+  "wall-contact": "wall",
   died: "death",
   won: "win",
 };
 
 export function createAudio(scene: Phaser.Scene, settings: AudioSettings) {
   let current = settings;
+  let lastFootstep = -1;
+  const footstep = scene.cache.audio.exists("footstep") ? scene.sound.add("footstep") : null;
+  const scrape = scene.cache.audio.exists("scrape")
+    ? scene.sound.add("scrape", { loop: true, volume: 0.35 })
+    : null;
+  const music = scene.cache.audio.exists("music")
+    ? scene.sound.add("music", { loop: true, volume: 0.38 })
+    : null;
+
+  function startMusic() {
+    if (!music || scene.sound.locked || document.hidden || current.muted || current.volume <= 0)
+      return;
+    if (music.isPaused) music.resume();
+    else if (!music.isPlaying) music.play();
+  }
+
+  function onVisibility() {
+    if (document.hidden) {
+      music?.pause();
+      scrape?.stop();
+    } else startMusic();
+  }
+
+  function updateMovement(state: State, enabled: boolean) {
+    const sliding =
+      enabled &&
+      isWallSliding(state) &&
+      !scene.sound.locked &&
+      !document.hidden &&
+      !current.muted &&
+      current.volume > 0;
+    if (sliding) {
+      if (scrape && !scrape.isPlaying) scrape.play();
+    } else if (scrape?.isPlaying) scrape.stop();
+    const running =
+      enabled &&
+      state.status === "running" &&
+      state.tick > 0 &&
+      state.player.grounded &&
+      state.player.wall === 0 &&
+      Math.abs(state.player.vx) > 0;
+    if (!running) {
+      if (lastFootstep !== -1) footstep?.stop();
+      lastFootstep = -1;
+      return;
+    }
+    // Two footfalls per six-frame run cycle (five simulation ticks per sprite frame).
+    const beat = Math.floor(state.tick / 15);
+    if (beat === lastFootstep) return;
+    lastFootstep = beat;
+    if (!scene.sound.locked && !document.hidden && !current.muted && current.volume > 0)
+      footstep?.play({ volume: 0.65, rate: beat % 2 ? 1.06 : 0.96 });
+  }
+
+  function stopEffects() {
+    lastFootstep = -1;
+    for (const key of Object.keys(AUDIO)) {
+      if (key !== "music") scene.sound.stopByKey(key);
+    }
+  }
 
   function apply(next: AudioSettings) {
     current = next;
     scene.sound.mute = next.muted;
     scene.sound.volume = next.volume;
+    if (next.muted || next.volume <= 0) scrape?.stop();
+    startMusic();
   }
 
   function playEvent(event: GameEvent) {
-    const key = EVENT_SOUNDS[event.type];
+    // The landing sound is already the first footfall after a jump.
+    if (event.type === "landed") lastFootstep = Math.floor(event.tick / 15);
+    const key =
+      event.type === "jumped" && event.kind === "wall" ? "wallJump" : EVENT_SOUNDS[event.type];
     if (!key || scene.sound.locked || current.muted || current.volume <= 0) return;
     if (!scene.cache.audio.exists(key)) return;
 
+    if (event.type === "died") stopEffects();
+    if (event.type === "jumped" || event.type === "wall-contact") footstep?.stop();
+    if (event.type === "wall-contact") {
+      scene.sound.stopByKey("jump");
+      scene.sound.stopByKey("wallJump");
+    }
+    if (key === "wallJump") scene.sound.stopByKey("wall");
     scene.sound.play(key);
   }
 
@@ -32,14 +107,22 @@ export function createAudio(scene: Phaser.Scene, settings: AudioSettings) {
     events.forEach(playEvent);
   }
 
+  scene.sound.on("unlocked", startMusic);
+  document.addEventListener("visibilitychange", onVisibility);
   apply(settings);
 
   return {
     apply,
     consume,
-    stop: () => scene.sound.stopAll(),
+    updateMovement,
+    stop: stopEffects,
     destroy() {
-      scene.sound.stopAll();
+      scene.sound.off("unlocked", startMusic);
+      document.removeEventListener("visibilitychange", onVisibility);
+      stopEffects();
+      music?.destroy();
+      footstep?.destroy();
+      scrape?.destroy();
     },
   };
 }

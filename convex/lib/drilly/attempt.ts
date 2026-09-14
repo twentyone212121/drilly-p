@@ -1,3 +1,4 @@
+import { collisionPlatforms } from "../../../shared/game/roomBoundary";
 import { initialState, step } from "../../../shared/game/simulation";
 import { RULES } from "../../../shared/game/rules";
 import { parseDrillyStrategy } from "../../../shared/validation";
@@ -61,7 +62,7 @@ export async function playAttempt(
               await plan(
                 INSTRUCTIONS,
                 {
-                  room: level,
+                  room: { ...level, platforms: collisionPlatforms(level) },
                   observation: observeRoom(level, state),
                   strategy: strategy ?? null,
                   previousAttempts,

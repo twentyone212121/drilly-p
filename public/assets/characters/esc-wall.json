@@ -1,0 +1,33 @@
+{
+  "frames": {
+    "slide": {
+      "frame": {
+        "x": 277,
+        "y": 278,
+        "w": 792,
+        "h": 696
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 792,
+        "h": 696
+      },
+      "sourceSize": {
+        "w": 792,
+        "h": 696
+      }
+    }
+  },
+  "meta": {
+    "image": "esc-wall.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1254,
+      "h": 1254
+    },
+    "scale": "1"
+  }
+}

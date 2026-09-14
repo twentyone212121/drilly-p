@@ -1,3 +1,4 @@
+import { interpolateFrame } from "./interpolateFrame";
 import { OBSTACLE_TEXTURES } from "./obstacleArt";
 import Phaser from "phaser";
 import { initialState } from "../../../shared/game/simulation";
@@ -32,7 +33,7 @@ export class GameScene extends Phaser.Scene {
       if (name === "turret") this.load.image("obstacle-turret", "/assets/obstacles/turret.png");
       else this.load.svg(`obstacle-${name}`, `/assets/obstacles/${name}.svg`);
     }
-    for (const name of ["esc", "esc-run", "drilly"]) {
+    for (const name of ["esc", "esc-run", "esc-wall", "drilly"]) {
       this.load.atlas(name, `/assets/characters/${name}.png`, `/assets/characters/${name}.json`);
     }
     this.load.atlas(
@@ -66,13 +67,18 @@ export class GameScene extends Phaser.Scene {
     this.syncLevel(view.level);
     this.editor?.flushPreview();
     const editing = view.phase === "build";
+    this.audio?.updateMovement(
+      this.session.frameState(),
+      !editing && view.canPlay && !view.paused && view.mode === "human",
+    );
     const animating = this.roomArt?.update(
-      editing ? this.draftState! : this.session.frameState(),
+      editing ? this.draftState! : interpolateFrame(this.session.renderFrame()),
       !editing && view.mode === "replay",
       delta,
       editing,
     );
-    if ((view.paused || !view.canPlay) && !animating) this.game.loop.sleep();
+    if ((view.paused || !view.canPlay) && !view.presentingDeath && !animating)
+      this.game.loop.sleep();
   }
 
   // Coalesce input/resize wakes; Phaser remains the only continuous frame loop.

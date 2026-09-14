@@ -1,3 +1,4 @@
+import { isFixedRoomPlatform } from "../../shared/game/roomBoundary";
 import type { Obstacle, ObstacleKind } from "../../shared/game/obstacleTypes";
 import { obstacleBounds } from "../../shared/game/obstacles";
 import { RULES } from "../../shared/game/rules";
@@ -13,10 +14,12 @@ export type Edit = { type: "put"; object: EditorObject } | { type: "delete"; sel
 
 export function editorObjects(level: Level): EditorObject[] {
   return [
-    ...level.platforms.map((value): EditorObject => ({
-      kind: "platform",
-      value,
-    })),
+    ...level.platforms
+      .filter((platform) => !isFixedRoomPlatform(platform, level))
+      .map((value): EditorObject => ({
+        kind: "platform",
+        value,
+      })),
     ...(level.obstacles ?? []).map((value): EditorObject => ({ kind: "obstacle", value })),
     ...level.traps.map((value): EditorObject => ({ kind: "saw", value })),
     ...level.treasures.map((value): EditorObject => ({
@@ -171,9 +174,18 @@ export function resizePlatform(object: EditorObject, delta: Point): EditorObject
 }
 
 export function applyEdit(level: Level, edit: Edit): Level {
+  const selected = edit.type === "put" ? edit.object : edit.selection;
+  const id = edit.type === "put" ? edit.object.value.id : edit.selection.id;
+  if (
+    selected.kind === "platform" &&
+    level.platforms.some((p) => p.id === id && isFixedRoomPlatform(p, level))
+  )
+    throw new Error("The room frame cannot be moved, resized, or removed.");
   const candidate = structuredClone(level);
 
   if (edit.type === "put") {
+    const error = editorPlacementError(level, edit.object);
+    if (error) throw new Error(error);
     const object = edit.object;
     if (object.kind === "obstacle") {
       candidate.obstacles ??= [];
