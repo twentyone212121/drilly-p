@@ -22,21 +22,20 @@ it("requires guest authentication before calling the provider", async () => {
   await expect(
     t.action(api.drilly.raid, {
       level: newPlayerDungeon(),
+      previousAttempts: [],
     }),
   ).rejects.toThrow("Sign in");
   expect(fetch).not.toHaveBeenCalled();
 });
 it("runs authenticated build and raid actions through the real simulation with a stubbed provider", async () => {
   const t = convexTest(schema, modules);
-  const userId = await t.run((ctx) =>
-    ctx.db.insert("users", { isAnonymous: true }),
-  );
+  const userId = await t.run((ctx) => ctx.db.insert("users", { isAnonymous: true }));
   const guest = t.withIdentity({
     subject: `${userId}|session`,
     issuer: "https://test",
   });
   vi.stubEnv("OPENAI_API_KEY", "test-only");
-  vi.stubEnv("DRILLY_MODEL", undefined);
+  vi.stubEnv("DRILLY_MODEL", "gpt-6-astra");
   const response = (value: unknown) =>
     new Response(
       JSON.stringify({
@@ -51,19 +50,35 @@ it("runs authenticated build and raid actions through the real simulation with a
       }),
       { headers: { "Content-Type": "application/json" } },
     );
+  let expectedModel = "gpt-6-astra";
   const fetch = vi.fn(async (_url: unknown, init: RequestInit) => {
     const body = JSON.parse(init.body as string);
-    expect(body.model).toBe("gpt-6-astra");
+    expect(body.model).toBe(expectedModel);
     expect(body.reasoning).toEqual({ effort: "low" });
     const data = JSON.parse(body.input.slice(body.input.indexOf("\n") + 1));
-    return response(await buildPlan("", data));
+    return response(await buildPlan("", data, { schemaName: body.text.format.name }));
   });
   vi.stubGlobal("fetch", fetch);
   const room = await guest.action(api.drilly.build, {});
   expect(replayAttempt(room.proof).stopReason).toBe("won");
   expect(room.level).not.toHaveProperty("jumpTicks");
-  const attempts = await guest.action(api.drilly.raid, {
+  expectedModel = "gpt-5.6-sol";
+  const attempt = await guest.action(api.drilly.raid, {
     level: newPlayerDungeon(),
+    previousAttempts: [],
+    model: "gpt-5.6-sol",
   });
-  expect(attempts.map((a) => a.outcome)).toEqual(["won"]);
+  expect(attempt.outcome).toBe("won");
+  expect(replayAttempt(attempt.replay).stopReason).toBe("won");
+  fetch.mockClear();
+  await expect(
+    guest.action(api.drilly.raid, {
+      level: newPlayerDungeon(),
+      previousAttempts: [],
+      // External callers must not bypass the model allowlist.
+      // @ts-expect-error Deliberately invalid model.
+      model: "unsupported-model",
+    }),
+  ).rejects.toThrow();
+  expect(fetch).not.toHaveBeenCalled();
 });

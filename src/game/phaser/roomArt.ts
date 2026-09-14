@@ -50,7 +50,14 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
   );
   const obstacleArt = createObstacleArt(scene, level);
   const player = scene.add.image(0, 0, "esc", "idle").setOrigin(0.5, 1).setDepth(40);
-  objects.push(player);
+  const comparisonGhost = scene.add
+    .image(0, 0, "esc", "idle")
+    .setOrigin(0.5, 1)
+    .setDepth(39)
+    .setTint(0x65eaff)
+    .setAlpha(0.35)
+    .setVisible(false);
+  objects.push(player, comparisonGhost);
   const fragments = scene.add.graphics().setDepth(50);
   let jumpTick = -100;
   let wallJumpTick = -100;
@@ -88,6 +95,25 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
             .setRotation(0)
             .setFlipY(false);
         }
+      }
+    },
+    comparison(ghost: State["player"] | null) {
+      comparisonGhost.setVisible(ghost !== null);
+      if (!ghost) return;
+
+      const braced = !ghost.grounded && ghost.wall !== 0;
+      const texture = braced ? "esc-wall" : "esc";
+      const frame = braced ? "slide" : ghost.grounded ? "idle" : "jump";
+      const reference = scene.textures.getFrame(texture, braced ? "slide" : "idle");
+      comparisonGhost
+        .setTexture(texture, frame)
+        .setOrigin(0.5, 1)
+        .setScale(RULES.playerHeight / reference.height)
+        .setFlipX((ghost.wall || ghost.direction) < 0)
+        .setPosition(ghost.x + RULES.playerWidth / 2, ghost.y + RULES.playerHeight);
+      if (ghost.wall !== 0) {
+        const wallX = ghost.x + (ghost.wall > 0 ? RULES.playerWidth : 0);
+        comparisonGhost.setX(wallX - (ghost.wall * comparisonGhost.displayWidth) / 2);
       }
     },
     consume(events: GameEvent[]) {
@@ -195,7 +221,7 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
         // origin keeps flipped and unflipped sprites on the same side of the wall.
         const wallX = state.player.x + (state.player.wall > 0 ? RULES.playerWidth : 0);
         player.setOrigin(0.5, 1);
-        player.setX(wallX - state.player.wall * player.displayWidth / 2);
+        player.setX(wallX - (state.player.wall * player.displayWidth) / 2);
       }
       if (wallContact && (wallImpact > 0 || isWallSliding(state))) drawWallSparks(fragments, state);
       player.setAlpha(ghost ? 0.8 : 1).clearTint();

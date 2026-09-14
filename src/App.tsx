@@ -8,6 +8,8 @@ import { GameHud } from "./components/GameHud";
 import { GameOverlay } from "./components/GameOverlay";
 import { GameIcon, GameSprite } from "./components/GameArt";
 import type { AudioSettings } from "./game/phaser/audio";
+import { RULES } from "../shared/game/rules";
+import { parseDrillyModel } from "../shared/validation";
 
 export default function App({ session }: { session: Session }) {
   const view = useSyncExternalStore(session.subscribe, session.getSnapshot);
@@ -92,6 +94,22 @@ export default function App({ session }: { session: Session }) {
             }}
           />
           <div className="build-actions">
+            {view.liveDrilly && (
+              <label className="model-control">
+                Drilly
+                <select
+                  aria-label="Drilly model"
+                  value={view.model}
+                  onChange={(event) => session.setModel(parseDrillyModel(event.target.value))}
+                >
+                  {RULES.drilly.models.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <button
               className="game-button"
               disabled={!level.treasures.length}
@@ -113,15 +131,29 @@ export default function App({ session }: { session: Session }) {
         </footer>
       ) : (
         <footer className="play-footer">
-          <p className="input-help">
-            {view.phase === "watch" ? (
-              "Drilly’s recorded attempt"
-            ) : (
-              <>
-                <kbd>Space</kbd> or tap to jump
-              </>
-            )}
-          </p>
+          {view.phase === "watch" && view.watchIndex !== null ? (
+            <div className="ghost-comparison">
+              <span>You · {((view.playerClearTicks ?? 0) / RULES.tickRate).toFixed(2)}s</span>
+              {view.finished && (
+                <span>
+                  Drilly ·{" "}
+                  {view.state.status === "won"
+                    ? `${(view.state.tick / RULES.tickRate).toFixed(2)}s`
+                    : "Failed"}
+                </span>
+              )}
+            </div>
+          ) : (
+            <p className="input-help">
+              {view.phase === "watch" ? (
+                "Drilly’s recorded attempt"
+              ) : (
+                <>
+                  <kbd>Space</kbd> or tap to jump
+                </>
+              )}
+            </p>
+          )}
           {view.canPlay && !view.paused && view.mode === "human" && (
             <button className="jump-button" onClick={() => session.jump()}>
               <GameIcon name="jump" />

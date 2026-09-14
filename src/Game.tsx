@@ -6,14 +6,18 @@ import { GameSprite } from "./components/GameArt";
 import { createDrillySource } from "./ai/drillySource";
 import { createSession } from "./game/session";
 import { loadTutorialCompleted, saveTutorialCompleted } from "./persistence/tutorial";
+import { loadModel, loadDungeon, persistDungeon } from "./persistence/dungeon";
 
 export function LocalGame() {
   const [session] = useState(() =>
     createSession({
+      editorLevel: loadDungeon(),
+      model: loadModel(),
       tutorialCompleted: loadTutorialCompleted(),
       onTutorialCompleted: saveTutorialCompleted,
     }),
   );
+  useEffect(() => persistDungeon(session), [session]);
   return <App session={session} />;
 }
 
@@ -58,10 +62,13 @@ function ConnectedGame() {
   const [session] = useState(() =>
     createSession({
       drilly: createDrillySource(client),
+      editorLevel: loadDungeon(),
+      model: loadModel(),
       tutorialCompleted: loadTutorialCompleted(),
       onTutorialCompleted: saveTutorialCompleted,
     }),
   );
+  useEffect(() => persistDungeon(session), [session]);
   useEffect(() => {
     session.prepareRoom();
   }, [session]);

@@ -27,6 +27,15 @@ its clear. This ends the current round; return to the draft after the tutorial.
 | Results       | Show outcome and medals; return to your existing draft.     |
 
 Challenge Drilly opens Test when a clear is needed, otherwise Your raid.
+Submitting the cleared room starts Drilly's attempts immediately, alongside your
+raid. Show its recordings after your attempts finish; request completion or
+failure must not interrupt your play. If it is still thinking, wait at Drilly's
+raid step; if it failed, offer Retry there and retain its completed attempts.
+
+Choose Drilly's model in the editor: Astra (default), Sol, or Luna. Remember the
+choice in localStorage and keep it fixed for the submitted round, including retries.
+This changes only Drilly's scored raids; room generation stays separate. All models
+use the same instructions, reasoning setting, physics, and three attempts.
 
 ## Rules
 
@@ -48,8 +57,10 @@ Challenge Drilly opens Test when a clear is needed, otherwise Your raid.
   fewer loses.
 - Accepted geometry edits require another clear; selection and rejected edits do
   not. Submit the exact cleared layout. Never give Drilly the player’s clear inputs.
-- Keep drafts between rounds in this tab. Reload may reset drafts and unfinished
-  rounds. Storage failure must not block play. Replay validation stays internal.
+- Save the current dungeon draft in localStorage after committed edits and restore
+  it on reload, including unfinished layouts. Reload resets its clear and the
+  current round. Invalid stored data and storage failure must not block play.
+  Replay validation stays internal.
 
 ## Look and feel
 
@@ -79,6 +90,13 @@ pause, resets, and terminal outcomes show their exact simulation positions. Stat
 room artwork is cached between edits. A quiet ambient electronic loop continues
 through play and menus, follows the audio controls, and pauses while the tab is hidden. Mockup motion never becomes game logic.
 
+During Drilly's playback, show your latest successful test as a translucent cyan
+ESC ghost. Start both at tick zero and share playback, pause, and restart controls;
+hold the ghost at its finish position if Drilly takes longer. Allow hiding it and
+show both completion times. The ghost is visual only: visible treasures and hazards
+belong to Drilly's attempt, so aimed hazards can differ from your recorded run.
+Keep your clear in the browser; never send it to the AI.
+
 ## AI and scope
 
 Drilly builds and proves a room, then raids yours under ordinary rules. Keep the
@@ -86,12 +104,21 @@ OpenAI SDK, Astra, server-side credentials, validated outputs, bounded retries,
 retryable errors, and protection against stale responses. Replays make no AI calls
 and cannot award medals twice.
 
-Replace the predictive physics search with model-chosen game inputs. During a raid,
-execute those inputs forward through the shared simulation; do not search alternate
-futures or discard failed runs without spending an attempt. The model may receive
-the room, current state, and feedback from its own scored attempts, never the
-player's clear inputs. Keep simulation for execution, replay checks, and Drilly's
-own-room proof. Input format and decision cadence still need a small headless trial.
+For scored raids, the selected model chooses a complete `jumpTicks` sequence in one call per
+attempt. Execute it literally through the shared simulation, including ignored
+jumps; do not search alternate futures or repair the inputs. Later attempts receive
+the room, rules, and actual feedback from Drilly's earlier scored failures, never
+the player's clear inputs. Keep each completed recording if a later request fails;
+retry continues with the remaining attempts. Replays use no model calls.
+
+The builder keeps its edit loop and tests each valid layout with one call to the
+same `playRaidAttempt` function. Feed the actual outcome back into the next design
+edit. Design and proof calls share the overall build deadline; publish only a
+winning room that cannot be cleared by simply running. A late request failure may
+return the last proven challenge. Remove the old route controller entirely.
+
+Broader generation improvements remain deferred. Use headless rooms and playtesting
+to evaluate reliability and latency before adding input batches or images.
 
 Cut story/level selection, locked slots, mastery, cloud drafts, save/version UI,
 round history, account screens, adaptive history, novelty scoring, and duplicate
@@ -101,12 +128,12 @@ keep useful headless tests. Add no new hazards or AI framework.
 ## Work order
 
 1. Ship the Arcade loop and tutorial persistence; delete replaced screens and state.
-2. Replace predictive movement search with direct model inputs; trim the route and
-   controller machinery it makes unnecessary. Check representative rooms to tune
-   the input format, decision cadence, and latency, not to retain hidden search.
+2. Evaluate direct model inputs on representative rooms and in the playable loop.
+   Tune from actual failures; add input batches only if the complete-sequence
+   version needs feedback during play. Reuse that completion path for builder proofs.
 
 Keep each step playable and verify simulation, replays, UI, and live integration.
-Starter layout, preset tuning, difficulty, and acceptable AI latency remain open
+Starter layout, preset tuning, model strength, and acceptable AI latency remain open
 to playtesting. Follow the [cleanup plan](cleanup-plan.md) for implementation.
 
 Engineering: [AGENTS.md](../AGENTS.md). Current setup and architecture:

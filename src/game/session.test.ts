@@ -38,7 +38,7 @@ function editingSession() {
           endTick: runAttempt(level, jumpTicks).state.tick,
         },
       }),
-      raid: async (room) => runDrillyFixture(room),
+      raid: async (room, history) => runDrillyFixture(room)[history.length],
     },
   });
   finish(session);
