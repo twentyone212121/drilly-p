@@ -1,7 +1,8 @@
 import { getExampleRoom } from "../../../shared/testing/rooms";
 import { expect, it, vi } from "vitest";
-import { runAttempt } from "../../../shared/game/replay";
+import { replayAttempt, runAttempt } from "../../../shared/game/replay";
 import { RULES } from "../../../shared/game/rules";
+import type { Level } from "../../../shared/game/types";
 import { parseDrillyBuild } from "../../../shared/validation";
 import { buildDungeon } from "./build";
 import { roomEdit } from "../../../shared/testing/planner";
@@ -21,8 +22,8 @@ it("adds full-height sides outside the interior budget without mutating or dupli
   const room = parseDrillyBuild({ level: original }, original, budget);
   expect(room.platforms).toEqual([
     original.platforms[0],
-    { id: "boundary-left", x: 0, y: 0, width: 24, height: 480 },
-    { id: "boundary-right", x: 876, y: 0, width: 24, height: 480 },
+    { id: "boundary-left", x: 0, y: 0, width: 12, height: 480 },
+    { id: "boundary-right", x: 888, y: 0, width: 12, height: 480 },
   ]);
   expect(original).toEqual(snapshot);
   expect(parseDrillyBuild({ level: room }, original, budget)).toEqual(room);
@@ -49,28 +50,51 @@ it.each([-1, 1] as const)(
       (event) => event.type === "wall-contact",
     )!;
     const jump = contact.tick + 3;
-    const reversed = runAttempt(room, [jump], jump + 8);
+    const upward = runAttempt(room, [jump], jump + 1);
+    expect(upward.state.player).toMatchObject({ direction, wall: direction, grounded: false });
+    expect(upward.state.player.y).toBeLessThan(waiting.state.player.y);
+    expect(upward.events).toContainEqual({ type: "jumped", kind: "ground", tick: jump });
+    const reversed = runAttempt(room, [jump, jump + 1], jump + 8);
     expect(reversed.state.player.direction).toBe(-direction);
     expect(reversed.events).toContainEqual({
       type: "jumped",
       kind: "wall",
-      tick: jump,
+      tick: jump + 1,
     });
-    expect(runAttempt(room, [jump], jump + 8)).toEqual(reversed);
+    expect(runAttempt(room, [jump, jump + 1], jump + 8)).toEqual(reversed);
   },
 );
 
-it("proves and plays enclosed geometry when the designer omits both walls", async () => {
+it("proves a return route using the workspace wall ID even when the edit omits both walls", async () => {
   const proposal = openRoom();
+  proposal.traps = [];
+  proposal.treasures = [{ id: "behind", x: 40, y: 392, width: 24, height: 28 }];
   let calls = 0;
-  const plan = vi.fn(async () => ({
-    ...roomEdit(proposal),
-    action: ++calls > 1 ? "finish" : "edit",
-  }));
+  const plan = vi.fn(async (_instructions: string, input: unknown) => {
+    const { workspace } = input as { workspace: Level };
+    const wall = workspace.platforms.find(
+      (platform) =>
+        platform.x + platform.width === workspace.width && platform.height === workspace.height,
+    )!;
+
+    return {
+      ...roomEdit(proposal),
+      action: ++calls > 1 ? "finish" : "edit",
+      strategy: {
+        objective: "Reverse at the right wall and collect the treasure behind spawn",
+        route: [
+          { kind: "wall", id: wall.id },
+          { kind: "treasure", id: "behind" },
+        ],
+      },
+    };
+  });
   const built = await buildDungeon(plan);
   expect(built.level.platforms).toHaveLength(3);
   expect(built.proof.level).toEqual(built.level);
-  expect(runAttempt(built.level, built.proof.jumpTicks).stopReason).toBe("won");
+  const replay = replayAttempt(built.proof);
+  expect(replay.stopReason).toBe("won");
+  expect(replay.events).toContainEqual(expect.objectContaining({ type: "jumped", kind: "wall" }));
 });
 
 it("rejects treasure buried in a fixed wall", () => {

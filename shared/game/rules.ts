@@ -1,7 +1,8 @@
 // Provisional mechanics and editor tuning. Bump the rules version when mechanics change.
 export const RULES = Object.freeze({
-  version: "obstacles-1",
+  version: "obstacles-7",
   raidAttempts: 3,
+  roomBorderWidth: 12,
   drilly: Object.freeze({
     defaultModel: "gpt-6-astra",
     buildEdits: 6,
@@ -27,7 +28,7 @@ export const RULES = Object.freeze({
     maxGeneratedHazards: 2,
     maxGeneratedTreasures: 1,
     maxGeneratedPlatforms: 5,
-    sideWallWidth: 24,
+    sideWallWidth: 12,
   }),
   tickRate: 60,
   playerWidth: 24,
@@ -60,7 +61,8 @@ export const RULES = Object.freeze({
     detectionRange: 160,
     chaseRange: 320,
     warningTicks: 30,
-    intervalTicks: 150,
+    intervalTicks: 90,
+    flameIntervalTicks: 150,
     warmupTicks: 45,
     activeTicks: 45,
     range: 240,
@@ -86,11 +88,11 @@ export function describeRules() {
     protocolVersion: 2,
     rules: RULES,
     objective:
-      "Collect every treasure rectangle without touching a hazard. At least one treasure is required.",
+      "Rooms always have an indestructible floor, ceiling, and side frame. Collect every treasure rectangle without touching a hazard. At least one treasure is required.",
     coordinates:
       "Pixels; origin top-left; positive x right, positive y down. Player/platform coordinates are top-left; trap coordinates are centers.",
     input:
-      "jumpTicks: sorted unique nonnegative integers. Tick N input is consumed before advancing state N to N+1. Ground and wall jumps only. Wall jumps reverse direction. No steering or stopping.",
+      "jumpTicks: sorted unique nonnegative integers. Tick N input is consumed before advancing state N to N+1. Grounded jumps keep direction, including at wall corners. Airborne wall jumps reverse direction. No steering or stopping.",
     timing:
       "60 fixed ticks/second. Jump events use the input tick; collision events use the resulting state tick. Legacy saws are stationary; obstacles update on the same fixed ticks. See obstacle behavior below.",
     obstacles: {
@@ -99,7 +101,7 @@ export function describeRules() {
       patrols:
         "slider/drone: linear ping-pong from x/y to endX/endY at speed pixels/second. Routes pass through platforms.",
       turret:
-        "Cycle begins at tick 0. Warning until warmupTicks, then one shot (fixed/aimed) or flame for activeTicks. Rest of intervalTicks is cooldown. Aimed shots lock the player's center at firing time within range. Platforms stop shots and flames. Bodies are lethal.",
+        "Cycle begins at tick 0. Warning until warmupTicks, then one shot (fixed/aimed) or flame for activeTicks. Rest of intervalTicks is cooldown. Aimed shots lock the player's center at firing time within range. Shots continue until a platform or room boundary; range only limits aimed acquisition and flame reach. Default firing interval is 90 ticks (1.5 seconds). Platforms stop shots and flames. Turret bodies are safe to touch; only shots and active flames are lethal.",
       pursuer:
         "Detect within detectionRange of home, warn warningTicks, then chase at speed. Return home if the player leaves chaseRange of home. Cannot reacquire until home. Passes through platforms. Body always lethal.",
       reset:

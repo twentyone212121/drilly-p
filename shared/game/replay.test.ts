@@ -30,12 +30,12 @@ describe("input boundary", () => {
           version: 2,
           rulesVersion: RULES.version,
           level,
-          jumpTicks: [44, 193],
-          endTick: 246,
+          jumpTicks: [44, 199, 200],
+          endTick: 259,
         }),
       ),
     );
-    expect(replayAttempt(replay)).toEqual(runAttempt(level, [44, 193], 246));
+    expect(replayAttempt(replay)).toEqual(runAttempt(level, [44, 199, 200], 259));
   });
   it("bounds unfinished attempts and accepts a zero-tick recording", () => {
     expect(runAttempt(level, [], 10)).toMatchObject({

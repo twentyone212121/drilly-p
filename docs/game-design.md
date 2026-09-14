@@ -30,8 +30,17 @@ Challenge Drilly opens Test when a clear is needed, otherwise Your raid.
 
 ## Rules
 
-- Automatic running; tap or Space jumps; wall jumps reverse direction. Collect
+- Every room has a permanent floor, ceiling, and side walls. The computer casing
+  defines the playable area and cannot be selected, moved, resized, or removed.
+  Slim side walls and ceiling leave more playable space. Existing template floor
+  height is preserved so its hazards and platforms stay aligned.
+
+- Automatic running; tap or Space jumps. Grounded jumps keep direction, including
+  at wall corners; a subsequent airborne wall jump pushes away and reverses direction. Collect
   every treasure. Humans and AI share deterministic physics and existing hazards.
+  Turret bodies are safe to touch; their projectiles and active flames remain lethal.
+  Shots travel until a wall/platform or room boundary, with a small firing sound.
+  The default firing cadence is once every 1.5 seconds.
 - Prison and own-room retries are unlimited. Death, timeout, and explicit restart
   spend a scored attempt; pause and technical failures do not.
 - Attack medals: three, two, or one for clearing on that try; otherwise zero.
@@ -47,13 +56,28 @@ Challenge Drilly opens Test when a clear is needed, otherwise Your raid.
 Full-screen Arcade presentation: existing computer art, chunky controls, compact
 editor tools, minimal HUD, and in-game overlays. Keep the five-step path visible;
 highlight the current step, check completed steps, and name the next action.
+The computer background has local flickering status lights, cyan/violet/amber
+light pulses at different speeds, and a broken wire with occasional sparks. Keep
+the center quiet and effects behind gameplay; respect reduced-motion preferences
+and suspend ambient animations while the tab is hidden.
 
 Keep all existing hazards available in the editor as presets. Remove their settings
 forms; placing and moving hazards should not require configuring numbers.
 
 Use functional copy only. No slogans, taunts, decorative labels, or developer panels.
 Respond immediately to input; avoid scene rebuilds, expensive full-screen effects,
-idle rendering, and artificial waits. Mockup motion never becomes game logic.
+idle rendering, and artificial waits outside the death presentation. ESC mirrors
+with movement, braces both hands against walls while airborne, and stretches into
+wall jumps. At a grounded wall corner, ESC stands upright with planted feet and
+no overlap into the wall. Sliding down emits tiny contact sparks and a quiet scraping sound;
+both stop on landing, push-off, or pause. Death gets
+a brief electric shock with shaking, sparks, and crackling audio before retry or
+round transition. ESC stays upright and the room keeps its size;
+simulation stops immediately, and the presentation does not change replay outcomes.
+Moving characters and hazards interpolate visually between fixed simulation ticks;
+pause, resets, and terminal outcomes show their exact simulation positions. Static
+room artwork is cached between edits. A quiet ambient electronic loop continues
+through play and menus, follows the audio controls, and pauses while the tab is hidden. Mockup motion never becomes game logic.
 
 ## AI and scope
 

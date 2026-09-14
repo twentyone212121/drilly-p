@@ -138,6 +138,15 @@ describe("obstacle simulation", () => {
     expect(advance(room([turret]), 200, 30).projectiles).toHaveLength(1);
     expect(advance(room([turret]), 200, 31).projectiles).toHaveLength(1);
   });
+  it("allows turret body contact while warning or idle, but its shot still kills", () => {
+    const level = room([turret]);
+    const state = initialState(level);
+    const touching = body(turret.x - RULES.playerWidth / 2);
+    state.player = { ...state.player, ...touching };
+    expect(advanceObstacles(level, state, touching, 1).hitId).toBeNull();
+    expect(advanceObstacles(level, state, touching, 31).hitId).toBeNull();
+    expect(advanceObstacles(level, state, touching, 30).hitId).toBe("gun");
+  });
   it("aimed shots lock their direction and respect detection range", () => {
     const level = room([{ ...turret, mode: "aimed" }]);
     const state = advance(level, 200, 30);
@@ -163,7 +172,6 @@ describe("obstacle simulation", () => {
         y: 314,
         vx: -480,
         vy: 0,
-        remaining: 100,
       },
     ];
     expect(advanceObstacles(level, state, body(302), 1).hitId).toBe("gun");
@@ -178,15 +186,31 @@ describe("obstacle simulation", () => {
     expect(blocked.hitId).toBeNull();
     expect(blocked.projectiles).toHaveLength(0);
   });
-  it("expires projectiles at their configured range", () => {
-    const level = room();
-    const state = initialState(level);
-    state.projectiles = [
-      { id: "p", ownerId: "gun", x: 600, y: 100, vx: 240, vy: 0, remaining: 2 },
-    ];
-    expect(
-      advanceObstacles(level, state, body(64), 1).projectiles,
-    ).toHaveLength(0);
+  it("keeps shots beyond the turret range until a wall or room boundary", () => {
+    const level = room([{ ...turret, range: 32 }]);
+    let state = advance(level, 64, 30);
+    const firstId = state.projectiles[0].id;
+    for (let tick = 31; tick < 50; tick++) {
+      const next = advanceObstacles(level, state, body(64), tick);
+      state = { ...state, tick, ...next };
+    }
+    expect(state.projectiles.some((shot) => shot.id === firstId)).toBe(true);
+    const shot = state.projectiles.find((p) => p.id === firstId)!;
+    level.platforms.push({ id: "stop", x: shot.x - 12, y: 280, width: 4, height: 60 });
+    expect(advanceObstacles(level, state, body(64), 50).projectiles).toHaveLength(0);
+    state.projectiles = [{ id: "exit", ownerId: "gun", x: level.width - 1, y: 100, vx: 240, vy: 0 }];
+    expect(advanceObstacles(room(), state, body(64), 51).projectiles).toHaveLength(0);
+  });
+  it("emits one firing event every 1.5 seconds with the editor defaults", () => {
+    const level = room([{ ...turret, intervalTicks: RULES.obstacles.intervalTicks }]);
+    let state = initialState(level);
+    const fired: number[] = [];
+    for (let tick = 1; tick <= 330; tick++) {
+      const next = advanceObstacles(level, state, body(64), tick);
+      fired.push(...next.events.map((event) => event.tick));
+      state = { ...state, tick, ...next };
+    }
+    expect(fired).toEqual([30, 120, 210, 300]);
   });
   it("flames only hurt in their active window and stop at platforms", () => {
     const o = { ...turret, mode: "flame" as const };

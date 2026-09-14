@@ -1,3 +1,4 @@
+import { collisionPlatforms } from "../../../shared/game/roomBoundary";
 import { flameBounds } from "../../../shared/game/obstacles";
 import { RULES } from "../../../shared/game/rules";
 import type { Level, State, Rect } from "../../../shared/game/types";
@@ -68,15 +69,15 @@ export function observeRoom(level: Level, state: State) {
     player: { ...p, width: RULES.playerWidth, height: RULES.playerHeight },
     canJump: p.grounded || p.wall !== 0,
     jumpEffect:
-      p.wall !== 0
-        ? "reverse direction and jump"
-        : p.grounded
-          ? "jump forward"
+      p.grounded
+        ? "jump forward"
+        : p.wall !== 0
+          ? "reverse direction and jump"
           : "no effect until landing or wall contact",
     treasuresRemaining: level.treasures.filter(
       (t) => !state.collectedTreasureIds.includes(t.id),
     ),
-    platformFaces: level.platforms.map((platform) => ({
+    platformFaces: collisionPlatforms(level).map((platform) => ({
       id: platform.id,
       ...relative(platform),
       riseFromFeet: Math.round(p.y + RULES.playerHeight - platform.y),

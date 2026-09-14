@@ -69,7 +69,7 @@ export function obstacleRoom(id: ObstacleCase): Level {
       y,
       radius: 18,
       direction: -1,
-      intervalTicks: r.intervalTicks,
+      intervalTicks: mode === "flame" ? r.flameIntervalTicks : r.intervalTicks,
       warmupTicks: r.warmupTicks,
       activeTicks: r.activeTicks,
       range: r.range,

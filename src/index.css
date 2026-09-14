@@ -310,7 +310,8 @@ h2 {
   min-width: 0;
 }
 .play-footer {
-  min-height: 65px;
+  /* Reserve the jump control space when play ends, so the room never resizes. */
+  min-height: 74px;
 }
 .editor-tools {
   display: flex;
@@ -884,7 +885,7 @@ kbd {
     display: none;
   }
   .play-footer {
-    min-height: 45px;
+    min-height: 54px;
   }
   .jump-button {
     width: 54px;

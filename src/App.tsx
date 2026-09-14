@@ -1,3 +1,4 @@
+import { ComputerBackground } from "./components/ComputerBackground";
 import { useEffect, useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
 import type { Session } from "./game/session";
 import { GameView } from "./components/GameView";
@@ -53,6 +54,7 @@ export default function App({ session }: { session: Session }) {
       className="arcade-game"
       style={{ "--room-ratio": level.width / level.height } as CSSProperties}
     >
+      <ComputerBackground />
       <GameHud
         view={view}
         totalTreasures={level.treasures.length}

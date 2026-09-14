@@ -38,6 +38,7 @@ export type State = {
 export type Input = { jump: boolean };
 
 export type GameEvent =
+  | { type: "turret-fired"; tick: number; turretId: string }
   | { type: "jumped"; tick: number; kind: "ground" | "wall" }
   | { type: "jump-ignored"; tick: number; reason: "airborne" }
   | { type: "landed"; tick: number; platformId: string }

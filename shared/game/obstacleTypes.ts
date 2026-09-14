@@ -42,5 +42,4 @@ export type Projectile = {
   y: number;
   vx: number;
   vy: number;
-  remaining: number;
 };

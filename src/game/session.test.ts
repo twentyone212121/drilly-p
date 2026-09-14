@@ -1,3 +1,4 @@
+import { DEATH_ANIMATION_MS } from "./presentation";
 import { expect, it } from "vitest";
 import { getPrison, newPlayerDungeon } from "../../shared/game/rooms";
 import { getExampleRoom } from "../../shared/testing/rooms";
@@ -15,6 +16,10 @@ function finish(session: Session, jumps: number[] = []) {
     session.step();
   }
   session.step(RULES.maxTicks);
+}
+
+function finishDeathPresentation(session: Session) {
+  for (let elapsed = 0; elapsed < DEATH_ANIMATION_MS; elapsed += 100) session.update(100);
 }
 
 function editingSession() {
@@ -47,9 +52,19 @@ it("allows unlimited prison retries and opens the editor after a real escape", (
   for (let i = 0; i < RULES.raidAttempts + 1; i++) {
     finish(session);
     expect(session.getSnapshot().tutorialCompleted).toBe(false);
+    const dead = session.frameState();
+    expect(dead.status).toBe("dead");
+    expect(session.getSnapshot().presentingDeath).toBe(true);
+    session.primaryAction();
+    session.reset();
+    session.update(Number.NaN);
+    expect(session.frameState()).toBe(dead);
+    finishDeathPresentation(session);
+    expect(session.getSnapshot().presentingDeath).toBe(false);
+    expect(session.frameState()).toBe(dead);
     session.reset();
   }
-  finish(session, [44, 193, 228]);
+  finish(session, [44, 199, 200, 234]);
   expect(session.frameState().status).toBe("won");
   session.primaryAction();
   expect(session.getSnapshot().editorLevel).toEqual(newPlayerDungeon());
@@ -114,6 +129,7 @@ it("counts each scored death or restart once, preserves the draft, and stops aft
   finish(session);
   session.pause();
   session.step();
+  finishDeathPresentation(session);
   expect(session.getSnapshot().round?.human).toHaveLength(1);
   session.reset();
   session.play();
@@ -121,6 +137,14 @@ it("counts each scored death or restart once, preserves the draft, and stops aft
   expect(session.getSnapshot().round?.human).toHaveLength(1);
   session.reset();
   finish(session);
+  const dead = session.frameState();
+  expect(session.getSnapshot()).toMatchObject({ phase: "raid", presentingDeath: true });
+  for (let elapsed = 0; elapsed < DEATH_ANIMATION_MS - 100; elapsed += 100) session.update(100);
+  expect(session.getSnapshot().phase).toBe("raid");
+  expect(session.frameState()).toBe(dead);
+  session.update(100);
+  expect(session.getSnapshot()).toMatchObject({ phase: "watch", presentingDeath: false });
+  session.update(100);
   session.reset();
   expect(session.getSnapshot().round?.human.map((a) => a.outcome)).toEqual([
     "dead",

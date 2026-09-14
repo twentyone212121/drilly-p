@@ -1,3 +1,4 @@
+import { DEATH_ANIMATION_MS } from "./presentation";
 import { drillyErrorMessage } from "../../shared/game/drillyErrors";
 import { getPrison, newPlayerDungeon } from "../../shared/game/rooms";
 import { RULES } from "../../shared/game/rules";
@@ -40,6 +41,7 @@ export function createSession(
   let result: ReturnType<typeof scoreRound> | null = null;
   let watchIndex: number | null = null;
   let recordedAttempt = false;
+  let deathRemainingMs = 0;
   let aiStatus: "idle" | "pending" | "error" = "idle";
   let aiError: string | null = null;
   let preparedRoom: Promise<BuiltDungeon> | null = null;
@@ -61,6 +63,7 @@ export function createSession(
     return {
       ...view,
       phase,
+      presentingDeath: deathRemainingMs > 0,
       // Read-only room references: accepted edits replace the draft.
       level: phase === "build" ? editorLevel : attemptLevel,
       editorLevel,
@@ -96,10 +99,12 @@ export function createSession(
   function loadAttempt(level: Level) {
     attemptLevel = level;
     recordedAttempt = false;
+    deathRemainingMs = 0;
     attempt.loadLevel(level);
   }
 
   function leaveRound() {
+    deathRemainingMs = 0;
     round = null;
     opponent = null;
     result = null;
@@ -247,7 +252,7 @@ export function createSession(
   }
 
   function reset() {
-    if (!snapshot.canRestart) return;
+    if (!snapshot.canRestart || deathRemainingMs > 0) return;
     if (phase === "watch") {
       showAttempt(watchIndex!);
       return;
@@ -289,6 +294,11 @@ export function createSession(
     notify();
   }
 
+  attempt.onEvents((events) => {
+    if (attempt.getSnapshot().mode === "human" && events.some((event) => event.type === "died"))
+      deathRemainingMs = DEATH_ANIMATION_MS;
+  });
+
   attempt.subscribe(() => {
     const view = attempt.getSnapshot();
     if (view.mode === "human" && view.state.status === "won") {
@@ -299,7 +309,13 @@ export function createSession(
         clearedLevel = editorLevel;
       }
     }
-    if (phase === "raid" && opponent && view.mode === "human" && view.finished)
+    if (
+      phase === "raid" &&
+      opponent &&
+      view.mode === "human" &&
+      view.finished &&
+      deathRemainingMs === 0
+    )
       recordRaid(
         view.state.status === "won" ? "won" : view.state.status === "dead" ? "dead" : "tick-limit",
       );
@@ -308,6 +324,7 @@ export function createSession(
 
   return {
     frameState: attempt.frameState,
+    renderFrame: attempt.renderFrame,
     getSnapshot: () => snapshot,
     onEvents: attempt.onEvents,
     subscribe: (fn: () => void) => {
@@ -335,6 +352,7 @@ export function createSession(
     prepareRoom,
     reset,
     primaryAction() {
+      if (deathRemainingMs > 0) return;
       switch (phase) {
         case "build":
           challengeDrilly();
@@ -383,6 +401,15 @@ export function createSession(
       if (isPlaying()) attempt.step(ticks);
     },
     update(deltaMs: number) {
+      if (deathRemainingMs > 0) {
+        if (!Number.isFinite(deltaMs) || deltaMs < 0) return;
+        deathRemainingMs = Math.max(0, deathRemainingMs - Math.min(deltaMs, 100));
+        if (deathRemainingMs === 0) {
+          if (phase === "raid") recordRaid("dead");
+          notify();
+        }
+        return;
+      }
       if (isPlaying()) attempt.update(deltaMs);
     },
   };

@@ -9,6 +9,7 @@ const MAX_FRAME_DELTA_MS = 100;
 export function createAttempt(initialLevel: Level) {
   let level = parseLevel(initialLevel);
   let state = initialState(level);
+  let previousState = state;
   let paused = true;
   let accumulator = 0;
   let pendingJump = false;
@@ -38,6 +39,7 @@ export function createAttempt(initialLevel: Level) {
 
   function resetAttempt() {
     state = initialState(level);
+    previousState = state;
     paused = true;
     accumulator = 0;
     pendingJump = false;
@@ -66,6 +68,7 @@ export function createAttempt(initialLevel: Level) {
 
     const result = step(level, state, { jump });
     pendingJump = false;
+    previousState = state;
     state = result.state;
 
     eventListeners.forEach((fn) => fn(result.events));
@@ -74,6 +77,11 @@ export function createAttempt(initialLevel: Level) {
 
   return {
     frameState: () => state,
+    renderFrame: () => ({
+      previous: previousState,
+      current: state,
+      alpha: paused ? 1 : Math.max(0, Math.min(1, accumulator / TICK_DURATION_MS)),
+    }),
     getSnapshot: () => snapshot,
     exportReplay: (): Replay => ({
       version: 2,
@@ -102,6 +110,7 @@ export function createAttempt(initialLevel: Level) {
 
       if (paused) {
         paused = false;
+        previousState = state;
         accumulator = 0;
       } else if (mode === "human") {
         pendingJump = true;
@@ -123,6 +132,7 @@ export function createAttempt(initialLevel: Level) {
       if (isFinished()) return;
 
       paused = false;
+      previousState = state;
       accumulator = 0;
       notify();
     },

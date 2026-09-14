@@ -44,27 +44,62 @@ describe("checkpoint mechanics", () => {
     });
     expect(second.state.player.vy).toBeGreaterThan(first.state.player.vy);
   });
-  it("reverses direction on wall jump and clears the room with two taps", () => {
-    const result = runAttempt(level, [44, 193]);
+  it("jumps up at a grounded corner, then reverses on an airborne wall jump", () => {
+    const result = runAttempt(level, [44, 199, 200]);
     expect(result.state.status).toBe("won");
-    expect(result.state.tick).toBe(246);
-    expect(result.trajectory[194].player.direction).toBe(-1);
+    expect(result.state.tick).toBe(259);
+    expect(result.trajectory[199].player).toMatchObject({ grounded: true, wall: 1 });
+    expect(result.trajectory[200].player).toMatchObject({ grounded: false, direction: 1, wall: 1 });
+    expect(result.trajectory[200].player.y).toBeLessThan(result.trajectory[199].player.y);
+    expect(result.events).toContainEqual({ type: "jumped", tick: 199, kind: "ground" });
+    expect(result.trajectory[201].player.direction).toBe(-1);
     expect(result.events).toContainEqual({
       type: "jumped",
-      tick: 193,
+      tick: 200,
       kind: "wall",
     });
     expect(result.events).toContainEqual({
       type: "landed",
-      tick: 223,
+      tick: 233,
       platformId: "vault-ledge",
+    });
+  });
+  it("keeps all four room boundaries even when the authored platforms are empty", () => {
+    const empty = {
+      ...level,
+      platforms: [],
+      traps: [],
+      treasures: [{ id: "high", x: 400, y: 100, width: 24, height: 24 }],
+    };
+    const falling = runAttempt(empty, []);
+    expect(falling.stopReason).toBe("tick-limit");
+    expect(falling.state.player.y + RULES.playerHeight).toBe(empty.height - RULES.roomBorderWidth);
+    expect(falling.state.player.wall).toBe(1);
+    expect(falling.state.player.x + RULES.playerWidth).toBe(empty.width - RULES.roomBorderWidth);
+    const rising = initialState(empty);
+    rising.player = {
+      ...rising.player,
+      x: 200,
+      y: RULES.roomBorderWidth + 1,
+      vy: -RULES.jumpSpeed,
+      grounded: false,
+    };
+    expect(step(empty, rising, { jump: false }).state.player).toMatchObject({
+      y: RULES.roomBorderWidth,
+      vy: 0,
+    });
+    const left = initialState(empty);
+    left.player = { ...left.player, x: RULES.roomBorderWidth, direction: -1 };
+    expect(step(empty, left, { jump: false }).state.player).toMatchObject({
+      x: RULES.roomBorderWidth,
+      wall: -1,
     });
   });
   it("caps downward velocity while sliding against a wall", () => {
     const state = initialState(level);
     state.player = {
       ...state.player,
-      x: 840,
+      x: level.width - RULES.roomBorderWidth - RULES.playerWidth,
       y: 80,
       grounded: false,
       wall: 1,

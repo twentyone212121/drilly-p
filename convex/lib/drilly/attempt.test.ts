@@ -67,9 +67,10 @@ it("keeps executing the last strategy within the normal tick limit after the mod
   expect(plan).toHaveBeenCalledTimes(RULES.drilly.maxDecisionsPerAttempt);
 });
 
-it("resolves an unavoidable spawn fall without spending model calls", async () => {
+it("resolves an unavoidable fall into a hazard without spending model calls", async () => {
   const level = newPlayerDungeon();
   level.platforms = [];
+  level.traps = [{ id: "fall-hazard", x: 115, y: 443, radius: 8 }];
   const plan = vi.fn(async () => directStrategy(level));
   const result = await playAttempt(level, plan, []);
   expect(plan).not.toHaveBeenCalled();

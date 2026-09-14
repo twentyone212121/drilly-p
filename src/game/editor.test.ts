@@ -35,6 +35,22 @@ describe("editor geometry and placement", () => {
     expect(level).toEqual(before);
   });
 
+  it("keeps the frame out of selection and rejects removal or resizing of template borders", () => {
+    for (const id of ["floor", "left-wall", "right-wall"]) {
+      const platform = level.platforms.find((p) => p.id === id)!;
+      expect(hitObject(level, { x: platform.x + 1, y: platform.y + 1 })).toBeUndefined();
+      expect(() =>
+        applyEdit(level, { type: "delete", selection: { kind: "platform", id } }),
+      ).toThrow("frame");
+      expect(() =>
+        applyEdit(level, {
+          type: "put",
+          object: { kind: "platform", value: { ...platform, width: platform.width + 8 } },
+        }),
+      ).toThrow("frame");
+    }
+    expect(placementError(level, newObject(level, "treasure", { x: 80, y: 0 }))).toContain("frame");
+  });
   it("preserves off-grid geometry on click and collision ordering on updates", () => {
     const object: EditorObject = {
       kind: "platform",

@@ -1,3 +1,8 @@
+import { drawRoomFrame } from "./roomFrame";
+import { isFixedRoomPlatform } from "../../../shared/game/roomBoundary";
+import { drawWallSparks } from "./wallSlide";
+import { DEATH_ANIMATION_MS, isWallSliding } from "../presentation";
+import { drawElectricDeath } from "./electricDeath";
 import { createObstacleArt, setObstacleImage } from "./obstacleArt";
 import type Phaser from "phaser";
 import type { EditorObject, GameEvent, Level, State } from "../../../shared/game/types";
@@ -25,11 +30,17 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
   const previewImage = props("saw", 0, 0, 1, 1).setDepth(70).setAlpha(0.65).setVisible(false);
   const platforms = scene.add.graphics();
   for (const platform of level.platforms) {
+    if (isFixedRoomPlatform(platform, level)) continue;
     for (const panel of platformPanels(platform)) {
       platforms.fillStyle(panel.color);
       platforms.fillRect(panel.x, panel.y, panel.width, panel.height);
     }
   }
+  drawRoomFrame(platforms, level);
+  // Bake static panel details once per room/edit instead of replaying their draw commands.
+  platforms.generateTexture("room-platforms", level.width, level.height);
+  platforms.destroy();
+  const platformImage = scene.add.image(0, 0, "room-platforms").setOrigin(0);
   const saws = level.traps.map((trap) => {
     const image = props("saw", trap.x, trap.y, trap.radius * 2, trap.radius * 2);
     return image.setOrigin(0.5).setDepth(20);
@@ -43,6 +54,7 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
   const fragments = scene.add.graphics().setDepth(50);
   let jumpTick = -100;
   let wallJumpTick = -100;
+  let wallContactTick = -100;
   let deathMs = 0;
   let lastTick = -1;
   let landingTick = -100;
@@ -80,6 +92,7 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
     },
     consume(events: GameEvent[]) {
       for (const event of events) {
+        if (event.type === "wall-contact") wallContactTick = event.tick;
         if (event.type === "landed") landingTick = event.tick;
         if (event.type === "jumped") {
           jumpTick = event.tick;
@@ -88,7 +101,7 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
       }
     },
     update(state: State, ghost: boolean, delta: number, editing = false) {
-      const dying = !editing && !ghost && state.status === "dead" && deathMs < 500;
+      const dying = !editing && !ghost && state.status === "dead" && deathMs < DEATH_ANIMATION_MS;
       if (state === lastState && ghost === lastGhost && editing === lastEditing && !dying)
         return false;
       lastState = state;
@@ -97,14 +110,22 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
       grid.setVisible(editing);
       obstacleArt.update(state);
       if (state.tick === 0 || state.tick < lastTick) {
-        landingTick = jumpTick = wallJumpTick = -100;
+        landingTick = jumpTick = wallJumpTick = wallContactTick = -100;
         deathMs = 0;
       }
       lastTick = state.tick;
       if (state.status !== "dead") deathMs = 0;
-      else deathMs = Math.min(500, deathMs + Math.max(0, Math.min(delta, 100)));
+      else deathMs = Math.min(DEATH_ANIMATION_MS, deathMs + Math.max(0, Math.min(delta, 100)));
       fragments.clear();
       const landed = state.tick - landingTick < 6;
+      const wallContact =
+        !editing && !ghost && state.status === "running" && state.player.wall !== 0;
+      const braced = wallContact && !state.player.grounded;
+      const wallImpact = wallContact ? Math.max(0, 1 - (state.tick - wallContactTick) / 9) : 0;
+      const wallPush =
+        !editing && !ghost && state.status === "running"
+          ? Math.max(0, 1 - (state.tick - wallJumpTick) / 14)
+          : 0;
       const running =
         !editing &&
         !ghost &&
@@ -112,6 +133,7 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
         state.tick > 0 &&
         state.player.grounded &&
         !landed &&
+        !wallContact &&
         Math.abs(state.player.vx) > 0;
       const frame = editing
         ? "idle"
@@ -121,17 +143,21 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
             : state.player.grounded
               ? "hover"
               : "active"
-          : !state.player.grounded
-            ? "jump"
-            : landed
-              ? "land"
-              : "idle";
-      const texture = ghost ? "drilly" : running ? "esc-run" : "esc";
+          : state.status === "dead"
+            ? "idle"
+            : wallContact
+              ? "idle"
+              : !state.player.grounded
+                ? "jump"
+                : landed
+                  ? "land"
+                  : "idle";
+      const texture = ghost ? "drilly" : braced ? "esc-wall" : running ? "esc-run" : "esc";
       const runFrame = `run-${Math.floor(state.tick / 5) % 6}`;
-      player.setTexture(texture, running ? runFrame : frame).setOrigin(0.5, 1);
+      player.setTexture(texture, braced ? "slide" : running ? runFrame : frame).setOrigin(0.5, 1);
       const reference = scene.textures.getFrame(
         texture,
-        ghost ? "hover" : running ? "run-0" : "idle",
+        ghost ? "hover" : braced ? "slide" : running ? "run-0" : "idle",
       );
       const scale = RULES.playerHeight / reference.height;
       const jumpStrength =
@@ -141,46 +167,61 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
           ? Math.max(0, 1 - (state.tick - landingTick) / 6)
           : 0;
       player.setScale(
-        scale * (1 - jumpStrength * 0.08 + landStrength * 0.08),
-        scale * (1 + jumpStrength * 0.1 - landStrength * 0.08),
+        scale *
+          (1 - jumpStrength * 0.08 + landStrength * 0.08 - wallImpact * 0.2 - wallPush * 0.12),
+        scale *
+          (1 + jumpStrength * 0.1 - landStrength * 0.08 + wallImpact * 0.12 + wallPush * 0.18),
       );
       player.setPosition(
         state.player.x + RULES.playerWidth / 2,
         state.player.y + RULES.playerHeight,
       );
-      // A small visual lean communicates direction without mirroring the ESC label.
+      player.setFlipX(!ghost && state.player.direction < 0);
       player.setRotation(
         !editing && state.status === "running"
-          ? state.player.direction *
-              (0.04 + (!ghost ? Math.max(0, 1 - (state.tick - wallJumpTick) / 10) * 0.16 : 0))
+          ? wallContact
+            ? state.player.wall * (0.14 + wallImpact * 0.12)
+            : state.player.direction * (0.04 + wallPush * 0.35)
           : 0,
       );
-      player.setAlpha(ghost ? 0.8 : state.status === "dead" ? Math.max(0.3, 1 - deathMs / 300) : 1);
-      if (!ghost && state.status === "dead" && deathMs < 500) {
-        const t = deathMs / 1000;
-        for (let index = 0; index < 6; index++) {
-          const angle = (index * Math.PI * 2) / 6;
-          fragments.fillStyle(index % 2 ? 0xeee4d2 : 0x50dcf3, 1 - deathMs / 500);
-          fragments.fillRect(
-            player.x + Math.cos(angle) * t * 55 - 2,
-            player.y - RULES.playerHeight / 2 + Math.sin(angle) * t * 45 + t * t * 80,
-            3,
-            3,
-          );
+      if (wallContact) {
+        // Grounded corners use an upright, planted pose; airborne contact uses the palms.
+        // Anchor the visible edge so the wider artwork cannot lean into the wall.
+        player
+          .setScale(scale)
+          .setRotation(0)
+          .setFlipX(state.player.wall < 0);
+        // Atlas frames with custom pivots mirror around their origin. A centered
+        // origin keeps flipped and unflipped sprites on the same side of the wall.
+        const wallX = state.player.x + (state.player.wall > 0 ? RULES.playerWidth : 0);
+        player.setOrigin(0.5, 1);
+        player.setX(wallX - state.player.wall * player.displayWidth / 2);
+      }
+      if (wallContact && (wallImpact > 0 || isWallSliding(state))) drawWallSparks(fragments, state);
+      player.setAlpha(ghost ? 0.8 : 1).clearTint();
+      if (!editing && !ghost && state.status === "dead") {
+        drawElectricDeath(player, fragments, deathMs, scale);
+      } else if (wallPush > 0 && !braced) {
+        // Short kick-off streaks originate behind ESC, toward the wall he left.
+        fragments.lineStyle(2, 0x50dcf3, wallPush * 0.8);
+        for (let index = 0; index < 3; index++) {
+          const x = player.x - state.player.direction * (12 + (1 - wallPush) * 16);
+          const y = player.y - 6 - index * 8;
+          fragments.lineBetween(x, y, x - state.player.direction * wallPush * 12, y + 4);
         }
       }
-      player.setTint(state.status === "dead" && !ghost ? 0xff8297 : 0xffffff);
       saws.forEach((image) => image.setRotation(state.tick / 10));
       treasures.forEach((image, index) =>
         image.setVisible(!state.collectedTreasureIds.includes(level.treasures[index].id)),
       );
-      return !editing && !ghost && state.status === "dead" && deathMs < 500;
+      return !editing && !ghost && state.status === "dead" && deathMs < DEATH_ANIMATION_MS;
     },
     destroy() {
       grid.destroy();
       guides.destroy();
       previewPanels.destroy();
-      platforms.destroy();
+      platformImage.destroy();
+      scene.textures.remove("room-platforms");
       obstacleArt.destroy();
       fragments.destroy();
       objects.forEach((image) => image.destroy());

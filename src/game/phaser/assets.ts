@@ -1,6 +1,12 @@
 export const AUDIO = {
+  shot: "/assets/audio/shot.wav",
+  music: "/assets/audio/ambient.wav",
   jump: "/assets/audio/jump.wav",
+  wallJump: "/assets/audio/wall-jump.wav",
+  wall: "/assets/audio/wall.wav",
+  scrape: "/assets/audio/scrape.wav",
   land: "/assets/audio/land.wav",
+  footstep: "/assets/audio/footstep.wav",
   death: "/assets/audio/death.wav",
   win: "/assets/audio/win.wav",
 };

@@ -98,3 +98,16 @@ simulation ticks and freeze during pause. These are presentation changes only.
 
 The obstacle lab is accessible from **Try the obstacle lab** above the game room.
 Use its room selector to inspect each behavior before building with it.
+
+## ESC wall slide
+
+The additional `esc-wall` atlas uses one `slide` pose with both hands braced
+against a vertical wall. The built-in image generator used the original ESC
+atlas as a reference; the [prompt and provenance](esc-wall-prompt.json) and
+[source image](source/characters/esc-wall.png) are retained. The runtime PNG
+preserves the generated alpha; its atlas selects the visible silhouette without
+changing the image. It is separate from the original atlas export script.
+
+The renderer anchors the palms to either wall, mirrors the pose, and adds tiny
+friction sparks while descending. A quiet scrape loop follows the same sliding
+condition and stops on jumping, landing, death, pause, or hidden tabs.
