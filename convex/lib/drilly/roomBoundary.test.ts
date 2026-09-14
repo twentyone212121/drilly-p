@@ -1,7 +1,8 @@
 import { getExampleRoom } from "../../../shared/testing/rooms";
 import { expect, it, vi } from "vitest";
-import { runAttempt } from "../../../shared/game/replay";
+import { replayAttempt, runAttempt } from "../../../shared/game/replay";
 import { RULES } from "../../../shared/game/rules";
+import type { Level } from "../../../shared/game/types";
 import { parseDrillyBuild } from "../../../shared/validation";
 import { buildDungeon } from "./build";
 import { roomEdit } from "../../../shared/testing/planner";
@@ -64,17 +65,36 @@ it.each([-1, 1] as const)(
   },
 );
 
-it("proves and plays enclosed geometry when the designer omits both walls", async () => {
+it("proves a return route using the workspace wall ID even when the edit omits both walls", async () => {
   const proposal = openRoom();
+  proposal.traps = [];
+  proposal.treasures = [{ id: "behind", x: 40, y: 392, width: 24, height: 28 }];
   let calls = 0;
-  const plan = vi.fn(async () => ({
-    ...roomEdit(proposal),
-    action: ++calls > 1 ? "finish" : "edit",
-  }));
+  const plan = vi.fn(async (_instructions: string, input: unknown) => {
+    const { workspace } = input as { workspace: Level };
+    const wall = workspace.platforms.find(
+      (platform) =>
+        platform.x + platform.width === workspace.width && platform.height === workspace.height,
+    )!;
+
+    return {
+      ...roomEdit(proposal),
+      action: ++calls > 1 ? "finish" : "edit",
+      strategy: {
+        objective: "Reverse at the right wall and collect the treasure behind spawn",
+        route: [
+          { kind: "wall", id: wall.id },
+          { kind: "treasure", id: "behind" },
+        ],
+      },
+    };
+  });
   const built = await buildDungeon(plan);
   expect(built.level.platforms).toHaveLength(3);
   expect(built.proof.level).toEqual(built.level);
-  expect(runAttempt(built.level, built.proof.jumpTicks).stopReason).toBe("won");
+  const replay = replayAttempt(built.proof);
+  expect(replay.stopReason).toBe("won");
+  expect(replay.events).toContainEqual(expect.objectContaining({ type: "jumped", kind: "wall" }));
 });
 
 it("rejects treasure buried in a fixed wall", () => {
