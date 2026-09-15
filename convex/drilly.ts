@@ -5,14 +5,12 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { action, env, internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
 import { levelValidator, raidAttemptValidator } from "./lib/validators";
 import { buildDungeon } from "./lib/drilly/build";
 import { playRaidAttempt } from "./lib/drilly/raid";
 import { openAIPlanner } from "./lib/drilly/provider";
 import { RULES } from "../shared/game/rules";
-import type { Level } from "../shared/game/types";
-import { parseBuiltDungeon } from "../shared/validation";
+import { withDeadline } from "./lib/drilly/deadline";
 
 export const generate = internalAction({
   args: { buildId: v.id("builds"), runNumber: v.number() },
@@ -23,52 +21,23 @@ export const generate = internalAction({
     const started = Date.now();
     console.info("drilly.build.started", { ...args, model: build.model });
 
-    let candidateId: Id<"levels"> | undefined;
-    const proofs = new Map<string, { levelId: Id<"levels">; proofAttemptId: Id<"attempts"> }>();
-    async function recordCandidate(room: Level) {
-      candidateId = await ctx.runMutation(internal.levels.recordCandidate, {
-        ...args,
-        room,
+    try {
+      const plan = withDeadline(
+        openAIPlanner(env.OPENAI_API_KEY, build.model),
+        RULES.drilly.buildThinkingTimeoutMs,
+      );
+      const room = await buildDungeon(plan, {
+        seed: `${build.seed}-${build.runNumber}`,
+        brief: build.brief,
       });
-    }
-    async function recordAttempt(attempt: Awaited<ReturnType<typeof playRaidAttempt>>) {
-      if (!candidateId) throw new Error("Missing generated candidate.");
+      const levelId = await ctx.runMutation(internal.levels.recordCandidate, { ...args, room });
+      const attempt = await playRaidAttempt(room, plan);
       const proofAttemptId = await ctx.runMutation(internal.attempts.recordProof, {
         ...args,
-        levelId: candidateId,
+        levelId,
         attempt,
       });
-      if (attempt.outcome === "won")
-        proofs.set(JSON.stringify(attempt.replay.level), {
-          levelId: candidateId,
-          proofAttemptId,
-        });
-    }
-
-    try {
-      const room = parseBuiltDungeon(
-        await buildDungeon(
-          openAIPlanner(env.OPENAI_API_KEY, build.model),
-          (progress) => console.info("drilly.build", progress),
-          {
-            seed: build.seed,
-            brief: build.brief,
-            onCandidate: recordCandidate,
-            onAttempt: recordAttempt,
-          },
-        ),
-      );
-      let accepted = proofs.get(JSON.stringify(room.level));
-      // A title change publishes a new snapshot without rewriting earlier candidates.
-      if (!accepted) {
-        await recordCandidate(room.level);
-        await recordAttempt({ outcome: "won", replay: room.proof });
-        accepted = proofs.get(JSON.stringify(room.level))!;
-      }
-      await ctx.runMutation(internal.builds.complete, {
-        ...args,
-        ...accepted,
-      });
+      await ctx.runMutation(internal.builds.complete, { ...args, levelId, proofAttemptId });
       console.info("drilly.build.completed", {
         elapsedMs: Date.now() - started,
       });

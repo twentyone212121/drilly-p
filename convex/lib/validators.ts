@@ -78,10 +78,6 @@ export const replayValidator = v.object({
   endTick: v.number(),
 });
 
-export const builtDungeonValidator = v.object({
-  level: levelValidator,
-  proof: replayValidator,
-});
 export const raidAttemptValidator = v.object({
   outcome: v.union(v.literal("won"), v.literal("dead"), v.literal("tick-limit")),
   replay: replayValidator,

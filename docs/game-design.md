@@ -111,23 +111,23 @@ the room, rules, and actual feedback from Drilly's earlier scored failures, neve
 the player's clear inputs. Keep each completed recording if a later request fails;
 retry continues with the remaining attempts. Replays use no model calls.
 
-The builder keeps its edit loop and tests each valid layout with one call to the
-same `playRaidAttempt` function. Feed the actual outcome back into the next design
-edit. Design and proof calls share the overall build deadline; publish only a
-winning room that cannot be cleared by simply running. A late request failure may
-return the last proven challenge. Remove the old route controller entirely.
-
+The builder proposes one complete room, then tests it once with the same
+`playRaidAttempt` function used for raids. Both calls share the model and deadline.
+Publish only a verified winning room that cannot be cleared by simply running.
+A failed proposal or playthrough ends that generation run; Retry generates a new
+room. Keep the failed candidate and completed attempt. There are no partial edits,
+repair loops, checkpoints, or fallback rooms. Object limits remain provisional
+and should be tuned through playtesting.
 Generation runs as a scheduled backend job. Entering the editor requests a build;
 the browser observes its status and loads the saved level when ready. Reuse pending
-work, and request a fresh build after consuming a completed room. Save each valid
-candidate before testing it and retain every completed proof attempt, including
-failures. Verify publication on the backend and keep proof inputs private. A retry
+work, and request a fresh build after consuming a completed room. Save the valid candidate before testing it and retain its completed proof attempt,
+including failures. Verify publication on the backend and keep proof inputs private. A retry
 retains earlier candidates and attempts; stale workers cannot publish over it.
 Rounds, scored attempts, and medals still live in browser memory. Their persistence
 APIs are defined but are not connected to gameplay yet.
 
-Broader generation improvements remain deferred. Use headless rooms and playtesting
-to evaluate reliability and latency before adding input batches or images.
+Use playtesting to evaluate variety, difficulty, reliability and latency before
+adding generation machinery or input batches.
 
 Cut story/level selection, locked slots, mastery, cloud drafts, save/version UI,
 round history, account screens, adaptive history, novelty scoring, and duplicate

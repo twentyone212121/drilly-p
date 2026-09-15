@@ -1,7 +1,7 @@
 // Only these reviewed messages may cross the AI service boundary into the game UI.
 export const DRILLY_ERRORS = {
   unproven:
-    "Drilly could not finish testing its room within the building budget. Retry; your draft and medals are unchanged.",
+    "Drilly could not produce a playable challenge. Retry to generate another room.",
   configuration: "Drilly is not configured. Set the backend OpenAI API key.",
   credentials: "Drilly’s API key was rejected. Check the backend OpenAI key.",
   quota:

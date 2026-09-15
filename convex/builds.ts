@@ -138,7 +138,7 @@ export const complete = internalMutation({
       proof.roundId ||
       proof.outcome !== "won"
     )
-      throw new Error("A build needs its own winning proof.");
+      throw new Error(DRILLY_ERRORS.unproven);
 
     const verified = replayAttempt(parseReplay({ ...proof.recording, level: level.room }));
     if (
@@ -146,7 +146,7 @@ export const complete = internalMutation({
       verified.state.tick !== proof.recording.endTick ||
       runAttempt(level.room, []).stopReason === "won"
     )
-      throw new Error("The generated room must have a verified clear and require a jump.");
+      throw new Error(DRILLY_ERRORS.unproven);
 
     await ctx.db.patch("builds", buildId, {
       status: "ready",

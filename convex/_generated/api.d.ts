@@ -18,7 +18,6 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_builds from "../lib/builds.js";
 import type * as lib_drilly_build from "../lib/drilly/build.js";
 import type * as lib_drilly_buildSchema from "../lib/drilly/buildSchema.js";
-import type * as lib_drilly_construction from "../lib/drilly/construction.js";
 import type * as lib_drilly_deadline from "../lib/drilly/deadline.js";
 import type * as lib_drilly_observation from "../lib/drilly/observation.js";
 import type * as lib_drilly_protocol from "../lib/drilly/protocol.js";
@@ -44,7 +43,6 @@ declare const fullApi: ApiFromModules<{
   "lib/builds": typeof lib_builds;
   "lib/drilly/build": typeof lib_drilly_build;
   "lib/drilly/buildSchema": typeof lib_drilly_buildSchema;
-  "lib/drilly/construction": typeof lib_drilly_construction;
   "lib/drilly/deadline": typeof lib_drilly_deadline;
   "lib/drilly/observation": typeof lib_drilly_observation;
   "lib/drilly/protocol": typeof lib_drilly_protocol;

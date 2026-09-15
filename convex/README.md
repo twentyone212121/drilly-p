@@ -4,12 +4,12 @@ The browser uses automatic guest authentication. Generation runs as a scheduled
 job in `convex/drilly.ts`; scored raids still call its `raid` action directly.
 Shared AI functions live in `convex/lib/drilly/` and also run in headless evaluations.
 
-| Module                                          | Responsibility                                                |
-| ----------------------------------------------- | ------------------------------------------------------------- |
-| `build.ts`, `construction.ts`, `buildSchema.ts` | Edit/test loop, room edits and structured output              |
-| `raid.ts`                                       | One input sequence and recording for raids and builder proofs |
-| `observation.ts`                                | Room/player observations without predictions                  |
-| `protocol.ts`, `provider.ts`, `deadline.ts`     | Model contract, OpenAI SDK and cancellation                   |
+| Module                                      | Responsibility                                                |
+| ------------------------------------------- | ------------------------------------------------------------- |
+| `build.ts`, `buildSchema.ts`                | One complete room proposal and structured output              |
+| `raid.ts`                                   | One input sequence and recording for raids and builder proofs |
+| `observation.ts`                            | Room/player observations without predictions                  |
+| `protocol.ts`, `provider.ts`, `deadline.ts` | Model contract, OpenAI SDK and cancellation                   |
 
 Gameplay validation stays in `shared/validation.ts`; wire validators live in
 `convex/lib/validators.ts`. Simulation and tuning stay in `shared/game/`.
@@ -19,8 +19,8 @@ Gameplay validation stays in `shared/validation.ts`; wire validators live in
 1. Entering the editor calls `builds.request`. It reuses the latest pending,
    unassigned build or creates a new one and schedules `drilly.generate`.
 2. The worker marks the build running and uses its saved model, seed, and brief.
-   It saves each valid candidate before asking Drilly to play it, then saves the
-   verified recording and outcome. Failed attempts remain available internally.
+   Astra proposes one complete room. The worker saves it, calls `playRaidAttempt`
+   once, and saves the verified recording and outcome, including a failed attempt.
 3. Publication checks that the saved proof wins under the current rules and that
    simply running cannot clear the room. The build becomes ready with references
    to its accepted level and proof. Proof inputs stay private.
@@ -88,16 +88,15 @@ human's clear inputs. All selectable models use the same low reasoning effort,
 output budget, instructions and attempt limit. The same function is imported by
 Convex and the headless evaluator.
 
-The builder edits geometry, then calls `playRaidAttempt` once for each valid edit.
-`attemptFeedback` supplies the actual result to its next design call. Design and
-completion share one build deadline and model. There is no separate proof solver
-or route language; builder attempts are private tests and do not award medals.
+`buildDungeon(plan, { seed, brief })` asks for a complete layout without showing a
+starter layout. The model chooses geometry and hazards; shared validation restores
+the permanent floor and side walls and checks object limits. The worker saves the
+candidate before its single proof attempt. Generation and proof share one deadline.
 
-Builds use a fixed budget. Failed edits preserve the last cleared route for repair
-and the last proven challenge for publication. A late provider failure can return
-that proven challenge; an unfinished room or one cleared by simply running cannot
-be published. There is no adaptive player history, novelty ranking or timing-score
-search. Broader generation improvements remain deferred.
+A failed proof or a room cleared by simply running fails the build. Retry generates
+a new room while retaining previous candidates and attempts. There are no edit
+commands, checkpoints, automatic repairs or fallback rooms. Room variety and
+success rate are evaluated through playtesting.
 
 `raid` accepts `level`, `previousAttempts`, and an optional model string, then
 returns one recording. The session verifies raid responses against the simulation
@@ -105,7 +104,7 @@ and owns concurrent raids, retry history, stale-response protection and playback
 for round progression and scoring.
 
 The generation worker and raid action log starts, elapsed time, completion and safe errors. Build logs include
-edit-stage outcomes; raid logs include model, attempt number, outcome, ticks and
+generation completion; raid logs include model, attempt number, outcome, ticks and
 executed jump inputs. `drilly.raid.input` records instructions and input data;
 `drilly.raid.output` records the complete parsed model reply before simulation or
 truncation at the terminal tick. Use `npx convex logs --history 20` or the dashboard Logs page.

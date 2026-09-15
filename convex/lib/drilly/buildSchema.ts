@@ -1,4 +1,3 @@
-import type { BuildBudget } from "../../../shared/game/drilly";
 import { RULES } from "../../../shared/game/rules";
 
 // Provider wire format only. Shared validation still owns gameplay correctness.
@@ -42,72 +41,62 @@ const center = {
 };
 const patrol = { ...center, endX: number, endY: number, speed };
 
-export function buildSchema(budget: BuildBudget, canFinish: boolean) {
-  return object({
-    action: { type: "string", enum: canFinish ? ["edit", "finish"] : ["edit"] },
-    base: { type: "string", enum: ["working", "checkpoint"] },
-    name: {
-      ...id,
-      description:
-        "Invent a short room title. Do not copy the workspace's placeholder name.",
+export const buildSchema = object({
+  level: object({
+    name: id,
+    platforms: {
+      type: "array",
+      maxItems: RULES.drilly.maxGeneratedPlatforms,
+      items: object(rectangle),
     },
-    idea: { type: "string", minLength: 1, maxLength: 240 },
-    removeIds: { type: "array", maxItems: 24, items: id },
-    edit: object({
-      platforms: {
-        type: "array",
-        maxItems: budget.platforms,
-        items: object(rectangle),
+    traps: {
+      type: "array",
+      maxItems: RULES.drilly.maxGeneratedHazards,
+      items: object(center),
+    },
+    treasures: {
+      type: "array",
+      maxItems: RULES.drilly.maxGeneratedTreasures,
+      items: object(rectangle),
+    },
+    obstacles: {
+      type: "array",
+      maxItems: RULES.drilly.maxGeneratedHazards,
+      items: {
+        anyOf: [
+          object({
+            ...rectangle,
+            kind: { type: "string", enum: ["spikes"] },
+          }),
+          object({
+            ...patrol,
+            kind: { type: "string", enum: ["slider", "drone"] },
+          }),
+          object({
+            ...center,
+            kind: { type: "string", enum: ["turret"] },
+            mode: { type: "string", enum: ["fixed", "aimed", "flame"] },
+            direction: { type: "number", enum: [-1, 1] },
+            intervalTicks: {
+              type: "integer",
+              minimum: RULES.obstacles.minInterval,
+              maximum: RULES.obstacles.maxInterval,
+            },
+            warmupTicks: warning,
+            activeTicks: warning,
+            range,
+            projectileSpeed: speed,
+          }),
+          object({
+            ...center,
+            kind: { type: "string", enum: ["pursuer"] },
+            speed,
+            detectionRange: range,
+            chaseRange: range,
+            warningTicks: warning,
+          }),
+        ],
       },
-      traps: {
-        type: "array",
-        maxItems: budget.hazards,
-        items: object(center),
-      },
-      treasures: {
-        type: "array",
-        maxItems: budget.treasures,
-        items: object(rectangle),
-      },
-      obstacles: {
-        type: "array",
-        maxItems: budget.hazards,
-        items: {
-          anyOf: [
-            object({
-              ...rectangle,
-              kind: { type: "string", enum: ["spikes"] },
-            }),
-            object({
-              ...patrol,
-              kind: { type: "string", enum: ["slider", "drone"] },
-            }),
-            object({
-              ...center,
-              kind: { type: "string", enum: ["turret"] },
-              mode: { type: "string", enum: ["fixed", "aimed", "flame"] },
-              direction: { type: "number", enum: [-1, 1] },
-              intervalTicks: {
-                type: "integer",
-                minimum: RULES.obstacles.minInterval,
-                maximum: RULES.obstacles.maxInterval,
-              },
-              warmupTicks: warning,
-              activeTicks: warning,
-              range,
-              projectileSpeed: speed,
-            }),
-            object({
-              ...center,
-              kind: { type: "string", enum: ["pursuer"] },
-              speed,
-              detectionRange: range,
-              chaseRange: range,
-              warningTicks: warning,
-            }),
-          ],
-        },
-      },
-    }),
-  });
-}
+    },
+  }),
+});

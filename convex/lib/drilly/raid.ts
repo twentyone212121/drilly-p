@@ -80,7 +80,7 @@ export async function playRaidAttempt(
   } satisfies RaidAttempt;
 }
 
-// Both the designer and later raid attempts receive actual simulation feedback.
+// Reconstruct feedback from actual scored attempts.
 export function attemptFeedback(attempt: RaidAttempt) {
   const result = replayAttempt(attempt.replay);
   if (result.stopReason !== attempt.outcome || result.state.tick !== attempt.replay.endTick)

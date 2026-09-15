@@ -6,24 +6,21 @@ import { parseDrillyBuild } from "../../../shared/validation";
 
 function openRoom() {
   const room = getExampleRoom();
-  room.platforms = [
-    { id: "floor", x: 0, y: 420, width: room.width, height: 24 },
-  ];
+  room.platforms = [{ id: "floor", x: 0, y: 420, width: room.width, height: 24 }];
   return room;
 }
 
 it("adds full-height sides outside the interior budget without mutating or duplicating a proposal", () => {
   const original = openRoom();
   const snapshot = structuredClone(original);
-  const budget = { platforms: 1, hazards: 2, treasures: 1 };
-  const room = parseDrillyBuild({ level: original }, original, budget);
+  const room = parseDrillyBuild({ level: original }, original);
   expect(room.platforms).toEqual([
     original.platforms[0],
     { id: "boundary-left", x: 0, y: 0, width: 12, height: 480 },
     { id: "boundary-right", x: 888, y: 0, width: 12, height: 480 },
   ]);
   expect(original).toEqual(snapshot);
-  expect(parseDrillyBuild({ level: room }, original, budget)).toEqual(room);
+  expect(parseDrillyBuild({ level: room }, original)).toEqual(room);
 });
 
 it.each([-1, 1] as const)(
@@ -43,9 +40,7 @@ it.each([-1, 1] as const)(
         ? RULES.drilly.sideWallWidth
         : room.width - RULES.drilly.sideWallWidth - RULES.playerWidth,
     );
-    const contact = waiting.events.find(
-      (event) => event.type === "wall-contact",
-    )!;
+    const contact = waiting.events.find((event) => event.type === "wall-contact")!;
     const jump = contact.tick + 3;
     const upward = runAttempt(room, [jump], jump + 1);
     expect(upward.state.player).toMatchObject({ direction, wall: direction, grounded: false });
@@ -65,7 +60,5 @@ it.each([-1, 1] as const)(
 it("rejects treasure buried in a fixed wall", () => {
   const room = openRoom();
   room.treasures[0].x = 4;
-  expect(() => parseDrillyBuild({ level: room }, room)).toThrow(
-    "inside the side walls",
-  );
+  expect(() => parseDrillyBuild({ level: room }, room)).toThrow("inside the side walls");
 });

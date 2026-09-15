@@ -7,9 +7,9 @@ import type { Planner } from "../convex/lib/drilly/protocol";
 import type { RaidAttempt } from "../shared/game/round";
 import { RULES } from "../shared/game/rules";
 import { parseDrillyModel } from "../shared/validation";
-import { replayAttempt } from "../shared/game/replay";
+import { replayAttempt, runAttempt } from "../shared/game/replay";
 import { drillyCases } from "./evals/drilly-cases";
-import type { BuildProgress } from "../convex/lib/drilly/build";
+import { withDeadline } from "../convex/lib/drilly/deadline";
 
 // Explicit opt-in: ordinary npm test never calls a paid provider.
 const args = process.argv.slice(2);
@@ -63,12 +63,10 @@ function writeReport() {
 for (const name of selected) {
   const calls: { input: unknown; output?: unknown; error?: string; seconds?: number }[] = [];
   const attempts: RaidAttempt[] = [];
-  const progress: BuildProgress[] = [];
   const entry: Record<string, unknown> = {
     case: name,
     status: "running",
     decisions: calls,
-    progress,
     recordings: attempts,
   };
   reports.push(entry);
@@ -91,16 +89,20 @@ for (const name of selected) {
   let summary: Record<string, unknown>;
   try {
     if (name === "build") {
-      const built = await buildDungeon(planner, (event) => {
-        progress.push(event);
-        writeReport();
+      const request = withDeadline(planner, RULES.drilly.buildThinkingTimeoutMs);
+      const room = await buildDungeon(request, {
+        seed: crypto.randomUUID(),
+        brief:
+          "Build a readable room with a distinct spatial idea that requires intentional jumps.",
       });
-      const room = built.level;
+      entry.room = room;
+      const attempt = await playRaidAttempt(room, request);
+      attempts.push(attempt);
       summary = {
         case: name,
-        passed: replayAttempt(built.proof).stopReason === "won",
+        passed: attempt.outcome === "won" && runAttempt(room, []).stopReason !== "won",
         room,
-        proof: built.proof,
+        proof: attempt.replay,
       };
     } else {
       const level = drillyCases[name as keyof typeof drillyCases];
