@@ -16,7 +16,7 @@ export function createAttempt(initialLevel: Level) {
   let jumps: number[] = [];
   let mode: "human" | "replay" = "human";
   let schedule = new Set<number>();
-  let endTick: number = RULES.maxTicks;
+  let endTick = Infinity;
 
   const listeners = new Set<() => void>();
   const eventListeners = new Set<(events: GameEvent[]) => void>();
@@ -48,7 +48,7 @@ export function createAttempt(initialLevel: Level) {
 
   function resetToHuman() {
     mode = "human";
-    endTick = RULES.maxTicks;
+    endTick = Infinity;
     schedule = new Set();
     resetAttempt();
   }
@@ -80,7 +80,9 @@ export function createAttempt(initialLevel: Level) {
     renderFrame: () => ({
       previous: previousState,
       current: state,
-      alpha: paused ? 1 : Math.max(0, Math.min(1, accumulator / TICK_DURATION_MS)),
+      alpha: paused
+        ? 1
+        : Math.max(0, Math.min(1, accumulator / TICK_DURATION_MS)),
     }),
     getSnapshot: () => snapshot,
     exportReplay: (): Replay => ({

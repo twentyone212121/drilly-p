@@ -1,3 +1,6 @@
+import { createPatrolGuides } from "./patrolGuides";
+import { fitObjectToRoom, rotateObstacle } from "../obstacleEditing";
+import { createObjectDeleteButton } from "./objectDeleteButton";
 import type { ObstacleKind } from "../../../shared/game/obstacleTypes";
 import type { Level } from "../../../shared/game/types";
 import { RULES } from "../../../shared/game/rules";
@@ -8,7 +11,8 @@ import {
   newObject,
   objectBounds,
   placementError,
-  resizePlatform,
+  resizeObject,
+  snap,
   type EditorObject,
   type ObjectKind,
   type Point,
@@ -39,7 +43,7 @@ type Drag = {
   pointerId: number;
   origin: Point;
   object: EditorObject;
-  operation: "place" | "move" | "resize";
+  operation: "place" | "move" | "resize" | "route";
 };
 
 // DOM capture keeps releases/cancellation reliable outside the scaled canvas.
@@ -55,11 +59,36 @@ export function createEditorInput(
   ) => void,
   requestRender: () => void,
 ) {
+  const patrolGuides = createPatrolGuides(canvas);
+  const knownStates = new WeakSet<EditorState>([options.state]);
   let level = session.getSnapshot().level;
   let drag: Drag | null = null;
   let pendingPoint: Point | null = null;
   let preview: EditorObject | null = null;
   let previewKey = "";
+  const deleteButton = createObjectDeleteButton(
+    canvas,
+    () => {
+      if (!enabled() || !options.state.selection) return;
+      try {
+        session.edit({ type: "delete", selection: options.state.selection });
+        level = session.getSnapshot().editorLevel;
+        publish({ tool: "select", selection: null, message: "" });
+      } catch (error) {
+        publish({
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+      canvas.focus();
+      redraw();
+    },
+    () => {
+      const object = findObject(level, options.state.selection);
+      if (!enabled() || !object) return;
+      commit(rotateObstacle(object, level));
+      redraw();
+    },
+  );
 
   function enabled() {
     return options.enabled && session.getSnapshot().phase === "build";
@@ -68,11 +97,31 @@ export function createEditorInput(
   function publish(change: Partial<EditorState>) {
     const state = { ...options.state, ...change };
     if (JSON.stringify(state) === JSON.stringify(options.state)) return;
+    knownStates.add(state);
     options = { ...options, state };
     options.onChange(state);
   }
 
   function redraw() {
+    const selected = enabled()
+      ? findObject(level, options.state.selection)
+      : undefined;
+    patrolGuides.update(
+      enabled() ? (preview ?? selected) : null,
+      level,
+      Boolean(options.state.message),
+    );
+    deleteButton.update(
+      selected && !drag && options.state.tool === "select"
+        ? objectBounds(selected)
+        : null,
+      level,
+      Boolean(
+        selected?.kind === "obstacle" &&
+        ["turret", "drone", "spikes"].includes(selected.value.kind),
+      ),
+      selected?.kind === "obstacle" && selected.value.kind === "turret",
+    );
     draw(
       enabled() ? findObject(level, options.state.selection) : undefined,
       enabled() ? preview : null,
@@ -99,7 +148,7 @@ export function createEditorInput(
     };
   }
 
-  function objectAt(point: Point): EditorObject {
+  function rawObjectAt(point: Point): EditorObject {
     if (!drag || drag.operation === "place")
       return newObject(
         level,
@@ -108,18 +157,51 @@ export function createEditorInput(
         options.state.obstacleKind,
       );
     const delta = { x: point.x - drag.origin.x, y: point.y - drag.origin.y };
+    if (drag.operation === "route") {
+      const object = structuredClone(drag.object);
+      if (object.kind === "obstacle" && object.value.kind === "drone") {
+        const o = object.value;
+        const dx = o.endX - o.x,
+          dy = o.endY - o.y;
+        const vertical = Math.abs(dy) > Math.abs(dx);
+        const direction = Math.sign(vertical ? dy : dx) || 1;
+        const length = Math.max(
+          RULES.editor.gridSize,
+          snap(
+            Math.abs(vertical ? dy : dx) +
+              direction * (vertical ? delta.y : delta.x),
+          ),
+        );
+        o.endX = o.x + (vertical ? 0 : direction * length);
+        o.endY = o.y + (vertical ? direction * length : 0);
+      }
+      return object;
+    }
     return drag.operation === "resize"
-      ? resizePlatform(drag.object, delta)
+      ? resizeObject(drag.object, delta)
       : moveObject(drag.object, delta);
   }
 
-  function commit(object: EditorObject) {
+  function objectAt(point: Point): EditorObject {
+    return fitObjectToRoom(rawObjectAt(point), level, {
+      preservePatrolStart: drag?.operation === "route",
+    });
+  }
+
+  function commit(object: EditorObject, placed = false) {
     try {
       session.edit({ type: "put", object });
       level = session.getSnapshot().editorLevel;
-      publish({ selection: { kind: object.kind, id: object.value.id }, message: "" });
+      publish({
+        selection: { kind: object.kind, id: object.value.id },
+        message: "",
+        ...(placed ? { tool: "select" as const } : {}),
+      });
+      if (placed) canvas.style.cursor = "grab";
     } catch (error) {
-      publish({ message: error instanceof Error ? error.message : String(error) });
+      publish({
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -127,7 +209,9 @@ export function createEditorInput(
     if (event.button !== 0 || drag) return;
     if (!enabled()) {
       const view = session.getSnapshot();
-      if (view.canPlay && !view.paused && view.mode === "human") session.jump();
+      if (view.waitingToStart) session.play();
+      else if (view.canPlay && !view.paused && view.mode === "human")
+        session.jump();
       return;
     }
     event.preventDefault();
@@ -139,18 +223,32 @@ export function createEditorInput(
     // Keep the handle usable at every viewport size.
     const handle = (12 * level.width) / canvas.getBoundingClientRect().width;
     const resizing =
-      selected?.kind === "platform" &&
+      (selected?.kind === "platform" ||
+        (selected?.kind === "obstacle" && selected.value.kind === "spikes")) &&
       bounds &&
       Math.abs(point.x - bounds.x - bounds.width) <= handle &&
       Math.abs(point.y - bounds.y - bounds.height) <= handle;
+    const resizingRoute =
+      selected?.kind === "obstacle" &&
+      selected.value.kind === "drone" &&
+      Math.hypot(
+        point.x - selected.value.endX,
+        point.y - selected.value.endY,
+      ) <= handle;
     const placing = options.state.tool !== "select";
-    const object = placing ? objectAt(point) : resizing ? selected : hitObject(level, point);
+    const object = placing
+      ? objectAt(point)
+      : resizing || resizingRoute
+        ? selected
+        : hitObject(level, point);
     publish({
       message: "",
       ...(placing
         ? {}
         : {
-            selection: object ? { kind: object.kind, id: object.value.id } : null,
+            selection: object
+              ? { kind: object.kind, id: object.value.id }
+              : null,
           }),
     });
     if (object) {
@@ -158,7 +256,13 @@ export function createEditorInput(
         pointerId: event.pointerId,
         origin: point,
         object,
-        operation: placing ? "place" : resizing ? "resize" : "move",
+        operation: placing
+          ? "place"
+          : resizingRoute
+            ? "route"
+            : resizing
+              ? "resize"
+              : "move",
       };
       canvas.setPointerCapture(event.pointerId);
       pendingPoint = point;
@@ -177,9 +281,10 @@ export function createEditorInput(
   function pointerUp(event: PointerEvent) {
     if (!drag || drag.pointerId !== event.pointerId) return;
     const object = objectAt(pointAt(event));
+    const placed = drag.operation === "place";
     // Clear capture before the commit can notify subscribers and change rooms.
     cancel();
-    if (enabled()) commit(object);
+    if (enabled()) commit(object, placed);
     redraw();
   }
 
@@ -228,18 +333,25 @@ export function createEditorInput(
   canvas.addEventListener("pointermove", pointerMove);
   canvas.addEventListener("pointerup", pointerUp);
   canvas.addEventListener("pointercancel", pointerCancel);
-  canvas.addEventListener("lostpointercapture", pointerCancel);
+  // A drag can lose capture when overlays change; still finish on release anywhere.
+  window.addEventListener("pointerup", pointerUp, true);
   canvas.addEventListener("pointerleave", pointerLeave);
   canvas.addEventListener("keydown", keyDown);
   window.addEventListener("blur", cancel);
 
   return {
     setOptions(next: EditorOptions) {
+      // React may acknowledge an older local selection after another drag began.
+      // Toolbar choices create fresh states and remain authoritative.
+      if (knownStates.has(next.state) && next.state !== options.state)
+        next = { ...next, state: options.state };
+      knownStates.add(next.state);
       const changed =
         next.enabled !== options.enabled ||
         next.state.tool !== options.state.tool ||
         next.state.obstacleKind !== options.state.obstacleKind ||
-        next.state.selection !== options.state.selection;
+        next.state.selection?.id !== options.state.selection?.id ||
+        next.state.selection?.kind !== options.state.selection?.kind;
       options = next;
       if (changed) cancel();
       canvas.style.touchAction = enabled() ? "none" : "manipulation";
@@ -257,7 +369,10 @@ export function createEditorInput(
       redraw();
     },
     setLevel(next: Level) {
-      if (level === next) return;
+      if (level === next) {
+        redraw();
+        return;
+      }
       level = next;
       cancel();
     },
@@ -274,11 +389,13 @@ export function createEditorInput(
     },
     destroy() {
       cancel();
+      deleteButton.destroy();
+      patrolGuides.destroy();
       canvas.removeEventListener("pointerdown", pointerDown);
       canvas.removeEventListener("pointermove", pointerMove);
       canvas.removeEventListener("pointerup", pointerUp);
       canvas.removeEventListener("pointercancel", pointerCancel);
-      canvas.removeEventListener("lostpointercapture", pointerCancel);
+      window.removeEventListener("pointerup", pointerUp, true);
       canvas.removeEventListener("pointerleave", pointerLeave);
       canvas.removeEventListener("keydown", keyDown);
       window.removeEventListener("blur", cancel);

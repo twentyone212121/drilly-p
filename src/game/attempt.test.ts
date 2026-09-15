@@ -1,3 +1,4 @@
+import { RULES } from "../../shared/game/rules";
 import { interpolateFrame } from "./phaser/interpolateFrame";
 import { describe, expect, it } from "vitest";
 import checkpoint from "../../shared/levels/checkpoint.json";
@@ -42,11 +43,17 @@ describe("attempt clock and headless parity", () => {
       const trajectory = [session.frameState()];
       session.onEvents(() => trajectory.push(session.frameState()));
       session.play();
-      for (let frame = 0; !session.getSnapshot().paused && frame < 5000; frame++) {
+      for (
+        let frame = 0;
+        !session.getSnapshot().paused && frame < 5000;
+        frame++
+      ) {
         session.update(intervals[frame % intervals.length]);
         interpolateFrame(session.renderFrame());
       }
-      expect(interpolateFrame(session.renderFrame())).toBe(session.frameState());
+      expect(interpolateFrame(session.renderFrame())).toBe(
+        session.frameState(),
+      );
       expect(session.frameState().status).toBe("won");
       expect(trajectory).toEqual(runAttempt(level, [44, 199, 200]).trajectory);
     },
@@ -82,7 +89,30 @@ describe("attempt clock and headless parity", () => {
     session.jump();
     session.step(59);
     expect(session.exportReplay().jumpTicks).toEqual([44, 45, 199, 200]);
-    expect(replayAttempt(session.exportReplay()).state).toEqual(session.frameState());
+    expect(replayAttempt(session.exportReplay()).state).toEqual(
+      session.frameState(),
+    );
+    expect(session.frameState().status).toBe("won");
+  });
+
+  it("allows a human to wait beyond the old timer and replay a later win", () => {
+    const session = createAttempt(level);
+    session.step(44);
+    session.jump();
+    session.step(RULES.maxTicks);
+    expect(session.frameState().tick).toBeGreaterThan(RULES.maxTicks);
+    expect(session.getSnapshot().finished).toBe(false);
+    session.jump();
+    session.step(1);
+    session.jump();
+    session.step(100);
+    expect(session.frameState().status).toBe("won");
+    const replay = session.exportReplay();
+    expect(replayAttempt(replay).state).toEqual(session.frameState());
+    session.loadReplay(replay);
+    session.step(RULES.maxTicks);
+    session.step(200);
+    expect(session.getSnapshot().finished).toBe(true);
     expect(session.frameState().status).toBe("won");
   });
 

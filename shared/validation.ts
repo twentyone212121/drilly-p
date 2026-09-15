@@ -4,7 +4,11 @@ import { segmentRect, sweptCircle } from "./game/sweep";
 import * as v from "valibot";
 import { overlaps, touchesCircle } from "./game/collision";
 import { RULES } from "./game/rules";
-import { collisionPlatforms, roomBorders, isFixedRoomPlatform } from "./game/roomBoundary";
+import {
+  collisionPlatforms,
+  roomBorders,
+  isFixedRoomPlatform,
+} from "./game/roomBoundary";
 import type { EditorObject, Level, Rect, Replay } from "./game/types";
 
 const NameSchema = v.pipe(v.string(), v.minLength(1), v.maxLength(100));
@@ -84,6 +88,7 @@ const ObstacleSchema = v.variant("kind", [
     ...RectSchema.entries,
     id: NameSchema,
     kind: v.literal("spikes"),
+    rotation: v.optional(v.picklist([0, 1, 2, 3])),
   }),
   v.object({ ...PathFields, kind: v.literal("slider") }),
   v.object({ ...PathFields, kind: v.literal("drone") }),
@@ -91,6 +96,7 @@ const ObstacleSchema = v.variant("kind", [
     ...CenterFields,
     kind: v.literal("turret"),
     mode: v.picklist(["fixed", "aimed", "flame"]),
+    axis: v.optional(v.picklist(["x", "y"])),
     direction: v.union([v.literal(-1), v.literal(1)]),
     intervalTicks: v.pipe(
       v.number(),
@@ -107,9 +113,9 @@ const ObstacleSchema = v.variant("kind", [
     ...CenterFields,
     kind: v.literal("pursuer"),
     speed: SpeedSchema,
-    detectionRange: RangeSchema,
-    chaseRange: RangeSchema,
-    warningTicks: WarningSchema,
+    detectionRange: v.optional(RangeSchema),
+    chaseRange: v.optional(RangeSchema),
+    warningTicks: v.optional(WarningSchema),
   }),
 ]);
 
@@ -171,7 +177,7 @@ const TickLimitSchema = v.pipe(
   v.finite(),
   v.integer(),
   v.minValue(0),
-  v.maxValue(RULES.maxTicks),
+  v.maxValue(Number.MAX_SAFE_INTEGER),
 );
 
 const JumpTicksSchema = v.pipe(
@@ -181,10 +187,9 @@ const JumpTicksSchema = v.pipe(
       v.finite(),
       v.integer(),
       v.minValue(0),
-      v.maxValue(RULES.maxTicks - 1),
+      v.maxValue(Number.MAX_SAFE_INTEGER - 1),
     ),
   ),
-  v.maxLength(RULES.maxTicks),
   v.check(
     (ticks) => ticks.every((tick, i) => i === 0 || tick > ticks[i - 1]),
     "Jump ticks must be unique integers in increasing order.",
@@ -205,12 +210,25 @@ const ReplaySchema = v.pipe(
   ),
 );
 
+// Human recordings may be arbitrarily long; incoming AI recordings must stay
+// within the planner's execution budget before the browser simulates them.
+const DrillyReplaySchema = v.pipe(
+  ReplaySchema,
+  v.check(
+    (replay) => replay.endTick <= RULES.maxTicks,
+    "Drilly recording exceeds its execution budget.",
+  ),
+);
+
 export function parseLevel(value: unknown): Level {
   return v.parse(LevelSchema, value);
 }
 
 export function parseDrillyModel(value: unknown): DrillyModel {
-  return v.parse(v.picklist(RULES.drilly.models.map((model) => model.id)), value);
+  return v.parse(
+    v.picklist(RULES.drilly.models.map((model) => model.id)),
+    value,
+  );
 }
 
 // Drafts may have no treasure; room dimensions and spawn belong to the fixed template.
@@ -227,7 +245,6 @@ export function parseEditorLevel(value: unknown, template: Level): Level {
           level.spawn.direction === template.spawn.direction,
         "Room dimensions and player spawn are fixed.",
       ),
-
     ),
     value,
   );
@@ -235,10 +252,21 @@ export function parseEditorLevel(value: unknown, template: Level): Level {
 
 // Previews come from a validated draft and editor presets. Validate just the changed
 // object; the complete draft is still validated when the user commits the edit.
-export function editorPlacementError(level: Level, object: EditorObject): string | null {
-  const bounds = object.kind === "obstacle" ? obstacleBounds(object.value)
-    : object.kind === "saw" ? { x: object.value.x - object.value.radius, y: object.value.y - object.value.radius, width: object.value.radius * 2, height: object.value.radius * 2 }
-    : object.value;
+export function editorPlacementError(
+  level: Level,
+  object: EditorObject,
+): string | null {
+  const bounds =
+    object.kind === "obstacle"
+      ? obstacleBounds(object.value)
+      : object.kind === "saw"
+        ? {
+            x: object.value.x - object.value.radius,
+            y: object.value.y - object.value.radius,
+            width: object.value.radius * 2,
+            height: object.value.radius * 2,
+          }
+        : object.value;
   if (roomBorders(level).some((border) => overlaps(bounds, border)))
     return "Keep objects inside the room frame.";
   const key =
@@ -258,7 +286,10 @@ export function editorPlacementError(level: Level, object: EditorObject): string
         : object.kind === "treasure"
           ? RULES.editor.maxTreasures
           : RULES.obstacles.maxCount;
-  if (objects.length >= limit && !objects.some((item) => item.id === object.value.id))
+  if (
+    objects.length >= limit &&
+    !objects.some((item) => item.id === object.value.id)
+  )
     return "Object limit reached.";
   if (
     object.kind === "obstacle" &&
@@ -286,8 +317,20 @@ export function editorPlacementError(level: Level, object: EditorObject): string
   }
 }
 
-export function parseReplay(value: unknown): Replay {
-  return v.parse(ReplaySchema, value);
+export function parseReplay(
+  value: unknown,
+  maxTicks = Number.MAX_SAFE_INTEGER,
+): Replay {
+  return v.parse(
+    v.pipe(
+      ReplaySchema,
+      v.check(
+        (replay) => replay.endTick <= maxTicks,
+        "Recording exceeds its tick limit.",
+      ),
+    ),
+    value,
+  );
 }
 
 export function parseJumpTicks(
@@ -307,7 +350,8 @@ export function parseJumpTicks(
 }
 
 export function parseDrillyInputs(value: unknown): number[] {
-  return v.parse(v.strictObject({ jumpTicks: JumpTicksSchema }), value).jumpTicks;
+  return v.parse(v.strictObject({ jumpTicks: JumpTicksSchema }), value)
+    .jumpTicks;
 }
 
 function fitsRoom(rect: Rect, level: Level): boolean {
@@ -398,7 +442,6 @@ function validObstacles(level: Level): boolean {
         o.warmupTicks + (o.mode === "flame" ? o.activeTicks : 1) <
         o.intervalTicks
       );
-    if (o.kind === "pursuer") return o.chaseRange >= o.detectionRange;
     return true;
   });
 }
@@ -433,14 +476,18 @@ export function parseDrillyBuild(value: unknown, room: Level) {
     throw new Error("Generated room exceeds its object limits.");
 
   if (
-    level.treasures.some((treasure) =>
-      treasure.x < RULES.roomBorderWidth ||
-      treasure.x + treasure.width > room.width - RULES.roomBorderWidth,
+    level.treasures.some(
+      (treasure) =>
+        treasure.x < RULES.roomBorderWidth ||
+        treasure.x + treasure.width > room.width - RULES.roomBorderWidth,
     )
   )
     throw new Error("Keep treasure inside the side walls.");
 
-  const floor = room.platforms.filter((platform) => platform.id === "floor" && isFixedRoomPlatform(platform, room));
+  const floor = room.platforms.filter(
+    (platform) =>
+      platform.id === "floor" && isFixedRoomPlatform(platform, room),
+  );
   return parseEditorLevel(
     { ...level, platforms: [...floor, ...interiorPlatforms] },
     room,
@@ -453,7 +500,7 @@ export function parseDrillyAttempts(value: unknown, level: Level) {
     v.pipe(
       v.array(
         v.object({
-          replay: ReplaySchema,
+          replay: DrillyReplaySchema,
           outcome: v.picklist(["won", "dead", "tick-limit"]),
         }),
       ),
@@ -467,7 +514,10 @@ export function parseDrillyAttempts(value: unknown, level: Level) {
       throw new Error("Drilly recording belongs to another room.");
     if (attempt.outcome === "won" && index !== attempts.length - 1)
       throw new Error("Drilly must stop after its first clear.");
-    if (attempt.outcome === "tick-limit" && attempt.replay.endTick !== RULES.maxTicks)
+    if (
+      attempt.outcome === "tick-limit" &&
+      attempt.replay.endTick !== RULES.maxTicks
+    )
       throw new Error("A timed-out attempt must reach the game tick limit.");
   }
   return attempts;

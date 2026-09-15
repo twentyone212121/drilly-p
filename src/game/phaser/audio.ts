@@ -1,4 +1,4 @@
-import { isWallSliding } from "../presentation";
+import { isWallSliding, RUN_STRIDE_TICKS } from "../presentation";
 import type Phaser from "phaser";
 import type { GameEvent, State } from "../../../shared/game/types";
 import { AUDIO } from "./assets";
@@ -17,7 +17,9 @@ const EVENT_SOUNDS: Partial<Record<GameEvent["type"], keyof typeof AUDIO>> = {
 export function createAudio(scene: Phaser.Scene, settings: AudioSettings) {
   let current = settings;
   let lastFootstep = -1;
-  const footstep = scene.cache.audio.exists("footstep") ? scene.sound.add("footstep") : null;
+  const footstep = scene.cache.audio.exists("footstep")
+    ? scene.sound.add("footstep")
+    : null;
   const scrape = scene.cache.audio.exists("scrape")
     ? scene.sound.add("scrape", { loop: true, volume: 0.35 })
     : null;
@@ -26,7 +28,13 @@ export function createAudio(scene: Phaser.Scene, settings: AudioSettings) {
     : null;
 
   function startMusic() {
-    if (!music || scene.sound.locked || document.hidden || current.muted || current.volume <= 0)
+    if (
+      !music ||
+      scene.sound.locked ||
+      document.hidden ||
+      current.muted ||
+      current.volume <= 0
+    )
       return;
     if (music.isPaused) music.resume();
     else if (!music.isPlaying) music.play();
@@ -63,10 +71,15 @@ export function createAudio(scene: Phaser.Scene, settings: AudioSettings) {
       return;
     }
     // Two footfalls per six-frame run cycle (five simulation ticks per sprite frame).
-    const beat = Math.floor(state.tick / 15);
+    const beat = Math.floor(state.tick / (RUN_STRIDE_TICKS / 2));
     if (beat === lastFootstep) return;
     lastFootstep = beat;
-    if (!scene.sound.locked && !document.hidden && !current.muted && current.volume > 0)
+    if (
+      !scene.sound.locked &&
+      !document.hidden &&
+      !current.muted &&
+      current.volume > 0
+    )
       footstep?.play({ volume: 0.65, rate: beat % 2 ? 1.06 : 0.96 });
   }
 
@@ -87,14 +100,19 @@ export function createAudio(scene: Phaser.Scene, settings: AudioSettings) {
 
   function playEvent(event: GameEvent) {
     // The landing sound is already the first footfall after a jump.
-    if (event.type === "landed") lastFootstep = Math.floor(event.tick / 15);
+    if (event.type === "landed")
+      lastFootstep = Math.floor(event.tick / (RUN_STRIDE_TICKS / 2));
     const key =
-      event.type === "jumped" && event.kind === "wall" ? "wallJump" : EVENT_SOUNDS[event.type];
-    if (!key || scene.sound.locked || current.muted || current.volume <= 0) return;
+      event.type === "jumped" && event.kind === "wall"
+        ? "wallJump"
+        : EVENT_SOUNDS[event.type];
+    if (!key || scene.sound.locked || current.muted || current.volume <= 0)
+      return;
     if (!scene.cache.audio.exists(key)) return;
 
     if (event.type === "died") stopEffects();
-    if (event.type === "jumped" || event.type === "wall-contact") footstep?.stop();
+    if (event.type === "jumped" || event.type === "wall-contact")
+      footstep?.stop();
     if (event.type === "wall-contact") {
       scene.sound.stopByKey("jump");
       scene.sound.stopByKey("wallJump");

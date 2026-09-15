@@ -8,7 +8,10 @@ import type { DrillySource, DrillyModel } from "../../shared/game/drilly";
 import { createSession, type Session } from "./session";
 import { runDrillyFixture } from "../../shared/testing/drilly";
 
-function ready(drilly: DrillySource, model: DrillyModel = RULES.drilly.defaultModel) {
+function ready(
+  drilly: DrillySource,
+  model: DrillyModel = RULES.drilly.defaultModel,
+) {
   const room = newPlayerDungeon();
   const session = createSession({ prisonLevel: room, drilly });
   session.step(RULES.maxTicks);
@@ -23,8 +26,13 @@ async function flush() {
   for (let i = 0; i < 5; i++) await Promise.resolve();
 }
 async function review(session: Session) {
+  if (session.getSnapshot().phase === "results") return;
   session.primaryAction();
-  for (let i = 0; i < RULES.raidAttempts && !session.getSnapshot().result; i++) {
+  for (
+    let i = 0;
+    i < RULES.raidAttempts && session.getSnapshot().phase !== "results";
+    i++
+  ) {
     session.step(RULES.maxTicks);
     session.primaryAction();
   }
@@ -78,7 +86,9 @@ describe("live Drilly rivalry", () => {
     expect(source.raid).toHaveBeenCalledTimes(1);
     expect(Object.keys(source.raid.mock.calls[0][0])).not.toContain("replay");
     expect(source.raid.mock.calls[0][1]).toEqual([]);
-    expect(session.getSnapshot().result).toBeNull();
+    expect(session.getSnapshot().result?.total).toBe(3);
+    expect(session.getSnapshot().phase).toBe("results");
+    session.replayDrilly();
     expect(session.ghostFrame()?.x).toBe(level.spawn.x);
     session.play();
     session.update(25);
@@ -93,13 +103,22 @@ describe("live Drilly rivalry", () => {
     await review(session);
     expect(session.getSnapshot().result?.total).toBe(3);
     const result = session.getSnapshot().result;
+    const scoreboard = session.getSnapshot().scoreboard;
+    expect(scoreboard).toEqual({
+      you: { points: 3, wins: 0 },
+      drilly: { points: 3, wins: 0 },
+      rounds: 1,
+      draws: 1,
+    });
     session.replayDrilly();
     session.step(RULES.maxTicks);
     session.primaryAction();
     expect(session.getSnapshot().result).toEqual(result);
+    expect(session.getSnapshot().scoreboard).toEqual(scoreboard);
     expect(source.raid).toHaveBeenCalledTimes(1);
 
-    session.primaryAction();
+    session.requestReturn();
+    expect(session.getSnapshot().scoreboard).toEqual(scoreboard);
     const draft = session.getSnapshot().level;
     session.challengeDrilly();
     await flush();
@@ -139,7 +158,9 @@ describe("live Drilly rivalry", () => {
     session.step(RULES.maxTicks);
     await flush();
     expect(session.getSnapshot().aiStatus).toBe("error");
-    expect(session.getSnapshot().round?.drilly).toEqual([{ outcome: "tick-limit" }]);
+    expect(session.getSnapshot().round?.drilly).toEqual([
+      { outcome: "tick-limit" },
+    ]);
     expect(session.getSnapshot().result).toBeNull();
     session.primaryAction();
     session.primaryAction();
@@ -152,9 +173,38 @@ describe("live Drilly rivalry", () => {
       "gpt-5.6-luna",
     ]);
     expect(session.getSnapshot().round?.human).toHaveLength(1);
-    const clear = runAttempt(room, []).state.player;
+    session.replayDrilly();
     session.step(RULES.maxTicks);
-    expect(session.ghostFrame()).toEqual(clear);
+    expect(session.getSnapshot()).toMatchObject({
+      watchIndex: 1,
+      paused: false,
+    });
+    session.step(RULES.maxTicks);
+    expect(session.getSnapshot()).toMatchObject({
+      watchIndex: 0,
+      watchIdle: true,
+      paused: true,
+    });
+    expect(session.frameState().tick).toBe(0);
+    session.selectDrillyAttempt(1);
+    expect(session.getSnapshot()).toMatchObject({
+      watchIndex: 1,
+      watchIdle: false,
+      paused: false,
+    });
+    session.step(RULES.maxTicks);
+    expect(session.getSnapshot()).toMatchObject({
+      watchIndex: 1,
+      watchIdle: true,
+      paused: true,
+    });
+    session.selectDrillyAttempt(0);
+    session.step(RULES.maxTicks);
+    expect(session.getSnapshot()).toMatchObject({
+      watchIndex: 0,
+      watchIdle: true,
+      paused: true,
+    });
     await review(session);
     expect(session.getSnapshot().result?.defense).toBe(1);
     expect(source.raid).toHaveBeenCalledTimes(3);
@@ -208,7 +258,9 @@ it("retries room generation without consuming a human raid attempt", async () =>
 });
 
 it("ignores an abandoned raid response while a new round is waiting", async () => {
-  const responses: ((value: ReturnType<typeof runDrillyFixture>[number]) => void)[] = [];
+  const responses: ((
+    value: ReturnType<typeof runDrillyFixture>[number],
+  ) => void)[] = [];
   const source: DrillySource = {
     build: async () => newPlayerDungeon(),
     raid: () =>
@@ -239,7 +291,8 @@ it("ignores an abandoned raid response while a new round is waiting", async () =
   await flush();
   expect(session.getSnapshot()).toMatchObject({
     aiStatus: "idle",
-    watchIndex: 0,
+    phase: "results",
+    watchIndex: null,
   });
 });
 
@@ -265,4 +318,50 @@ it("returns to the draft after tutorial replay and ignores the abandoned room re
   session.primaryAction();
   expect(session.getSnapshot().level).toEqual(draft);
   expect(session.getSnapshot().cleared).toBe(true);
+});
+
+it("confirms giving up, finishes Drilly's work once, and starts a fresh next round", async () => {
+  const builds: ((value: Level) => void)[] = [];
+  const raids: ((value: RaidAttempt) => void)[] = [];
+  const source: DrillySource = {
+    build: () => new Promise((resolve) => builds.push(resolve)),
+    raid: () => new Promise((resolve) => raids.push(resolve)),
+  };
+  const session = ready(source);
+  await flush();
+  session.requestReturn();
+  expect(session.getSnapshot().confirmingGiveUp).toBe(true);
+  session.cancelGiveUp();
+  expect(session.getSnapshot().phase).toBe("raid");
+  expect(session.getSnapshot().scoreboard.rounds).toBe(0);
+  session.requestReturn();
+  session.confirmGiveUp();
+  expect(session.getSnapshot()).toMatchObject({
+    phase: "watch",
+    waitingForDrilly: true,
+    confirmingGiveUp: false,
+  });
+  builds[0](newPlayerDungeon());
+  await flush();
+  expect(session.getSnapshot().phase).toBe("watch");
+  raids[0](runDrillyFixture(newPlayerDungeon())[0]);
+  await flush();
+  expect(session.getSnapshot().phase).toBe("results");
+  expect(session.getSnapshot().scoreboard).toMatchObject({
+    rounds: 1,
+    you: { points: 0, wins: 0 },
+    drilly: { points: 6, wins: 1 },
+  });
+  session.confirmGiveUp();
+  expect(session.getSnapshot().scoreboard.rounds).toBe(1);
+  session.requestReturn();
+  session.challengeDrilly();
+  await flush();
+  expect(builds).toHaveLength(2);
+  expect(raids).toHaveLength(2);
+  expect(session.getSnapshot()).toMatchObject({
+    phase: "raid",
+    result: null,
+    round: { human: [], drilly: [] },
+  });
 });

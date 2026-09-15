@@ -80,6 +80,28 @@ describe("obstacle simulation", () => {
       y: 250,
     });
   });
+  it("eases drones at both ends while preserving their route and repeat period", () => {
+    const drone: Patrol = { ...patrol, kind: "drone" };
+    const halfPeriod =
+      (60 * Math.hypot(drone.endX - drone.x, drone.endY - drone.y)) /
+      drone.speed;
+    expect(patrolPosition(drone, 0)).toEqual({ x: drone.x, y: drone.y });
+    expect(patrolPosition(drone, halfPeriod)).toEqual({
+      x: drone.endX,
+      y: drone.endY,
+    });
+    expect(patrolPosition(drone, halfPeriod * 2)).toEqual({
+      x: drone.x,
+      y: drone.y,
+    });
+    const startStep = patrolPosition(drone, 1).x - drone.x;
+    const middleStep =
+      patrolPosition(drone, halfPeriod / 2 + 1).x -
+      patrolPosition(drone, halfPeriod / 2).x;
+    const endStep = drone.endX - patrolPosition(drone, halfPeriod - 1).x;
+    expect(middleStep).toBeGreaterThan(startStep * 4);
+    expect(endStep).toBeCloseTo(startStep);
+  });
   it("sweeps a fast moving hazard across the player", () => {
     const o = { ...patrol, x: 280, y: 314, endY: 314, speed: 480, radius: 4 };
     const level = room([o]);
@@ -103,14 +125,64 @@ describe("obstacle simulation", () => {
     state.player = { ...state.player, ...body(292) };
     expect(advanceObstacles(level, state, body(292), 2).hitId).toBe("rail");
   });
+  it("uses eased drone timing for collisions at a reversal", () => {
+    const drone: Patrol = { ...patrol, kind: "drone", radius: 4, speed: 160 };
+    const level = room([drone]);
+    const hitAt = (tick: number, x: number) => {
+      const state = initialState(level);
+      state.tick = tick;
+      state.obstacles[0] = {
+        ...state.obstacles[0],
+        ...patrolPosition(drone, tick),
+      };
+      state.player = { ...state.player, ...body(x, 188) };
+      return advanceObstacles(level, state, body(x, 188), tick + 1).hitId;
+    };
+    expect(hitAt(37, 404)).toBe("rail");
+    expect(hitAt(59, 402)).toBeNull();
+  });
   it("spikes kill before a treasure on the same tick", () => {
     const level = room([
       { id: "pins", kind: "spikes", x: 91, y: 412, width: 48, height: 28 },
     ]);
     level.treasures = [{ id: "gold", x: 91, y: 412, width: 32, height: 28 }];
-    const result = step(level, initialState(level), { jump: false });
+    const state = initialState(level);
+    state.player = { ...state.player, x: 95, y: 383, vy: 180 };
+    const result = step(level, state, { jump: false });
     expect(result.state.status).toBe("dead");
     expect(result.state.collectedTreasureIds).toEqual([]);
+  });
+  it("kills on tooth contact from any direction, with a solid safe base", () => {
+    const level = room([
+      { id: "pins", kind: "spikes", x: 300, y: 300, width: 64, height: 28 },
+    ]);
+    const hit = (from: Rect, to: Rect) => {
+      const state = initialState(level);
+      state.player = { ...state.player, ...from };
+      return advanceObstacles(level, state, to, 1).hitId;
+    };
+    expect(hit(body(310, 240), body(310, 340))).toBe("pins");
+    expect(hit(body(270, 304), body(290, 304))).toBe("pins");
+    expect(hit(body(310, 304), body(310, 304))).toBe("pins");
+    const state = initialState(level);
+    state.player = { ...state.player, x: 310, y: 332, vy: -680 };
+    const blocked = step(level, state, { jump: false }).state;
+    expect(blocked.status).toBe("running");
+    expect(blocked.player.y).toBe(328);
+    expect(blocked.player.vy).toBe(0);
+    level.obstacles = [
+      {
+        id: "pins",
+        kind: "spikes",
+        x: 300,
+        y: 300,
+        width: 28,
+        height: 64,
+        rotation: 1,
+      },
+    ];
+    expect(hit(body(350, 310), body(320, 310))).toBe("pins");
+    expect(hit(body(300, 310), body(300, 310))).toBe("pins");
   });
   it("uses exact swept circle corners and catches thin walls", () => {
     expect(
@@ -196,13 +268,34 @@ describe("obstacle simulation", () => {
     }
     expect(state.projectiles.some((shot) => shot.id === firstId)).toBe(true);
     const shot = state.projectiles.find((p) => p.id === firstId)!;
-    level.platforms.push({ id: "stop", x: shot.x - 12, y: 280, width: 4, height: 60 });
-    expect(advanceObstacles(level, state, body(64), 50).projectiles).toHaveLength(0);
-    state.projectiles = [{ id: "exit", ownerId: "gun", x: level.width - 1, y: 100, vx: 240, vy: 0 }];
-    expect(advanceObstacles(room(), state, body(64), 51).projectiles).toHaveLength(0);
+    level.platforms.push({
+      id: "stop",
+      x: shot.x - 12,
+      y: 280,
+      width: 4,
+      height: 60,
+    });
+    expect(
+      advanceObstacles(level, state, body(64), 50).projectiles,
+    ).toHaveLength(0);
+    state.projectiles = [
+      {
+        id: "exit",
+        ownerId: "gun",
+        x: level.width - 1,
+        y: 100,
+        vx: 240,
+        vy: 0,
+      },
+    ];
+    expect(
+      advanceObstacles(room(), state, body(64), 51).projectiles,
+    ).toHaveLength(0);
   });
   it("emits one firing event every 1.5 seconds with the editor defaults", () => {
-    const level = room([{ ...turret, intervalTicks: RULES.obstacles.intervalTicks }]);
+    const level = room([
+      { ...turret, intervalTicks: RULES.obstacles.intervalTicks },
+    ]);
     let state = initialState(level);
     const fired: number[] = [];
     for (let tick = 1; tick <= 330; tick++) {
@@ -230,29 +323,34 @@ describe("obstacle simulation", () => {
     expect(flameBounds(o, level).x).toBe(408);
     expect(advanceObstacles(level, state, body(300), 30).hitId).toBeNull();
   });
-  it("pursuers warn, chase, return, and cannot reacquire until home", () => {
+  it("pursuers immediately track the player across the room and never return home", () => {
     const level = room([pursuer]);
-    let state = initialState(level);
-    state.player = { ...state.player, ...body(350, 190) };
-    const target = body(350, 190);
-    for (let tick = 1; tick <= 12; tick++) {
-      const next = advanceObstacles(level, state, target, tick);
-      state = { ...state, tick, obstacles: next.obstacles };
-      expect(next.obstacles[0].phase).toBe("warning");
-      expect(next.obstacles[0].x).toBe(300);
-    }
-    const chasing = advanceObstacles(level, state, target, 13);
-    expect(chasing.obstacles[0].phase).toBe("active");
-    expect(chasing.obstacles[0].x).toBeGreaterThan(300);
-    state = { ...state, tick: 13, obstacles: chasing.obstacles };
-    // Put it farther away to inspect several return ticks.
-    state.obstacles[0].x = 380;
-    const returning = advanceObstacles(level, state, body(800), 14);
-    expect(returning.obstacles[0].phase).toBe("returning");
-    state = { ...state, tick: 14, obstacles: returning.obstacles };
-    expect(advanceObstacles(level, state, target, 15).obstacles[0].phase).toBe(
-      "returning",
-    );
+    const state = initialState(level);
+    const far = advanceObstacles(level, state, body(800, 100), 1);
+    expect(far.obstacles[0].phase).toBe("active");
+    expect(far.obstacles[0].x).toBeGreaterThan(pursuer.x);
+    state.obstacles = far.obstacles;
+    state.tick = 1;
+    const reversed = advanceObstacles(level, state, body(40, 100), 2);
+    expect(reversed.obstacles[0].phase).toBe("active");
+    expect(reversed.obstacles[0].x).toBeLessThan(far.obstacles[0].x);
+  });
+  it("fires vertically and stops vertical flames at the first platform", () => {
+    const vertical = { ...turret, axis: "y" as const, direction: -1 as const };
+    const level = room([vertical]);
+    const fired = advanceObstacles(level, initialState(level), body(40), 30);
+    expect(fired.projectiles[0].vy).toBeLessThan(0);
+    expect(Math.abs(fired.projectiles[0].vx)).toBeLessThan(0.0001);
+    level.platforms.push({
+      id: "shield",
+      x: vertical.x - 40,
+      y: 220,
+      width: 80,
+      height: 8,
+    });
+    const flame = flameBounds({ ...vertical, mode: "flame" }, level);
+    expect(flame.y).toBe(228);
+    expect(flame.y + flame.height).toBe(vertical.y);
   });
   it("resets every hazard and projectile without mutating previous frames", () => {
     const level = room([turret, patrol, pursuer]);
@@ -277,7 +375,6 @@ describe("obstacle validation and replays", () => {
     { ...turret, warmupTicks: 0 },
     { ...turret, intervalTicks: 30 },
     { ...turret, mode: "flame", activeTicks: 100 },
-    { ...pursuer, chaseRange: 32 },
   ])("rejects malformed obstacle %j", (obstacle) => {
     expect(() =>
       parseLevel({ ...obstacleRoom("spikes"), obstacles: [obstacle] }),

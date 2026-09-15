@@ -5,13 +5,22 @@ import App from "./App";
 import { GameSprite } from "./components/GameArt";
 import { createDrillySource } from "./ai/drillySource";
 import { createSession } from "./game/session";
-import { loadTutorialCompleted, saveTutorialCompleted } from "./persistence/tutorial";
-import { loadModel, loadDungeon, persistDungeon } from "./persistence/dungeon";
+import {
+  loadTutorialCompleted,
+  saveTutorialCompleted,
+} from "./persistence/tutorial";
+import {
+  loadModel,
+  loadDungeon,
+  loadDungeonClear,
+  persistDungeon,
+} from "./persistence/dungeon";
 
 export function LocalGame() {
   const [session] = useState(() =>
     createSession({
       editorLevel: loadDungeon(),
+      playerClear: loadDungeonClear(),
       model: loadModel(),
       tutorialCompleted: loadTutorialCompleted(),
       onTutorialCompleted: saveTutorialCompleted,
@@ -33,7 +42,9 @@ export function GuestGame() {
     try {
       await signIn("anonymous");
     } catch {
-      setError("Could not connect to Drilly. Check that Convex is running and retry.");
+      setError(
+        "Could not connect to Drilly. Check that Convex is running and retry.",
+      );
     }
   }, [signIn]);
 
@@ -63,6 +74,7 @@ function ConnectedGame() {
     createSession({
       drilly: createDrillySource(client),
       editorLevel: loadDungeon(),
+      playerClear: loadDungeonClear(),
       model: loadModel(),
       tutorialCompleted: loadTutorialCompleted(),
       onTutorialCompleted: saveTutorialCompleted,

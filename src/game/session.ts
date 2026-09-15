@@ -8,6 +8,7 @@ import {
   parseDrillyModel,
   parseEditorLevel,
   parseLevel,
+  parseReplay,
 } from "../../shared/validation";
 import type { DrillySource, DrillyModel } from "../../shared/game/drilly";
 import { replayAttempt } from "../../shared/game/replay";
@@ -31,6 +32,7 @@ export function createSession(
   options: {
     prisonLevel?: Level;
     editorLevel?: Level;
+    playerClear?: unknown;
     tutorialCompleted?: boolean;
     onTutorialCompleted?: () => void;
     drilly?: DrillySource;
@@ -39,21 +41,60 @@ export function createSession(
 ) {
   const prison = parseLevel(options.prisonLevel ?? getPrison());
   const attempt = createAttempt(prison);
-  let editorLevel = parseEditorLevel(options.editorLevel ?? newPlayerDungeon(), newPlayerDungeon());
+  let editorLevel = parseEditorLevel(
+    options.editorLevel ?? newPlayerDungeon(),
+    newPlayerDungeon(),
+  );
   let tutorialCompleted = options.tutorialCompleted ?? false;
   let phase: Phase = tutorialCompleted ? "build" : "prison";
   let attemptLevel = prison;
   // Edits replace the draft and invalidate its clear; no revision bookkeeping needed.
   let playerClear: Replay | null = null;
+  if (options.playerClear) {
+    try {
+      const restored = parseReplay(
+        options.playerClear,
+        RULES.maxRestoredClearTicks,
+      );
+      if (JSON.stringify(restored.level) === JSON.stringify(editorLevel)) {
+        const verified = replayAttempt(restored, { recordTrace: false });
+        if (
+          verified.stopReason === "won" &&
+          verified.state.tick === restored.endTick
+        )
+          playerClear = restored;
+      }
+    } catch {
+      // Old rules, changed geometry, oversized or damaged recordings invalidate only the clear.
+    }
+  }
   let ghostTrajectory: State["player"][] = [];
   let showGhost = true;
   let model = parseDrillyModel(options.model ?? RULES.drilly.defaultModel);
   let opponent: Level | null = null;
   let round: Round | null = null;
   let result: ReturnType<typeof scoreRound> | null = null;
+  let scoreboard = {
+    you: { points: 0, wins: 0 },
+    drilly: { points: 0, wins: 0 },
+    rounds: 0,
+    draws: 0,
+  };
   let watchIndex: number | null = null;
+  let watchAutoplay = false;
+  let watchIdle = false;
+  let switchingReplay = false;
   let recordedAttempt = false;
   let deathRemainingMs = 0;
+  let respawned = false;
+  let confirmingGiveUp = false;
+  let resumeAfterCancel = false;
+  const waitingRoom = {
+    ...newPlayerDungeon(),
+    treasures: [],
+    traps: [],
+    obstacles: [],
+  };
   let opponentStatus: RequestStatus = "idle";
   let opponentError: string | null = null;
   let preparedRoom: Promise<Level> | null = null;
@@ -73,23 +114,43 @@ export function createSession(
 
   function makeSnapshot() {
     const view = attempt.getSnapshot();
+    const waitingForDrilly =
+      (phase === "raid" && !opponent) ||
+      (phase === "watch" && watchIndex === null);
     return {
       ...view,
       phase,
+      waitingForDrilly,
+      confirmingGiveUp,
       presentingDeath: deathRemainingMs > 0,
+      waitingToStart:
+        (phase === "test" ||
+          (phase === "prison" && respawned) ||
+          (phase === "raid" && opponent !== null)) &&
+        view.mode === "human" &&
+        view.paused &&
+        view.state.tick === 0 &&
+        !view.finished,
       // Read-only room references: accepted edits replace the draft.
-      level: phase === "build" ? editorLevel : attemptLevel,
+      level: waitingForDrilly
+        ? waitingRoom
+        : phase === "build"
+          ? editorLevel
+          : attemptLevel,
       editorLevel,
       tutorialCompleted,
       cleared: playerClear !== null,
+      playerClear,
       canChallenge:
         (phase === "build" || phase === "test") &&
         Boolean(options.drilly) &&
         editorLevel.treasures.length > 0,
       canReplayTutorial: tutorialCompleted && phase !== "prison" && view.paused,
-      canRestart: isPlaying() && !(phase === "prison" && view.state.status === "won"),
+      canRestart:
+        isPlaying() && !(phase === "prison" && view.state.status === "won"),
       canPlay: isPlaying(),
       watchIndex,
+      watchIdle,
       showGhost,
       model: round?.model ?? model,
       playerClearTicks: round?.playerClear.endTick ?? null,
@@ -100,8 +161,19 @@ export function createSession(
           }
         : null,
       result,
+      scoreboard,
+      livesRemaining:
+        phase === "raid"
+          ? Math.max(
+              0,
+              RULES.raidAttempts -
+                (round?.human.length ?? 0) -
+                Number(deathRemainingMs > 0 && !recordedAttempt),
+            )
+          : null,
       liveDrilly: Boolean(options.drilly),
-      aiStatus: phase === "watch" ? (round?.drillyStatus ?? "idle") : opponentStatus,
+      aiStatus:
+        phase === "watch" ? (round?.drillyStatus ?? "idle") : opponentStatus,
       aiError: phase === "watch" ? (round?.drillyError ?? null) : opponentError,
       roomPreparation,
     };
@@ -113,6 +185,7 @@ export function createSession(
   }
 
   function loadAttempt(level: Level) {
+    respawned = false;
     attemptLevel = level;
     recordedAttempt = false;
     deathRemainingMs = 0;
@@ -120,18 +193,26 @@ export function createSession(
   }
 
   function leaveRound() {
+    confirmingGiveUp = false;
+    preparationController?.abort();
+    preparationController = null;
+    preparedRoom = null;
+    roomPreparation = "idle";
     deathRemainingMs = 0;
     round = null;
     opponent = null;
     result = null;
     watchIndex = null;
+    watchAutoplay = false;
+    watchIdle = false;
     ghostTrajectory = [];
     opponentStatus = "idle";
     opponentError = null;
   }
 
   function editDungeon() {
-    if (!tutorialCompleted) throw new Error("Escape the prison before building your dungeon.");
+    if (!tutorialCompleted)
+      throw new Error("Escape the prison before building your dungeon.");
 
     leaveRound();
     phase = "build";
@@ -173,6 +254,12 @@ export function createSession(
       drillyError: null,
     };
     result = null;
+    confirmingGiveUp = false;
+    deathRemainingMs = 0;
+    watchIndex = null;
+    ghostTrajectory = [];
+    opponentStatus = "idle";
+    opponentError = null;
     opponent = null;
     phase = "raid";
     attempt.pause();
@@ -181,7 +268,8 @@ export function createSession(
   }
 
   async function prepareOpponent() {
-    if (!round || phase !== "raid" || opponent || opponentStatus === "pending") return;
+    if (!round || phase !== "raid" || opponent || opponentStatus === "pending")
+      return;
     const current = round;
     opponentStatus = "pending";
     opponentError = null;
@@ -190,7 +278,8 @@ export function createSession(
     const preparation = preparedRoom!;
     try {
       const generated = await preparation;
-      if (round !== current || preparedRoom !== preparation) return;
+      if (round !== current || preparedRoom !== preparation || phase !== "raid")
+        return;
 
       preparedRoom = null;
       preparationController = null;
@@ -199,7 +288,8 @@ export function createSession(
       opponentStatus = "idle";
       loadAttempt(opponent);
     } catch (error) {
-      if (round !== current || preparedRoom !== preparation) return;
+      if (round !== current || preparedRoom !== preparation || phase !== "raid")
+        return;
 
       preparedRoom = null;
       preparationController = null;
@@ -214,7 +304,12 @@ export function createSession(
   }
 
   function prepareRoom() {
-    if (!options.drilly || preparedRoom || !["build", "test", "raid"].includes(phase)) return;
+    if (
+      !options.drilly ||
+      preparedRoom ||
+      !["build", "test", "raid"].includes(phase)
+    )
+      return;
 
     roomPreparation = "building";
     const controller = new AbortController();
@@ -275,9 +370,12 @@ export function createSession(
         );
         if (round !== current) return;
 
-        const recordings = parseDrillyAttempts([...current.drilly, response], level);
+        const recordings = parseDrillyAttempts(
+          [...current.drilly, response],
+          level,
+        );
         const recording = recordings[recordings.length - 1];
-        const verified = replayAttempt(recording.replay);
+        const verified = replayAttempt(recording.replay, { recordTrace: false });
         if (
           verified.stopReason !== recording.outcome ||
           verified.state.tick !== recording.replay.endTick
@@ -290,7 +388,7 @@ export function createSession(
       }
       current.drillyStatus = "idle";
       // Background completion must never replace the human's active attempt.
-      if (phase === "watch") showAttempt(0);
+      if (phase === "watch") showResults();
       else notify();
     } catch (error) {
       if (round !== current) return;
@@ -314,7 +412,9 @@ export function createSession(
       recordRaid("restart");
       if (phase !== "raid") return;
     }
-    loadAttempt(phase === "prison" ? prison : phase === "test" ? editorLevel : opponent!);
+    loadAttempt(
+      phase === "prison" ? prison : phase === "test" ? editorLevel : opponent!,
+    );
   }
 
   function recordRaid(outcome: RaidAttempt["outcome"]) {
@@ -327,36 +427,114 @@ export function createSession(
       watchIndex = null;
       attempt.pause();
       // Reuse ready recordings; pending work finishes here and errors wait for Retry.
-      if (round.drillyStatus === "idle") showAttempt(0);
+      if (round.drillyStatus === "idle") showResults();
     }
   }
 
-  function showAttempt(index: number) {
+  function showAttempt(index: number, play = false) {
     if (!round?.drilly[index]) return;
 
     if (!ghostTrajectory.length)
-      ghostTrajectory = replayAttempt(round.playerClear).trajectory.map((state) => state.player);
+      ghostTrajectory = replayAttempt(round.playerClear).trajectory.map(
+        (state) => state.player,
+      );
     phase = "watch";
     watchIndex = index;
     attemptLevel = round.playerClear.level;
+    switchingReplay = true;
     attempt.loadReplay(round.drilly[index].replay);
+    if (play) attempt.play();
+    switchingReplay = false;
   }
 
   function showResults() {
     if (!round?.drilly.length) return;
 
-    result ??= scoreRound(round.human, round.drilly);
+    if (!result) {
+      result = scoreRound(round.human, round.drilly);
+      scoreboard = {
+        you: {
+          points: scoreboard.you.points + result.total,
+          wins: scoreboard.you.wins + Number(result.outcome === "win"),
+        },
+        drilly: {
+          points:
+            scoreboard.drilly.points + RULES.raidAttempts * 2 - result.total,
+          wins: scoreboard.drilly.wins + Number(result.outcome === "loss"),
+        },
+        rounds: scoreboard.rounds + 1,
+        draws: scoreboard.draws + Number(result.outcome === "draw"),
+      };
+    }
     phase = "results";
     notify();
   }
 
+  function requestReturn() {
+    if (
+      phase === "raid" &&
+      round &&
+      !round.human.some((a) => a.outcome === "won")
+    ) {
+      resumeAfterCancel = !attempt.getSnapshot().paused;
+      confirmingGiveUp = true;
+      attempt.pause();
+      notify();
+      return;
+    }
+    if (phase === "watch" && round && !result) {
+      if (round.drillyStatus === "idle") showResults();
+      else {
+        watchIndex = null;
+        attempt.pause();
+        notify();
+      }
+      return;
+    }
+    editDungeon();
+  }
+
+  function confirmGiveUp() {
+    if (!confirmingGiveUp || !round || phase !== "raid") return;
+    confirmingGiveUp = false;
+    deathRemainingMs = 0;
+    phase = "watch";
+    watchIndex = null;
+    attempt.pause();
+    if (round.drillyStatus === "idle") showResults();
+    else notify();
+  }
+
   attempt.onEvents((events) => {
-    if (attempt.getSnapshot().mode === "human" && events.some((event) => event.type === "died"))
+    if (
+      attempt.getSnapshot().mode === "human" &&
+      events.some((event) => event.type === "died")
+    )
       deathRemainingMs = DEATH_ANIMATION_MS;
   });
 
   attempt.subscribe(() => {
     const view = attempt.getSnapshot();
+    if (
+      phase === "watch" &&
+      view.mode === "replay" &&
+      view.finished &&
+      !watchIdle &&
+      !switchingReplay &&
+      watchIndex !== null &&
+      round
+    ) {
+      if (watchAutoplay && watchIndex + 1 < round.drilly.length) {
+        showAttempt(watchIndex + 1, true);
+      } else {
+        const restartIndex = watchAutoplay ? 0 : watchIndex;
+        watchAutoplay = false;
+        watchIdle = true;
+        showAttempt(restartIndex);
+      }
+      notify();
+      return;
+    }
     if (view.mode === "human" && view.state.status === "won") {
       if (phase === "prison" && !tutorialCompleted) {
         tutorialCompleted = true;
@@ -364,6 +542,7 @@ export function createSession(
       } else if (phase === "test" && !recordedAttempt) {
         playerClear = attempt.exportReplay();
         recordedAttempt = true;
+        phase = "build";
       }
     }
     if (
@@ -374,7 +553,11 @@ export function createSession(
       deathRemainingMs === 0
     )
       recordRaid(
-        view.state.status === "won" ? "won" : view.state.status === "dead" ? "dead" : "tick-limit",
+        view.state.status === "won"
+          ? "won"
+          : view.state.status === "dead"
+            ? "dead"
+            : "tick-limit",
       );
     notify();
   });
@@ -383,14 +566,20 @@ export function createSession(
     frameState: attempt.frameState,
     renderFrame: attempt.renderFrame,
     ghostFrame() {
-      if (!showGhost || phase !== "watch" || watchIndex === null || !ghostTrajectory.length)
+      if (
+        !showGhost ||
+        phase !== "watch" ||
+        watchIndex === null ||
+        !ghostTrajectory.length
+      )
         return null;
 
       const frame = attempt.renderFrame();
       const last = ghostTrajectory.length - 1;
       const current = ghostTrajectory[Math.min(frame.current.tick, last)];
       const previous = ghostTrajectory[Math.min(frame.previous.tick, last)];
-      if (frame.alpha >= 1 || frame.previous.tick + 1 !== frame.current.tick) return current;
+      if (frame.alpha >= 1 || frame.previous.tick + 1 !== frame.current.tick)
+        return current;
 
       return {
         ...current,
@@ -416,7 +605,8 @@ export function createSession(
       };
     },
     edit(change: Edit) {
-      if (phase !== "build") throw new Error("Return to editing before changing the dungeon.");
+      if (phase !== "build")
+        throw new Error("Return to editing before changing the dungeon.");
       const candidate = applyEdit(editorLevel, change);
       if (JSON.stringify(candidate) === JSON.stringify(editorLevel)) return;
 
@@ -425,9 +615,31 @@ export function createSession(
       notify();
     },
     editDungeon,
+    requestReturn,
+    confirmGiveUp,
+    cancelGiveUp() {
+      confirmingGiveUp = false;
+      if (resumeAfterCancel) attempt.play();
+      notify();
+    },
     replayTutorial,
     replayDrilly() {
-      if (phase === "results") showAttempt(0);
+      if (phase === "results") {
+        watchAutoplay = true;
+        watchIdle = false;
+        showAttempt(0, true);
+      }
+    },
+    selectDrillyAttempt(index: number) {
+      if (
+        phase !== "watch" ||
+        !Number.isInteger(index) ||
+        !round?.drilly[index]
+      )
+        return;
+      watchAutoplay = false;
+      watchIdle = false;
+      showAttempt(index, true);
     },
     testDungeon,
     challengeDrilly,
@@ -446,8 +658,11 @@ export function createSession(
         case "watch":
           if (round?.drillyStatus === "error") void requestDrilly();
           else if (watchIndex !== null) {
-            if (!attempt.getSnapshot().finished) attempt.play();
-            else if (round && watchIndex + 1 < round.drilly.length) showAttempt(watchIndex + 1);
+            if (!attempt.getSnapshot().finished) {
+              watchIdle = false;
+              attempt.play();
+            } else if (round && watchIndex + 1 < round.drilly.length)
+              showAttempt(watchIndex + 1);
             else showResults();
           }
           return;
@@ -463,12 +678,6 @@ export function createSession(
             return;
           }
           break;
-        case "test":
-          if (attempt.frameState().status === "won") {
-            challengeDrilly();
-            return;
-          }
-          break;
       }
       if (attempt.getSnapshot().finished) reset();
       if (isPlaying()) attempt.primaryAction();
@@ -477,6 +686,7 @@ export function createSession(
       if (isPlaying()) attempt.jump();
     },
     play() {
+      if (phase === "watch") watchIdle = false;
       if (isPlaying()) attempt.play();
     },
     pause: attempt.pause,
@@ -484,11 +694,20 @@ export function createSession(
       if (isPlaying()) attempt.step(ticks);
     },
     update(deltaMs: number) {
+      if (confirmingGiveUp) return;
       if (deathRemainingMs > 0) {
         if (!Number.isFinite(deltaMs) || deltaMs < 0) return;
-        deathRemainingMs = Math.max(0, deathRemainingMs - Math.min(deltaMs, 100));
+        deathRemainingMs = Math.max(
+          0,
+          deathRemainingMs - Math.min(deltaMs, 100),
+        );
         if (deathRemainingMs === 0) {
           if (phase === "raid") recordRaid("dead");
+          if (phase === "prison" || phase === "test" || phase === "raid") {
+            respawned = true;
+            recordedAttempt = false;
+            attempt.loadLevel(attemptLevel);
+          }
           notify();
         }
         return;

@@ -2,6 +2,7 @@ import type { State } from "../../shared/game/types";
 
 // Presentation timing does not advance simulation ticks or change replay outcomes.
 export const DEATH_ANIMATION_MS = 2400;
+export const RUN_STRIDE_TICKS = 48;
 
 export function isWallSliding(state: State) {
   return (

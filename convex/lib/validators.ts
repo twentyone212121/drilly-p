@@ -21,12 +21,19 @@ const patrol = {
   speed: v.number(),
 };
 const obstacleValidator = v.union(
-  v.object({ ...rectangle, kind: v.literal("spikes") }),
+  v.object({
+    ...rectangle,
+    kind: v.literal("spikes"),
+    rotation: v.optional(
+      v.union(v.literal(0), v.literal(1), v.literal(2), v.literal(3)),
+    ),
+  }),
   v.object({ ...patrol, kind: v.literal("slider") }),
   v.object({ ...patrol, kind: v.literal("drone") }),
   v.object({
     ...center,
     kind: v.literal("turret"),
+    axis: v.optional(v.union(v.literal("x"), v.literal("y"))),
     mode: v.union(v.literal("fixed"), v.literal("aimed"), v.literal("flame")),
     direction: v.union(v.literal(-1), v.literal(1)),
     intervalTicks: v.number(),
@@ -39,9 +46,9 @@ const obstacleValidator = v.union(
     ...center,
     kind: v.literal("pursuer"),
     speed: v.number(),
-    detectionRange: v.number(),
-    chaseRange: v.number(),
-    warningTicks: v.number(),
+    detectionRange: v.optional(v.number()),
+    chaseRange: v.optional(v.number()),
+    warningTicks: v.optional(v.number()),
   }),
 );
 
