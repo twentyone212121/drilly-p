@@ -225,10 +225,50 @@ h2 {
 }
 .build-actions {
   display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   align-items: center;
   justify-content: center;
   gap: 12px;
   flex-shrink: 0;
+}
+.model-control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #bdd1c4;
+  font-size: 0.75rem;
+}
+.model-control select {
+  color: #e5e7d2;
+  background: #1d353d;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  padding: 8px;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.arcade-game .model-control {
+  min-width: 120px;
+  font: 20px var(--display);
+}
+.arcade-game .model-control select {
+  border: 1px solid #7da8b4;
+  border-radius: 6px;
+  font: 22px var(--display);
+}
+.watch-comparison {
+  position: absolute;
+  z-index: 6;
+  left: var(--wall-controls-left);
+  top: var(--wall-controls-center);
+  transform: translateY(-50%) scale(var(--wall-controls-scale, 1));
+  transform-origin: left center;
+  padding: 12px 18px;
+  border: 1px solid #7da8b4;
+  border-radius: 6px;
+  background: #182e3e;
 }
 .game-button {
   display: flex;
@@ -275,6 +315,34 @@ h2 {
 .editor-tool:active:not(:disabled) {
   transform: translateY(3px);
 }
+.ghost-comparison,
+.ghost-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ghost-comparison {
+  flex-wrap: wrap;
+  gap: 1.2rem;
+  font-size: 0.9rem;
+  color: #d4adff;
+}
+
+.ghost-comparison > span:first-child,
+.ghost-toggle {
+  color: #65eaff;
+}
+.ghost-toggle {
+  justify-content: center;
+  margin-top: 14px;
+  cursor: pointer;
+}
+
+.ghost-toggle input {
+  accent-color: #65eaff;
+}
+
 kbd {
   display: inline-block;
   font: inherit;

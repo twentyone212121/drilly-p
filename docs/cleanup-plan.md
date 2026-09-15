@@ -60,22 +60,24 @@ new components and new visual effects to the later redesign checkpoints.
    test/config paths and setup documentation. Keep guest authentication automatic.
 2. Delete `drillyLearning.ts`, `variety.ts` and their history/novelty machinery.
    Simplify `buildBrief.ts`, `build.ts`, validators and evaluation scripts accordingly.
-   Reduce the browser contract to `build()` and `raid(level)`.
+  Use `build()` and `raid(level, previousAttempts, model)`; each raid request returns one
+  completed attempt so technical retries preserve earlier recordings.
 3. Preserve movement behavior during the removal pass. Keep proven-room checks,
    bounded retries, timeouts and stale-response protection through later changes.
 
 ## Later checkpoint: direct AI control
 
-Replace `convex/lib/drilly/movement.ts` predictive search with model-chosen inputs.
-Remove route-only contracts and tuning made unnecessary by that replacement.
-Execute inputs through the existing simulation and record the resulting attempt;
-do not branch into predicted futures, rewind, or hide failed raids. Keep Drilly's
-own-room verification, scored-attempt limits and replay validation. Model feedback
-may contain its own scored failures, never player clear inputs.
+Implement the [agreed direct-input behavior](game-design.md#ai-and-scope) in
+`convex/lib/drilly/raid.ts`, reusing the SDK and headless simulation. The session
+owns concurrent action calls and keeps recordings in browser memory. Reuse
+`playRaidAttempt` once after each valid builder edit, under the same build deadline.
+Delete `planner.ts`, `attempt.ts`, `proof.ts`, `movement.ts`, and their route-only
+contracts/tests. Keep the edit loop and proven-room checks; defer broader generation changes.
 
-Use a small set of representative headless rooms to settle the input format and
-decision cadence, then check a live round. Difficulty and acceptable latency remain
-playtesting decisions; the decision to remove predictive search is settled.
+Keep model selection and ghost playback in the existing session/UI. Cache the
+ghost trajectory once per round and sample the current playback clock. Use
+headless rooms and playtesting to evaluate model strength and latency before
+adding input batches or images. Add no custom language or agent framework.
 
 ## Tests and performance
 

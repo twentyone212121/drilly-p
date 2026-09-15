@@ -195,6 +195,16 @@ export function GameOverlay({
             )}
           </>
         ))}
+      {visible && view.phase === "watch" && view.watchIndex !== null && (
+        <label className="ghost-toggle">
+          <input
+            type="checkbox"
+            checked={view.showGhost}
+            onChange={(event) => session.setGhostVisible(event.target.checked)}
+          />
+          Show your ghost
+        </label>
+      )}
     </dialog>
   );
 }

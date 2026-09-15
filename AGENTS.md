@@ -26,6 +26,8 @@ The game is **Drilly P**: **Drilly** is the AI opponent, and **P** represents th
   and input format. Keep browser and headless attempts on the same simulation.
 - When the user is actively playtesting, hand off small UX checks to them instead
   of repeating browser automation unless requested.
+- When the user's Convex dev watcher is running, let it sync backend edits. Do not
+  run a separate sync unless diagnosing a watcher failure.
 - Preserve unrelated local edits. Keep changes focused on the requested task.
 - Do not commit or push changes without explicit user approval.
 - Use npm and the committed lockfile. For code changes, run `npm test`,

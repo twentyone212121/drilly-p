@@ -1,5 +1,4 @@
 import type { BuildBudget } from "../../../shared/game/drilly";
-import { strategySchema } from "./protocol";
 import { RULES } from "../../../shared/game/rules";
 
 // Provider wire format only. Shared validation still owns gameplay correctness.
@@ -53,7 +52,6 @@ export function buildSchema(budget: BuildBudget, canFinish: boolean) {
         "Invent a short room title. Do not copy the workspace's placeholder name.",
     },
     idea: { type: "string", minLength: 1, maxLength: 240 },
-    strategy: strategySchema,
     removeIds: { type: "array", maxItems: 24, items: id },
     edit: object({
       platforms: {

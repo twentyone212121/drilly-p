@@ -93,6 +93,7 @@ export class GameScene extends Phaser.Scene {
       delta,
       editing && this.editorOptions.enabled,
     );
+    this.roomArt?.comparison(this.session.ghostFrame());
     if ((view.paused || !view.canPlay) && !view.presentingDeath && !animating)
       this.game.loop.sleep();
   }

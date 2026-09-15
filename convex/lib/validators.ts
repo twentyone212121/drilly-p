@@ -1,5 +1,11 @@
 import { v } from "convex/values";
 
+export const drillyModelValidator = v.union(
+  v.literal("gpt-6-astra"),
+  v.literal("gpt-5.6-sol"),
+  v.literal("gpt-5.6-luna"),
+);
+
 const rectangle = {
   id: v.string(),
   x: v.number(),

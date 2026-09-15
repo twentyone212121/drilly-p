@@ -3,69 +3,21 @@ import { expect, it, vi, afterEach } from "vitest";
 import { newPlayerDungeon } from "../../../shared/game/rooms";
 import { RULES } from "../../../shared/game/rules";
 import { replayAttempt } from "../../../shared/game/replay";
-import { playDungeon, buildDungeon } from "./planner";
-import {
-  parseDrillyBuild,
-  parseDrillyStrategy,
-} from "../../../shared/validation";
-import {
-  buildPlan,
-  roomEdit,
-  directStrategy,
-} from "../../../shared/testing/planner";
+import { buildDungeon } from "./build";
+import { parseDrillyBuild } from "../../../shared/validation";
+import { buildPlan, roomEdit, withRaidInputs } from "../../../shared/testing/planner";
 import { DRILLY_ERRORS } from "../../../shared/game/drillyErrors";
 import { emptyWorkspace, applyEdit } from "./construction";
 import { parseDrillyEdit } from "../../../shared/validation";
+import type { Planner } from "./protocol";
 
 afterEach(() => vi.useRealTimers());
-
-it("stops scored attempts at first success and records the actual simulation", async () => {
-  const room = getExampleRoom();
-  const plan = vi.fn(async () => directStrategy(room));
-  const attempts = await playDungeon(room, plan);
-  expect(attempts).toHaveLength(1);
-  expect(replayAttempt(attempts[0].replay).stopReason).toBe("won");
-});
-
-it("limits scored attempts and provides only its own failure history", async () => {
-  const room = newPlayerDungeon();
-  room.treasures[0].y = 10;
-  const plan = vi.fn(async () => directStrategy(room));
-  const attempts = await playDungeon(room, plan);
-  expect(attempts).toHaveLength(RULES.raidAttempts);
-  for (const attempt of attempts)
-    expect(replayAttempt(attempt.replay).stopReason).toBe(attempt.outcome);
-  expect(plan.mock.calls).toEqual(
-    expect.arrayContaining([
-      expect.arrayContaining([
-        expect.objectContaining({
-          previousAttempts: expect.arrayContaining([
-            expect.objectContaining({ outcome: "tick-limit" }),
-          ]),
-        }),
-      ]),
-    ]),
-  );
-});
-
-it("validates route targets and requires every treasure", () => {
-  const room = getExampleRoom();
-  for (const route of [
-    [],
-    [{ kind: "treasure", id: "missing" }],
-    [{ kind: "teleport", id: room.treasures[0].id }],
-    [{ kind: "platform", id: room.platforms[0].id }],
-  ]) {
-    expect(() =>
-      parseDrillyStrategy({ objective: "Collect", route }, room),
-    ).toThrow();
-  }
-});
 
 it("publishes a real winning replay with exactly the enclosed room", async () => {
   const plan = vi.fn(buildPlan);
   const built = await buildDungeon(plan);
   expect(built.proof.level).toEqual(built.level);
+  expect(built.proof.jumpTicks).toEqual([34, 106]);
   expect(replayAttempt(built.proof).stopReason).toBe("won");
 });
 
@@ -74,9 +26,13 @@ it.each(["provider", "invalid", "unreachable"])(
   async (failure) => {
     const original = getExampleRoom();
     let count = 0;
-    const plan = vi.fn(async () => {
+    const plan = vi.fn<Planner>(async (instructions, input, options) => {
+      if (options?.schemaName === "drilly_inputs") {
+        if (failure === "provider" && count > 1) throw new Error(DRILLY_ERRORS.timeout);
+        return buildPlan(instructions, input, options);
+      }
       if (++count === 1) return roomEdit(original);
-      if (failure === "provider") throw new Error(DRILLY_ERRORS.timeout);
+      if (failure === "provider") return roomEdit(original);
       if (failure === "invalid") return { invalid: true };
       const broken = structuredClone(original);
       broken.treasures[0].y = 10;
@@ -109,7 +65,7 @@ it("repairs an individual object without discarding the working idea", async () 
       },
     };
   });
-  const built = await buildDungeon(plan);
+  const built = await buildDungeon(withRaidInputs(plan));
   expect(built.level.traps).toEqual(room.traps);
   expect(built.level.treasures).toEqual(room.treasures);
   expect(plan.mock.calls[1]).toEqual(
@@ -117,7 +73,7 @@ it("repairs an individual object without discarding the working idea", async () 
       expect.objectContaining({
         feedback: expect.objectContaining({
           cleared: false,
-          contacts: expect.any(Array),
+          attempt: expect.objectContaining({ outcome: "tick-limit", events: expect.any(Array) }),
         }),
       }),
     ]),
@@ -125,7 +81,7 @@ it("repairs an individual object without discarding the working idea", async () 
   expect(replayAttempt(built.proof).stopReason).toBe("won");
 });
 
-it("does not publish empty scaffolding, unreachable geometry or decorative hazards", async () => {
+it("does not publish trivial or uncompleted rooms", async () => {
   for (const room of [
     newPlayerDungeon(),
     {
@@ -134,7 +90,7 @@ it("does not publish empty scaffolding, unreachable geometry or decorative hazar
     },
   ]) {
     const plan = vi.fn(async () => roomEdit(room));
-    await expect(buildDungeon(plan)).rejects.toThrow(DRILLY_ERRORS.unproven);
+    await expect(buildDungeon(withRaidInputs(plan))).rejects.toThrow(DRILLY_ERRORS.unproven);
     expect(plan).toHaveBeenCalledTimes(RULES.drilly.buildEdits);
   }
 });
@@ -149,26 +105,13 @@ it("does not hide provider failure before a checkpoint exists", async () => {
 
 it("preserves fixed metadata and validates object budgets after merging edits", () => {
   const room = getExampleRoom();
-  expect(() =>
-    parseDrillyBuild({ level: { ...room, width: 400 } }, room),
-  ).toThrow();
+  expect(() => parseDrillyBuild({ level: { ...room, width: 400 } }, room)).toThrow();
   const workspace = emptyWorkspace();
   const edit = parseDrillyEdit(roomEdit(room));
-  expect(() =>
-    applyEdit(workspace, edit, { platforms: 5, treasures: 1, hazards: 1 }),
-  ).toThrow("budget");
-  expect(workspace.traps).toEqual([]);
-});
-
-it("bounds a stalled provider without inventing scored losses", async () => {
-  vi.useFakeTimers();
-  const plan = vi.fn(() => new Promise<unknown>(() => {}));
-  const pending = expect(playDungeon(newPlayerDungeon(), plan)).rejects.toThrow(
-    "too long",
+  expect(() => applyEdit(workspace, edit, { platforms: 5, treasures: 1, hazards: 1 })).toThrow(
+    "budget",
   );
-  await vi.advanceTimersByTimeAsync(RULES.drilly.raidThinkingTimeoutMs);
-  await pending;
-  expect(plan).toHaveBeenCalledTimes(1);
+  expect(workspace.traps).toEqual([]);
 });
 
 it("builds a plain route first, then adds the hazard that makes it a challenge", async () => {
@@ -176,11 +119,10 @@ it("builds a plain route first, then adds the hazard that makes it a challenge",
   let edit = 0;
   const plan = vi.fn(async (_instructions: string, _input: unknown) => {
     const next = structuredClone(room);
-    if (++edit > 1)
-      next.traps = [{ id: "crossing", x: 320, y: 400, radius: 18 }];
+    if (++edit > 1) next.traps = [{ id: "crossing", x: 320, y: 400, radius: 18 }];
     return { ...roomEdit(next), action: edit > 2 ? "finish" : "edit" };
   });
-  const result = await buildDungeon(plan);
+  const result = await buildDungeon(withRaidInputs(plan));
   expect(plan.mock.calls[1][1]).toMatchObject({
     checkpoint: { proof: { jumpCount: 0 } },
     challengeReady: false,
@@ -193,9 +135,33 @@ it("builds a plain route first, then adds the hazard that makes it a challenge",
 it("never uses a route-only checkpoint as a fallback after provider failure", async () => {
   let calls = 0;
   await expect(
-    buildDungeon(async () => {
-      if (++calls === 1) return roomEdit(newPlayerDungeon());
-      throw new Error(DRILLY_ERRORS.quota);
-    }),
+    buildDungeon(
+      withRaidInputs(async () => {
+        if (++calls === 1) return roomEdit(newPlayerDungeon());
+        throw new Error(DRILLY_ERRORS.quota);
+      }),
+    ),
   ).rejects.toThrow(DRILLY_ERRORS.quota);
+});
+
+it("uses the remaining build deadline for its model-driven proof", async () => {
+  vi.useFakeTimers();
+  let aborted = false;
+  const plan: Planner = async (_instructions, _input, options) => {
+    if (options?.schemaName === "drilly_edit") {
+      vi.setSystemTime(Date.now() + RULES.drilly.buildThinkingTimeoutMs - 10);
+      return roomEdit(getExampleRoom());
+    }
+    return new Promise((_resolve, reject) => {
+      options?.signal?.addEventListener("abort", () => {
+        aborted = true;
+        reject(new Error("aborted"));
+      });
+    });
+  };
+  const pending = expect(buildDungeon(plan)).rejects.toThrow(DRILLY_ERRORS.timeout);
+  await vi.advanceTimersByTimeAsync(10);
+  await pending;
+  expect(aborted).toBe(true);
+  expect(vi.getTimerCount()).toBe(0);
 });

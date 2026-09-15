@@ -95,7 +95,14 @@ export function createRoomArt(scene: Phaser.Scene, level: Level, density = 1) {
     .image(0, 0, "esc", "idle")
     .setOrigin(0.5, 1)
     .setDepth(40);
-  objects.push(player);
+  const comparisonGhost = scene.add
+    .image(0, 0, "esc", "idle")
+    .setOrigin(0.5, 1)
+    .setDepth(39)
+    .setTint(0x65eaff)
+    .setAlpha(0.35)
+    .setVisible(false);
+  objects.push(player, comparisonGhost);
   const legs = createRunLegs(scene);
   const fragments = scene.add.graphics().setDepth(50);
   let jumpTick = -100;
@@ -142,6 +149,33 @@ export function createRoomArt(scene: Phaser.Scene, level: Level, density = 1) {
             .setRotation(0)
             .setFlipY(false);
         }
+      }
+    },
+    comparison(ghost: State["player"] | null) {
+      comparisonGhost.setVisible(ghost !== null);
+      if (!ghost) return;
+
+      const braced = !ghost.grounded && ghost.wall !== 0;
+      const texture = braced ? "esc-wall" : "esc";
+      const frame = braced ? "slide" : ghost.grounded ? "idle" : "jump";
+      const reference = scene.textures.getFrame(
+        texture,
+        braced ? "slide" : "idle",
+      );
+      comparisonGhost
+        .setTexture(texture, frame)
+        .setOrigin(0.5, 1)
+        .setScale(RULES.playerHeight / reference.height)
+        .setFlipX((ghost.wall || ghost.direction) < 0)
+        .setPosition(
+          ghost.x + RULES.playerWidth / 2,
+          ghost.y + RULES.playerHeight,
+        );
+      if (ghost.wall !== 0) {
+        const wallX = ghost.x + (ghost.wall > 0 ? RULES.playerWidth : 0);
+        comparisonGhost.setX(
+          wallX - (ghost.wall * comparisonGhost.displayWidth) / 2,
+        );
       }
     },
     consume(events: GameEvent[]) {

@@ -69,9 +69,10 @@ export function roomBorders(room: Level): Platform[] {
     if (platform.id === "floor") bottom = room.height - platform.y;
   }
   return [
-    { id: "room-frame-left", x: 0, y: 0, width: left, height: room.height },
+    // Keep the side-wall IDs exposed by the builder valid in routes and observations.
+    { id: "boundary-left", x: 0, y: 0, width: left, height: room.height },
     {
-      id: "room-frame-right",
+      id: "boundary-right",
       x: room.width - right,
       y: 0,
       width: right,
