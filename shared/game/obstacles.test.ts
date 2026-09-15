@@ -84,7 +84,7 @@ describe("obstacle simulation", () => {
     const drone: Patrol = { ...patrol, kind: "drone" };
     const halfPeriod =
       (60 * Math.hypot(drone.endX - drone.x, drone.endY - drone.y)) /
-      (drone.speed * RULES.obstacles.droneSpeedMultiplier);
+      drone.speed;
     expect(patrolPosition(drone, 0)).toEqual({ x: drone.x, y: drone.y });
     expect(patrolPosition(drone, halfPeriod)).toEqual({
       x: drone.endX,
@@ -126,7 +126,7 @@ describe("obstacle simulation", () => {
     expect(advanceObstacles(level, state, body(292), 2).hitId).toBe("rail");
   });
   it("uses eased drone timing for collisions at a reversal", () => {
-    const drone: Patrol = { ...patrol, kind: "drone", radius: 4 };
+    const drone: Patrol = { ...patrol, kind: "drone", radius: 4, speed: 160 };
     const level = room([drone]);
     const hitAt = (tick: number, x: number) => {
       const state = initialState(level);

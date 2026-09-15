@@ -183,7 +183,9 @@ export function createEditorInput(
   }
 
   function objectAt(point: Point): EditorObject {
-    return fitObjectToRoom(rawObjectAt(point), level);
+    return fitObjectToRoom(rawObjectAt(point), level, {
+      preservePatrolStart: drag?.operation === "route",
+    });
   }
 
   function commit(object: EditorObject, placed = false) {

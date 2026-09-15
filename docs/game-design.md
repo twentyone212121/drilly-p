@@ -98,8 +98,11 @@ use the same instructions, reasoning setting, physics, and three attempts.
 - Save the current dungeon draft in localStorage after committed edits and restore
   it on reload, including unfinished layouts and successful test recordings. Reload
   resets the current round, but preserves a verified clear. Geometry edits, changed
-  rules, or invalid recordings require another test. Invalid stored data and storage
-  failure must not block play.
+  rules, or invalid recordings require another test. Restoring a clear has a bounded
+  tick budget; longer recordings require another test after reload. Verification
+  keeps only the final simulation result. The restoration budget remains provisional
+  and does not limit human play. Invalid stored data and storage failure must not
+  block play.
   Replay validation stays internal.
 
 ## Look and feel
@@ -146,8 +149,9 @@ their patrol route; spikes rotate their visible shape and rectangular collision 
 Select a drone and drag the cyan handle at its route endpoint to extend or shorten
 its patrol, keeping the entire route inside the room. The handle only changes length
 along the current direction; it cannot turn or reverse the route. Only Rotate changes
-direction, cycling through right, down, left, and up. Drones travel faster, smoothly
-slowing to a stop at each endpoint before reversing.
+direction, cycling through right, down, left, and up. A drone's speed directly sets
+its average travel speed, with smooth acceleration and slowing to a stop at each
+endpoint before reversing.
 Pursuers immediately and continuously follow the player from any distance, with no
 acquisition zone, waiting period, or return-to-base behavior.
 Hazards share graphite metal casings, cyan circuitry, and magenta energy cores.

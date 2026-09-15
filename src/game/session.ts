@@ -52,9 +52,12 @@ export function createSession(
   let playerClear: Replay | null = null;
   if (options.playerClear) {
     try {
-      const restored = parseReplay(options.playerClear);
+      const restored = parseReplay(
+        options.playerClear,
+        RULES.maxRestoredClearTicks,
+      );
       if (JSON.stringify(restored.level) === JSON.stringify(editorLevel)) {
-        const verified = replayAttempt(restored);
+        const verified = replayAttempt(restored, { recordTrace: false });
         if (
           verified.stopReason === "won" &&
           verified.state.tick === restored.endTick
@@ -62,7 +65,7 @@ export function createSession(
           playerClear = restored;
       }
     } catch {
-      // Old rules, changed geometry, or damaged recordings only invalidate the clear.
+      // Old rules, changed geometry, oversized or damaged recordings invalidate only the clear.
     }
   }
   let ghostTrajectory: State["player"][] = [];
@@ -372,7 +375,7 @@ export function createSession(
           level,
         );
         const recording = recordings[recordings.length - 1];
-        const verified = replayAttempt(recording.replay);
+        const verified = replayAttempt(recording.replay, { recordTrace: false });
         if (
           verified.stopReason !== recording.outcome ||
           verified.state.tick !== recording.replay.endTick

@@ -40,8 +40,7 @@ export function initialObstacles(level: Level): ObstacleState[] {
 export function patrolPosition(o: Patrol, tick: number) {
   const length = Math.hypot(o.endX - o.x, o.endY - o.y);
   if (length === 0) return { x: o.x, y: o.y };
-  const speed = patrolSpeed(o);
-  const distance = ((tick / RULES.tickRate) * speed) % (length * 2);
+  const distance = ((tick / RULES.tickRate) * o.speed) % (length * 2);
   const progress =
     (distance <= length ? distance : length * 2 - distance) / length;
   const fraction =
@@ -225,12 +224,6 @@ export function advanceObstacles(
   return { obstacles, projectiles, hitId, events };
 }
 
-function patrolSpeed(o: Patrol) {
-  return (
-    o.speed * (o.kind === "drone" ? RULES.obstacles.droneSpeedMultiplier : 1)
-  );
-}
-
 // Split at every reversal, using the same travel timing as the visible patrol.
 function patrolHit(
   o: Patrol,
@@ -243,7 +236,7 @@ function patrolHit(
   const length = Math.hypot(o.endX - o.x, o.endY - o.y);
   if (length === 0)
     return movingCircleHit(from, to, o.radius, oldBody, body) !== null;
-  const legTicks = (length * RULES.tickRate) / patrolSpeed(o);
+  const legTicks = (length * RULES.tickRate) / o.speed;
   const bodyAt = (time: number) => ({
     ...body,
     x: oldBody.x + (body.x - oldBody.x) * (time - tick),

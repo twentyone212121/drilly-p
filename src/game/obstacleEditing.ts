@@ -1,62 +1,77 @@
-import { RULES } from "../../shared/game/rules";
+import type { Patrol } from "../../shared/game/obstacleTypes";
 import { roomBorders } from "../../shared/game/roomBoundary";
-import type { Level } from "../../shared/game/types";
+import type { Level, Rect } from "../../shared/game/types";
 import { objectBounds, type EditorObject } from "./editor";
 
 export function fitObjectToRoom(
   object: EditorObject,
   level: Level,
+  options: { preservePatrolStart?: boolean } = {},
 ): EditorObject {
   const [left, right, ceiling, floor] = roomBorders(level);
+  const result = structuredClone(object);
+
+  if (
+    result.kind === "obstacle" &&
+    (result.value.kind === "drone" || result.value.kind === "slider")
+  ) {
+    const o = result.value;
+    fitPatrolToRoom(
+      o,
+      {
+        x: left.width + o.radius,
+        y: ceiling.height + o.radius,
+        width: right.x - left.width - o.radius * 2,
+        height: floor.y - ceiling.height - o.radius * 2,
+      },
+      options.preservePatrolStart ?? false,
+    );
+    return result;
+  }
+
   const bounds = objectBounds(object);
   const x = Math.max(left.width, Math.min(right.x - bounds.width, bounds.x));
   const y = Math.max(
     ceiling.height,
     Math.min(floor.y - bounds.height, bounds.y),
   );
-  const dx = x - bounds.x,
-    dy = y - bounds.y;
-  const result = structuredClone(object);
-  result.value.x += dx;
-  result.value.y += dy;
-  if (
-    result.kind === "obstacle" &&
-    (result.value.kind === "drone" || result.value.kind === "slider")
-  ) {
-    const o = result.value;
-    o.endX = Math.max(
-      left.width + o.radius,
-      Math.min(right.x - o.radius, o.endX + dx),
-    );
-    o.endY = Math.max(
-      ceiling.height + o.radius,
-      Math.min(floor.y - o.radius, o.endY + dy),
-    );
-    if (Math.hypot(o.endX - o.x, o.endY - o.y) < RULES.editor.gridSize) {
-      const original =
-        object.kind === "obstacle" &&
-        (object.value.kind === "drone" || object.value.kind === "slider")
-          ? object.value
-          : o;
-      if (
-        Math.abs(original.endY - original.y) >
-        Math.abs(original.endX - original.x)
-      )
-        o.endY =
-          o.y < (ceiling.height + floor.y) / 2
-            ? Math.min(floor.y - o.radius, o.y + RULES.obstacles.pathLength)
-            : Math.max(
-                ceiling.height + o.radius,
-                o.y - RULES.obstacles.pathLength,
-              );
-      else
-        o.endX =
-          o.x < (left.width + right.x) / 2
-            ? Math.min(right.x - o.radius, o.x + RULES.obstacles.pathLength)
-            : Math.max(left.width + o.radius, o.x - RULES.obstacles.pathLength);
-    }
-  }
+  result.value.x += x - bounds.x;
+  result.value.y += y - bounds.y;
   return result;
+}
+
+function fitPatrolToRoom(o: Patrol, bounds: Rect, preserveStart: boolean) {
+  const right = bounds.x + bounds.width;
+  const bottom = bounds.y + bounds.height;
+
+  // The endpoint handle changes length without moving the drone's start.
+  if (preserveStart) {
+    o.endX = Math.max(bounds.x, Math.min(right, o.endX));
+    o.endY = Math.max(bounds.y, Math.min(bottom, o.endY));
+    return;
+  }
+
+  const dx = o.endX - o.x;
+  const dy = o.endY - o.y;
+  const scale = Math.min(
+    1,
+    dx === 0 ? 1 : bounds.width / Math.abs(dx),
+    dy === 0 ? 1 : bounds.height / Math.abs(dy),
+  );
+  const routeX = dx * scale;
+  const routeY = dy * scale;
+
+  // Fit both endpoints together, preserving direction and all length that fits.
+  o.x = Math.max(
+    bounds.x - Math.min(0, routeX),
+    Math.min(right - Math.max(0, routeX), o.x),
+  );
+  o.y = Math.max(
+    bounds.y - Math.min(0, routeY),
+    Math.min(bottom - Math.max(0, routeY), o.y),
+  );
+  o.endX = o.x + routeX;
+  o.endY = o.y + routeY;
 }
 
 export function rotateObstacle(

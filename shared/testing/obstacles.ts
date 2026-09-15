@@ -43,7 +43,7 @@ export function obstacleRoom(id: ObstacleCase): Level {
     endX: 600,
     endY: 270,
     radius: 18,
-    speed: r.patrolSpeed,
+    speed: r.droneSpeed,
   };
   const pursuer: Obstacle = {
     id: "pursuer",

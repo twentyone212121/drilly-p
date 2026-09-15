@@ -1,6 +1,6 @@
 // Provisional mechanics and editor tuning. Bump the rules version when mechanics change.
 export const RULES = Object.freeze({
-  version: "obstacles-14",
+  version: "obstacles-15",
   raidAttempts: 3,
   roomBorderWidth: 12,
   drilly: Object.freeze({
@@ -29,6 +29,8 @@ export const RULES = Object.freeze({
   wallSlideSpeed: 110,
   // Execution budget for AI planning and default headless runs, not a player timer.
   maxTicks: 1800,
+  // Provisional five-minute budget for verifying a saved human clear on reload.
+  maxRestoredClearTicks: 18_000,
   obstacles: Object.freeze({
     maxCount: 20,
     maxPerKind: 8,
@@ -50,7 +52,7 @@ export const RULES = Object.freeze({
     radius: 18,
     pathLength: 96,
     patrolSpeed: 90,
-    droneSpeedMultiplier: 1.6,
+    droneSpeed: 144,
     pursuerSpeed: 150,
     intervalTicks: 90,
     flameIntervalTicks: 150,
@@ -90,7 +92,7 @@ export function describeRules() {
       spikes:
         "Exposed teeth kill on contact from any direction. The mounting base is solid and safe (rotation 0 up, 1 right, 2 down, 3 left). x/y are top-left. All other obstacles use center x/y and radius.",
       patrols:
-        "drone: straight patrol from x/y to endX/endY, cosine easing to rest at each endpoint. Average travel speed is speed * droneSpeedMultiplier pixels/second. Routes pass through platforms.",
+        "drone: straight patrol from x/y to endX/endY, cosine easing to rest at each endpoint. speed is the average travel speed in pixels/second. Routes pass through platforms.",
       turret:
         "Cycle begins at tick 0. Warning until warmupTicks, then one shot (fixed/aimed) or flame for activeTicks. Rest of intervalTicks is cooldown. Aimed shots lock the player's center at firing time within range. Shots continue until a platform or room boundary; range only limits aimed acquisition and flame reach. axis x/y and direction -1/+1 select left/right/up/down. Default firing interval is 90 ticks (1.5 seconds). Platforms stop shots and flames. Turret bodies are safe to touch; only shots and active flames are lethal.",
       pursuer:

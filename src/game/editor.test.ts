@@ -149,14 +149,31 @@ it("fits hazards flush to each inner edge and rotates without leaving the room",
     newObject(level, "obstacle", { x: 1000, y: 1000 }, "drone"),
     level,
   );
+  const directions = [[0, -96], [96, 0], [0, 96], [-96, 0]];
   for (let turn = 0; turn < 4; turn++) {
     drone = rotateObstacle(drone, level);
     expect(placementError(level, drone)).toBeNull();
     if (drone.kind === "obstacle" && drone.value.kind === "drone") {
+      expect([
+        drone.value.endX - drone.value.x,
+        drone.value.endY - drone.value.y,
+      ]).toEqual(directions[turn]);
       expect(drone.value.endX - drone.value.radius).toBeGreaterThanOrEqual(12);
       expect(drone.value.endX + drone.value.radius).toBeLessThanOrEqual(888);
       expect(drone.value.endY - drone.value.radius).toBeGreaterThanOrEqual(12);
       expect(drone.value.endY + drone.value.radius).toBeLessThanOrEqual(420);
     }
+  }
+
+  const moved = fitObjectToRoom(moveObject(drone, { x: -1000, y: 0 }), level);
+  expect(placementError(level, moved)).toBeNull();
+  if (moved.kind === "obstacle" && moved.value.kind === "drone") {
+    expect(moved.value.endX - moved.value.x).toBe(-96);
+    const extended = fitObjectToRoom(
+      { ...moved, value: { ...moved.value, endX: -1000 } },
+      level,
+      { preservePatrolStart: true },
+    );
+    expect(extended).toEqual(moved);
   }
 });

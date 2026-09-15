@@ -281,7 +281,7 @@ export function newObstacle(
             ? r.pathLength
             : -r.pathLength),
         endY: position.y,
-        speed: r.patrolSpeed,
+        speed: kind === "drone" ? r.droneSpeed : r.patrolSpeed,
       };
     case "turret":
       return {

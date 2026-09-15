@@ -317,8 +317,20 @@ export function editorPlacementError(
   }
 }
 
-export function parseReplay(value: unknown): Replay {
-  return v.parse(ReplaySchema, value);
+export function parseReplay(
+  value: unknown,
+  maxTicks = Number.MAX_SAFE_INTEGER,
+): Replay {
+  return v.parse(
+    v.pipe(
+      ReplaySchema,
+      v.check(
+        (replay) => replay.endTick <= maxTicks,
+        "Recording exceeds its tick limit.",
+      ),
+    ),
+    value,
+  );
 }
 
 export function parseJumpTicks(

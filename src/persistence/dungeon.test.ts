@@ -1,6 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { newPlayerDungeon } from "../../shared/game/rooms";
 import { RULES } from "../../shared/game/rules";
+import { runAttempt } from "../../shared/game/replay";
 import { createSession } from "../game/session";
 import {
   loadDungeon,
@@ -33,7 +34,10 @@ it("restores edited and unfinished rooms, saving only when the draft changes", (
       tutorialCompleted: true,
       editorLevel: loadDungeon(),
       playerClear: loadDungeonClear(),
-      drilly: { build: async () => room, raid: () => new Promise<never>(() => {}) },
+      drilly: {
+        build: async () => room,
+        raid: () => new Promise<never>(() => {}),
+      },
     });
   const cleared = reload();
   expect(cleared.getSnapshot().cleared).toBe(true);
@@ -51,6 +55,33 @@ it("restores edited and unfinished rooms, saving only when the draft changes", (
   );
   expect(reload().getSnapshot().cleared).toBe(false);
   values.set("drilly-p.dungeon-clear", JSON.stringify(restoredClear));
+
+  // A valid clear beyond the restoration budget must leave the draft playable.
+  const slowRoom = {
+    ...room,
+    treasures: [{ id: "late-treasure", x: 852, y: 350, width: 32, height: 28 }],
+  };
+  const jumpTicks = [RULES.maxRestoredClearTicks - 1];
+  const endTick = RULES.maxRestoredClearTicks + 1;
+  const slowAttempt = runAttempt(slowRoom, jumpTicks, endTick, {
+    recordTrace: false,
+  });
+  expect(slowAttempt.stopReason).toBe("won");
+  expect(slowAttempt.state.tick).toBe(endTick);
+  const slowReload = createSession({
+    tutorialCompleted: true,
+    editorLevel: slowRoom,
+    playerClear: {
+      version: 2,
+      rulesVersion: RULES.version,
+      level: slowRoom,
+      jumpTicks,
+      endTick,
+    },
+  });
+  expect(slowReload.getSnapshot().cleared).toBe(false);
+  expect(slowReload.getSnapshot().editorLevel).toEqual(slowRoom);
+  expect(() => slowReload.testDungeon()).not.toThrow();
 
   session.editDungeon();
   session.setModel("gpt-5.6-sol");

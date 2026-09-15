@@ -20,12 +20,19 @@ const replay = {
 };
 
 describe("schema validation boundaries", () => {
-  it("keeps incoming AI recordings bounded without limiting human recordings", () => {
+  it("bounds AI and restored recordings separately from live human attempts", () => {
     const longReplay = { ...replay, endTick: RULES.maxTicks + 1 };
     expect(parseReplay(longReplay)).toEqual(longReplay);
     expect(() =>
       parseDrillyAttempts([{ replay: longReplay, outcome: "won" }], level),
     ).toThrow("execution budget");
+    const restoreLimit = RULES.maxRestoredClearTicks;
+    expect(
+      parseReplay({ ...replay, endTick: restoreLimit }, restoreLimit).endTick,
+    ).toBe(restoreLimit);
+    expect(() =>
+      parseReplay({ ...replay, endTick: restoreLimit + 1 }, restoreLimit),
+    ).toThrow("tick limit");
   });
 
   it.each([

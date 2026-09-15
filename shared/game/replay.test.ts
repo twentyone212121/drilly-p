@@ -40,6 +40,11 @@ describe("input boundary", () => {
     expect(replayAttempt(replay)).toEqual(
       runAttempt(level, [44, 199, 200], 259),
     );
+    expect(replayAttempt(replay, { recordTrace: false })).toEqual({
+      ...replayAttempt(replay),
+      events: [],
+      trajectory: [],
+    });
   });
   it("bounds unfinished attempts and accepts a zero-tick recording", () => {
     expect(runAttempt(level, [], 10)).toMatchObject({
