@@ -21,7 +21,7 @@ marks collectible concepts. These are art conventions, not new mechanics.
 - `../public/assets/environment/`: six named computer prop frames.
 - `prompts.json`: generation prompts and tool provenance.
 
-Each character has three key poses. ESC additionally has a six-frame run cycle. Drilly's
+Each character has three key poses. Drilly's
 poses are hover, active, and defeated; ESC's are idle, jump, and land.
 The renderer loads ESC, Drilly ghosts, platforms, saws, data pickups, and the
 background with ambient fan and light animation. Sprite size and collisions remain the
@@ -43,7 +43,7 @@ per room, with no per-tick texture generation or additional image downloads.
 ## Runtime format
 
 Character poses use RGBA PNG atlases (384 × 128), with three poses in padded
-128 × 128 cells. ESC's six-frame run atlas is 384 × 256.
+128 × 128 cells.
 Props use a 768 × 512 atlas with six padded 256 × 256 cells. JSON files use Phaser's
 hash atlas format with tight frame rectangles and bottom-center pivots.
 Padding stays outside frame rectangles to avoid texture bleeding.
@@ -53,9 +53,13 @@ dimensions must not be used as collision bounds.
 
 ```ts
 // In the Phaser scene's preload method:
-this.load.atlas('esc', '/assets/characters/esc.png', '/assets/characters/esc.json');
+this.load.atlas(
+  "esc",
+  "/assets/characters/esc.png",
+  "/assets/characters/esc.json",
+);
 // In create:
-this.add.sprite(100, 100, 'esc', 'idle');
+this.add.sprite(100, 100, "esc", "idle");
 ```
 
 Drilly uses `hover`, `active`, and `defeated`; the other characters use `idle`,
@@ -69,35 +73,19 @@ run `python3 scripts/art/export.py` from the repository root. The script can
 also be invoked by absolute path. It overwrites only this kit's runtime files.
 Retain originals in `source/`; do not edit generated exports by hand.
 
-ESC also has a six-frame run atlas (`esc-run`, frames `run-0` through `run-5`).
-It plays one frame per five simulation ticks during grounded movement, after
-the landing pose finishes. Pauses freeze the cycle. Source and prompt are retained
-for refinement; collision rules are unchanged.
-
-Jump and landing poses have brief stretch/squash feedback, and wall jumps add a
-directional lean without reversing the ESC lettering. Death fades and tints ESC
-while six small fragments disperse; Drilly ghosts use their defeated pose.
-Movement feedback follows simulation ticks. The brief death effect uses render
-time so it can finish after the attempt stops. Restart clears transient effects.
-
+ESC runs with a steady idle keycap and separately animated feet cropped from that
+atlas. The old full-body run source is retained for reference, but is not exported
+or shipped. Jump and landing feedback follow simulation ticks. Death is an upright
+electric shock with shaking and sparks before the next attempt.
 
 ## Obstacle artwork
 
-`public/assets/obstacles/` contains small vector sprites for spikes, patrol drones,
-and pursuers, plus a shaded PNG firewall turret. The sliding saw reuses the saw atlas.
-The editor displays these directly; Phaser rasterizes vector sprites when loading.
-The turret source is `source/obstacles/turret.png`; rebuild its trimmed, optimized
-runtime sprite with `python3 scripts/art/export-turret.py` using the same dependencies
-as the main export script. Its built-in image-generation prompt is in `turret-prompt.json`.
-
-The turret turns toward its firing direction. Recessed charge lights and muzzle glow
-telegraph shots; layered, flickering flame silhouettes and short projectile trails
-replace debug-style outlines. Flame artwork stays inside the simulation's reach;
-the collision footprint remains the full flame rectangle. All effects follow fixed
-simulation ticks and freeze during pause. These are presentation changes only.
-
-The obstacle lab is accessible from **Try the obstacle lab** above the game room.
-Use its room selector to inspect each behavior before building with it.
+The runtime uses original SVGs for saws, spike rows, turrets, drones, and pursuers.
+They share graphite casings, cyan circuitry, and magenta energy accents. Spike rows
+repeat teeth instead of stretching them; their mounting rail is solid. Turrets show
+charging and firing, drones have animated fans, and pursuers have a tracking eye.
+All effects follow simulation state and pause with it. The previous turret source
+and generation prompt remain under `assets/` as design references.
 
 ## ESC wall slide
 

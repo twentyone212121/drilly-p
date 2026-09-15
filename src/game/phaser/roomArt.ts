@@ -1,3 +1,4 @@
+import { createRunLegs } from "./runLegs";
 import { drawRoomFrame } from "./roomFrame";
 import { isFixedRoomPlatform } from "../../../shared/game/roomBoundary";
 import { drawWallSparks } from "./wallSlide";
@@ -5,15 +6,33 @@ import { DEATH_ANIMATION_MS, isWallSliding } from "../presentation";
 import { drawElectricDeath } from "./electricDeath";
 import { createObstacleArt, setObstacleImage } from "./obstacleArt";
 import type Phaser from "phaser";
-import type { EditorObject, GameEvent, Level, State } from "../../../shared/game/types";
+import type {
+  EditorObject,
+  GameEvent,
+  Level,
+  State,
+} from "../../../shared/game/types";
 import { RULES } from "../../../shared/game/rules";
 import { objectBounds } from "../editor";
 import { flameBounds } from "../../../shared/game/obstacles";
 
-export function createRoomArt(scene: Phaser.Scene, level: Level) {
+export function createRoomArt(scene: Phaser.Scene, level: Level, density = 1) {
   const objects: Phaser.GameObjects.Image[] = [];
-  const props = (frame: string, x: number, y: number, width: number, height: number) => {
-    const image = scene.add.image(x, y, "computer-props", frame).setOrigin(0);
+  const props = (
+    frame: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+  ) => {
+    const image = scene.add
+      .image(
+        x,
+        y,
+        frame === "saw" ? "obstacle-saw" : "computer-props",
+        frame === "saw" ? undefined : frame,
+      )
+      .setOrigin(0);
     image.setDisplaySize(width, height);
     objects.push(image);
     return image;
@@ -27,8 +46,12 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
     grid.lineBetween(0, y, level.width, y);
   const guides = scene.add.graphics().setDepth(60);
   const previewPanels = scene.add.graphics().setDepth(70).setAlpha(0.65);
-  const previewImage = props("saw", 0, 0, 1, 1).setDepth(70).setAlpha(0.65).setVisible(false);
+  const previewImage = props("saw", 0, 0, 1, 1)
+    .setDepth(70)
+    .setAlpha(0.65)
+    .setVisible(false);
   const platforms = scene.add.graphics();
+  platforms.scaleCanvas(density, density);
   for (const platform of level.platforms) {
     if (isFixedRoomPlatform(platform, level)) continue;
     for (const panel of platformPanels(platform)) {
@@ -38,19 +61,42 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
   }
   drawRoomFrame(platforms, level);
   // Bake static panel details once per room/edit instead of replaying their draw commands.
-  platforms.generateTexture("room-platforms", level.width, level.height);
+  platforms.generateTexture(
+    "room-platforms",
+    level.width * density,
+    level.height * density,
+  );
   platforms.destroy();
-  const platformImage = scene.add.image(0, 0, "room-platforms").setOrigin(0);
+  const platformImage = scene.add
+    .image(0, 0, "room-platforms")
+    .setOrigin(0)
+    .setDisplaySize(level.width, level.height);
   const saws = level.traps.map((trap) => {
-    const image = props("saw", trap.x, trap.y, trap.radius * 2, trap.radius * 2);
+    const image = props(
+      "saw",
+      trap.x,
+      trap.y,
+      trap.radius * 2,
+      trap.radius * 2,
+    );
     return image.setOrigin(0.5).setDepth(20);
   });
   const treasures = level.treasures.map((treasure) =>
-    props("data", treasure.x, treasure.y, treasure.width, treasure.height).setDepth(30),
+    props(
+      "data",
+      treasure.x,
+      treasure.y,
+      treasure.width,
+      treasure.height,
+    ).setDepth(30),
   );
   const obstacleArt = createObstacleArt(scene, level);
-  const player = scene.add.image(0, 0, "esc", "idle").setOrigin(0.5, 1).setDepth(40);
+  const player = scene.add
+    .image(0, 0, "esc", "idle")
+    .setOrigin(0.5, 1)
+    .setDepth(40);
   objects.push(player);
+  const legs = createRunLegs(scene);
   const fragments = scene.add.graphics().setDepth(50);
   let jumpTick = -100;
   let wallJumpTick = -100;
@@ -63,7 +109,11 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
   let lastEditing = false;
 
   return {
-    editor(selected: EditorObject | undefined, preview: EditorObject | null, invalid: boolean) {
+    editor(
+      selected: EditorObject | undefined,
+      preview: EditorObject | null,
+      invalid: boolean,
+    ) {
       guides.clear();
       previewPanels.clear();
       previewImage.setVisible(false);
@@ -77,11 +127,15 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
         }
       } else {
         previewImage.setVisible(true);
-        if (preview.kind === "obstacle") setObstacleImage(previewImage, preview.value);
+        if (preview.kind === "obstacle")
+          setObstacleImage(previewImage, preview.value);
         else {
           const b = objectBounds(preview);
           previewImage
-            .setTexture("computer-props", preview.kind === "saw" ? "saw" : "data")
+            .setTexture(
+              preview.kind === "saw" ? "obstacle-saw" : "computer-props",
+              preview.kind === "saw" ? undefined : "data",
+            )
             .setOrigin(0)
             .setPosition(b.x, b.y)
             .setDisplaySize(b.width, b.height)
@@ -101,8 +155,17 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
       }
     },
     update(state: State, ghost: boolean, delta: number, editing = false) {
-      const dying = !editing && !ghost && state.status === "dead" && deathMs < DEATH_ANIMATION_MS;
-      if (state === lastState && ghost === lastGhost && editing === lastEditing && !dying)
+      const dying =
+        !editing &&
+        !ghost &&
+        state.status === "dead" &&
+        deathMs < DEATH_ANIMATION_MS;
+      if (
+        state === lastState &&
+        ghost === lastGhost &&
+        editing === lastEditing &&
+        !dying
+      )
         return false;
       lastState = state;
       lastGhost = ghost;
@@ -115,13 +178,22 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
       }
       lastTick = state.tick;
       if (state.status !== "dead") deathMs = 0;
-      else deathMs = Math.min(DEATH_ANIMATION_MS, deathMs + Math.max(0, Math.min(delta, 100)));
+      else
+        deathMs = Math.min(
+          DEATH_ANIMATION_MS,
+          deathMs + Math.max(0, Math.min(delta, 100)),
+        );
       fragments.clear();
       const landed = state.tick - landingTick < 6;
       const wallContact =
-        !editing && !ghost && state.status === "running" && state.player.wall !== 0;
+        !editing &&
+        !ghost &&
+        state.status === "running" &&
+        state.player.wall !== 0;
       const braced = wallContact && !state.player.grounded;
-      const wallImpact = wallContact ? Math.max(0, 1 - (state.tick - wallContactTick) / 9) : 0;
+      const wallImpact = wallContact
+        ? Math.max(0, 1 - (state.tick - wallContactTick) / 9)
+        : 0;
       const wallPush =
         !editing && !ghost && state.status === "running"
           ? Math.max(0, 1 - (state.tick - wallJumpTick) / 14)
@@ -152,25 +224,38 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
                 : landed
                   ? "land"
                   : "idle";
-      const texture = ghost ? "drilly" : braced ? "esc-wall" : running ? "esc-run" : "esc";
-      const runFrame = `run-${Math.floor(state.tick / 5) % 6}`;
-      player.setTexture(texture, braced ? "slide" : running ? runFrame : frame).setOrigin(0.5, 1);
+      const texture = ghost ? "drilly" : braced ? "esc-wall" : "esc";
+      const pose = braced ? "slide" : frame;
+      if (player.texture.key !== texture || player.frame.name !== pose)
+        player.setTexture(texture, pose);
+      player.setOrigin(0.5, 1);
       const reference = scene.textures.getFrame(
         texture,
-        ghost ? "hover" : braced ? "slide" : running ? "run-0" : "idle",
+        ghost ? "hover" : braced ? "slide" : "idle",
       );
-      const scale = RULES.playerHeight / reference.height;
+      const scale =
+        (RULES.playerHeight * RULES.playerVisualScale) / reference.height;
       const jumpStrength =
-        !ghost && state.status === "running" ? Math.max(0, 1 - (state.tick - jumpTick) / 8) : 0;
+        !ghost && state.status === "running"
+          ? Math.max(0, 1 - (state.tick - jumpTick) / 8)
+          : 0;
       const landStrength =
         !ghost && state.status === "running" && landed
           ? Math.max(0, 1 - (state.tick - landingTick) / 6)
           : 0;
       player.setScale(
         scale *
-          (1 - jumpStrength * 0.08 + landStrength * 0.08 - wallImpact * 0.2 - wallPush * 0.12),
+          (1 -
+            jumpStrength * 0.08 +
+            landStrength * 0.08 -
+            wallImpact * 0.1 -
+            wallPush * 0.06),
         scale *
-          (1 + jumpStrength * 0.1 - landStrength * 0.08 + wallImpact * 0.12 + wallPush * 0.18),
+          (1 +
+            jumpStrength * 0.1 -
+            landStrength * 0.08 +
+            wallImpact * 0.06 +
+            wallPush * 0.09),
       );
       player.setPosition(
         state.player.x + RULES.playerWidth / 2,
@@ -181,9 +266,11 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
         !editing && state.status === "running"
           ? wallContact
             ? state.player.wall * (0.14 + wallImpact * 0.12)
-            : state.player.direction * (0.04 + wallPush * 0.35)
+            : state.player.direction * (0.02 + wallPush * 0.18)
           : 0,
       );
+      if (running) player.setScale(scale).setRotation(0);
+      legs.update(player, state.tick, running);
       if (wallContact) {
         // Grounded corners use an upright, planted pose; airborne contact uses the palms.
         // Anchor the visible edge so the wider artwork cannot lean into the wall.
@@ -193,30 +280,32 @@ export function createRoomArt(scene: Phaser.Scene, level: Level) {
           .setFlipX(state.player.wall < 0);
         // Atlas frames with custom pivots mirror around their origin. A centered
         // origin keeps flipped and unflipped sprites on the same side of the wall.
-        const wallX = state.player.x + (state.player.wall > 0 ? RULES.playerWidth : 0);
+        const wallX =
+          state.player.x + (state.player.wall > 0 ? RULES.playerWidth : 0);
         player.setOrigin(0.5, 1);
-        player.setX(wallX - state.player.wall * player.displayWidth / 2);
+        player.setX(wallX - (state.player.wall * player.displayWidth) / 2);
       }
-      if (wallContact && (wallImpact > 0 || isWallSliding(state))) drawWallSparks(fragments, state);
+      if (wallContact && (wallImpact > 0 || isWallSliding(state)))
+        drawWallSparks(fragments, state);
       player.setAlpha(ghost ? 0.8 : 1).clearTint();
       if (!editing && !ghost && state.status === "dead") {
         drawElectricDeath(player, fragments, deathMs, scale);
-      } else if (wallPush > 0 && !braced) {
-        // Short kick-off streaks originate behind ESC, toward the wall he left.
-        fragments.lineStyle(2, 0x50dcf3, wallPush * 0.8);
-        for (let index = 0; index < 3; index++) {
-          const x = player.x - state.player.direction * (12 + (1 - wallPush) * 16);
-          const y = player.y - 6 - index * 8;
-          fragments.lineBetween(x, y, x - state.player.direction * wallPush * 12, y + 4);
-        }
       }
       saws.forEach((image) => image.setRotation(state.tick / 10));
       treasures.forEach((image, index) =>
-        image.setVisible(!state.collectedTreasureIds.includes(level.treasures[index].id)),
+        image.setVisible(
+          !state.collectedTreasureIds.includes(level.treasures[index].id),
+        ),
       );
-      return !editing && !ghost && state.status === "dead" && deathMs < DEATH_ANIMATION_MS;
+      return (
+        !editing &&
+        !ghost &&
+        state.status === "dead" &&
+        deathMs < DEATH_ANIMATION_MS
+      );
     },
     destroy() {
+      legs.destroy();
       grid.destroy();
       guides.destroy();
       previewPanels.destroy();
@@ -236,25 +325,25 @@ function drawGuides(
   invalid: boolean,
   resize: boolean,
 ) {
+  if (
+    object.kind === "obstacle" &&
+    (object.value.kind === "drone" || object.value.kind === "slider")
+  )
+    return;
   const b = objectBounds(object);
   graphics.lineStyle(2, invalid ? 0xff568e : 0x50dcf3);
   graphics.strokeRect(b.x, b.y, b.width, b.height);
-  if (resize && object.kind === "platform") {
+  if (
+    resize &&
+    (object.kind === "platform" ||
+      (object.kind === "obstacle" && object.value.kind === "spikes"))
+  ) {
     graphics.fillStyle(0x50dcf3);
     graphics.fillRect(b.x + b.width - 6, b.y + b.height - 6, 12, 12);
   }
   if (object.kind !== "obstacle") return;
   const o = object.value;
   graphics.lineStyle(1.5, 0x61e0eb);
-  if (o.kind === "slider" || o.kind === "drone") {
-    graphics.lineBetween(o.x, o.y, o.endX, o.endY);
-    graphics.strokeCircle(o.endX, o.endY, o.radius);
-  }
-  if (o.kind === "pursuer") {
-    graphics.strokeCircle(o.x, o.y, o.detectionRange);
-    graphics.lineStyle(1.5, 0xee5fb9);
-    graphics.strokeCircle(o.x, o.y, o.chaseRange);
-  }
   if (o.kind === "turret") {
     if (o.mode === "aimed") graphics.strokeCircle(o.x, o.y, o.range);
     else if (o.mode === "flame") {
@@ -270,7 +359,13 @@ type PanelRect = Bounds & { color: number };
 /** Size-aware hardware panels for the room and its editor preview. */
 function platformPanels(bounds: Bounds): PanelRect[] {
   const result: PanelRect[] = [];
-  const add = (x: number, y: number, width: number, height: number, color: number) => {
+  const add = (
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    color: number,
+  ) => {
     if (width > 0 && height > 0) result.push({ x, y, width, height, color });
   };
   const { x, y, width, height } = bounds;

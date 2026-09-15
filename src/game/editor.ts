@@ -3,14 +3,19 @@ import type { Obstacle, ObstacleKind } from "../../shared/game/obstacleTypes";
 import { obstacleBounds } from "../../shared/game/obstacles";
 import { RULES } from "../../shared/game/rules";
 import type { EditorObject, Level, Rect } from "../../shared/game/types";
-import { editorPlacementError, parseEditorLevel } from "../../shared/validation";
+import {
+  editorPlacementError,
+  parseEditorLevel,
+} from "../../shared/validation";
 
 export type { EditorObject } from "../../shared/game/types";
 
 export type ObjectKind = EditorObject["kind"];
 export type Selection = { kind: ObjectKind; id: string };
 export type Point = { x: number; y: number };
-export type Edit = { type: "put"; object: EditorObject } | { type: "delete"; selection: Selection };
+export type Edit =
+  | { type: "put"; object: EditorObject }
+  | { type: "delete"; selection: Selection };
 
 export function editorObjects(level: Level): EditorObject[] {
   return [
@@ -20,7 +25,10 @@ export function editorObjects(level: Level): EditorObject[] {
         kind: "platform",
         value,
       })),
-    ...(level.obstacles ?? []).map((value): EditorObject => ({ kind: "obstacle", value })),
+    ...(level.obstacles ?? []).map((value): EditorObject => ({
+      kind: "obstacle",
+      value,
+    })),
     ...level.traps.map((value): EditorObject => ({ kind: "saw", value })),
     ...level.treasures.map((value): EditorObject => ({
       kind: "treasure",
@@ -31,7 +39,8 @@ export function editorObjects(level: Level): EditorObject[] {
 
 export function findObject(level: Level, selection: Selection | null) {
   return editorObjects(level).find(
-    (object) => object.kind === selection?.kind && object.value.id === selection.id,
+    (object) =>
+      object.kind === selection?.kind && object.value.id === selection.id,
   );
 }
 
@@ -56,13 +65,17 @@ export function objectBounds(object: EditorObject): Rect {
   };
 }
 
-export function hitObject(level: Level, point: Point): EditorObject | undefined {
+export function hitObject(
+  level: Level,
+  point: Point,
+): EditorObject | undefined {
   return editorObjects(level)
     .reverse()
     .find((object) => {
       if (object.kind === "saw") {
         return (
-          Math.hypot(point.x - object.value.x, point.y - object.value.y) <= object.value.radius
+          Math.hypot(point.x - object.value.x, point.y - object.value.y) <=
+          object.value.radius
         );
       }
 
@@ -131,8 +144,10 @@ export function moveObject(object: EditorObject, delta: Point): EditorObject {
     object.kind === "obstacle" &&
     (object.value.kind === "slider" || object.value.kind === "drone")
   ) {
-    const x = snap(delta.x) === 0 ? object.value.x : snap(object.value.x + delta.x);
-    const y = snap(delta.y) === 0 ? object.value.y : snap(object.value.y + delta.y);
+    const x =
+      snap(delta.x) === 0 ? object.value.x : snap(object.value.x + delta.x);
+    const y =
+      snap(delta.y) === 0 ? object.value.y : snap(object.value.y + delta.y);
     return {
       ...object,
       value: {
@@ -154,23 +169,37 @@ export function moveObject(object: EditorObject, delta: Point): EditorObject {
   } as EditorObject;
 }
 
-export function resizePlatform(object: EditorObject, delta: Point): EditorObject {
-  if (object.kind !== "platform" || (snap(delta.x) === 0 && snap(delta.y) === 0)) return object;
-
-  return {
-    kind: "platform",
-    value: {
-      ...object.value,
-      width:
-        snap(delta.x) === 0
-          ? object.value.width
-          : Math.max(RULES.editor.minPlatformSize, snap(object.value.width + delta.x)),
-      height:
-        snap(delta.y) === 0
-          ? object.value.height
-          : Math.max(RULES.editor.minPlatformSize, snap(object.value.height + delta.y)),
-    },
-  };
+export function resizeObject(object: EditorObject, delta: Point): EditorObject {
+  if (snap(delta.x) === 0 && snap(delta.y) === 0) return object;
+  const result = structuredClone(object);
+  if (result.kind === "obstacle" && result.value.kind === "spikes") {
+    const o = result.value;
+    const vertical = (o.rotation ?? 0) % 2 === 1;
+    const length = vertical ? o.height : o.width;
+    const change = vertical ? delta.y : delta.x;
+    if (snap(change) === 0) return object;
+    const tooth = RULES.obstacles.spikeToothWidth;
+    const nextLength = Math.max(
+      tooth,
+      Math.round((length + change) / tooth) * tooth,
+    );
+    if (vertical) o.height = nextLength;
+    else o.width = nextLength;
+    return result;
+  }
+  const rect = result.kind === "platform" ? result.value : null;
+  if (!rect) return object;
+  if (snap(delta.x) !== 0)
+    rect.width = Math.max(
+      RULES.editor.minPlatformSize,
+      snap(rect.width + delta.x),
+    );
+  if (snap(delta.y) !== 0)
+    rect.height = Math.max(
+      RULES.editor.minPlatformSize,
+      snap(rect.height + delta.y),
+    );
+  return result;
 }
 
 export function applyEdit(level: Level, edit: Edit): Level {
@@ -191,18 +220,27 @@ export function applyEdit(level: Level, edit: Edit): Level {
       candidate.obstacles ??= [];
       putObject(candidate.obstacles, object.value);
     }
-    if (object.kind === "platform") putObject(candidate.platforms, object.value);
+    if (object.kind === "platform")
+      putObject(candidate.platforms, object.value);
     if (object.kind === "saw") putObject(candidate.traps, object.value);
-    if (object.kind === "treasure") putObject(candidate.treasures, object.value);
+    if (object.kind === "treasure")
+      putObject(candidate.treasures, object.value);
   } else {
     const { kind, id } = edit.selection;
     if (kind === "obstacle")
-      candidate.obstacles = (candidate.obstacles ?? []).filter((item) => item.id !== id);
+      candidate.obstacles = (candidate.obstacles ?? []).filter(
+        (item) => item.id !== id,
+      );
     if (kind === "platform")
-      candidate.platforms = candidate.platforms.filter((item) => item.id !== id);
-    if (kind === "saw") candidate.traps = candidate.traps.filter((item) => item.id !== id);
+      candidate.platforms = candidate.platforms.filter(
+        (item) => item.id !== id,
+      );
+    if (kind === "saw")
+      candidate.traps = candidate.traps.filter((item) => item.id !== id);
     if (kind === "treasure")
-      candidate.treasures = candidate.treasures.filter((item) => item.id !== id);
+      candidate.treasures = candidate.treasures.filter(
+        (item) => item.id !== id,
+      );
   }
 
   return parseEditorLevel(candidate, level);
@@ -226,7 +264,12 @@ export function newObstacle(
   const center = { ...position, radius: r.radius };
   switch (kind) {
     case "spikes":
-      return { ...position, kind, width: r.spikesWidth, height: r.spikesHeight };
+      return {
+        ...position,
+        kind,
+        width: r.spikesWidth,
+        height: r.spikesHeight,
+      };
     case "slider":
     case "drone":
       return {
@@ -234,7 +277,9 @@ export function newObstacle(
         kind,
         endX:
           position.x +
-          (position.x + r.pathLength + r.radius <= level.width ? r.pathLength : -r.pathLength),
+          (position.x + r.pathLength + r.radius <= level.width
+            ? r.pathLength
+            : -r.pathLength),
         endY: position.y,
         speed: r.patrolSpeed,
       };
@@ -255,9 +300,6 @@ export function newObstacle(
         ...center,
         kind,
         speed: r.pursuerSpeed,
-        detectionRange: r.detectionRange,
-        chaseRange: r.chaseRange,
-        warningTicks: r.warningTicks,
       };
   }
 }

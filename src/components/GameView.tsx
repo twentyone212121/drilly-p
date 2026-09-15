@@ -48,17 +48,26 @@ export function GameView({
       const target = event.target;
       if (
         target instanceof HTMLElement &&
-        (target.closest("dialog, input, textarea, select") || target.isContentEditable)
+        (target.closest("dialog, input, textarea, select") ||
+          target.isContentEditable)
       )
         return;
 
       const view = session.getSnapshot();
-      if (!view.canPlay || view.paused || view.mode !== "human") return;
+      if (
+        !view.canPlay ||
+        (view.paused && !view.waitingToStart) ||
+        view.mode !== "human"
+      )
+        return;
 
       // Space belongs to gameplay even when a toolbar button retains focus.
       // Cancel its native keyup click as well as scrolling; Enter still activates buttons.
       event.preventDefault();
-      if (!event.repeat) session.jump();
+      if (!event.repeat) {
+        if (view.waitingToStart) session.play();
+        else session.jump();
+      }
     };
 
     document.addEventListener("visibilitychange", onVisibility);

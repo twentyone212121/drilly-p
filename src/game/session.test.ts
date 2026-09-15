@@ -19,7 +19,8 @@ function finish(session: Session, jumps: number[] = []) {
 }
 
 function finishDeathPresentation(session: Session) {
-  for (let elapsed = 0; elapsed < DEATH_ANIMATION_MS; elapsed += 100) session.update(100);
+  for (let elapsed = 0; elapsed < DEATH_ANIMATION_MS; elapsed += 100)
+    session.update(100);
 }
 
 function editingSession() {
@@ -73,8 +74,20 @@ it("allows unlimited prison retries and opens the editor after a real escape", (
 it("requires a clear and only invalidates it for accepted geometry changes", () => {
   const session = editingSession();
   session.challengeDrilly();
+  const start = session.frameState();
+  expect(session.getSnapshot().waitingToStart).toBe(true);
+  session.update(100);
+  expect(session.frameState()).toBe(start);
+  session.play();
+  session.update(20);
+  expect(session.frameState().tick).toBeGreaterThan(0);
+  expect(session.frameState().player.vy).toBeGreaterThanOrEqual(0);
   finish(session);
   expect(session.getSnapshot().cleared).toBe(true);
+  expect(session.getSnapshot().phase).toBe("build");
+  expect(session.getSnapshot().level).toEqual(
+    session.getSnapshot().editorLevel,
+  );
   session.editDungeon();
   const level = session.getSnapshot().level;
   session.edit({
@@ -96,7 +109,10 @@ it("allows incomplete drafts but refuses to test without a treasure", () => {
   const session = editingSession();
   session.edit({
     type: "delete",
-    selection: { kind: "treasure", id: session.getSnapshot().level.treasures[0].id },
+    selection: {
+      kind: "treasure",
+      id: session.getSnapshot().level.treasures[0].id,
+    },
   });
   expect(() => session.testDungeon()).toThrow();
   session.replayTutorial();
@@ -138,12 +154,19 @@ it("counts each scored death or restart once, preserves the draft, and stops aft
   session.reset();
   finish(session);
   const dead = session.frameState();
-  expect(session.getSnapshot()).toMatchObject({ phase: "raid", presentingDeath: true });
-  for (let elapsed = 0; elapsed < DEATH_ANIMATION_MS - 100; elapsed += 100) session.update(100);
+  expect(session.getSnapshot()).toMatchObject({
+    phase: "raid",
+    presentingDeath: true,
+  });
+  for (let elapsed = 0; elapsed < DEATH_ANIMATION_MS - 100; elapsed += 100)
+    session.update(100);
   expect(session.getSnapshot().phase).toBe("raid");
   expect(session.frameState()).toBe(dead);
   session.update(100);
-  expect(session.getSnapshot()).toMatchObject({ phase: "watch", presentingDeath: false });
+  expect(session.getSnapshot()).toMatchObject({
+    phase: "watch",
+    presentingDeath: false,
+  });
   session.update(100);
   session.reset();
   expect(session.getSnapshot().round?.human.map((a) => a.outcome)).toEqual([

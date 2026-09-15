@@ -1,6 +1,6 @@
 // Provisional mechanics and editor tuning. Bump the rules version when mechanics change.
 export const RULES = Object.freeze({
-  version: "obstacles-7",
+  version: "obstacles-14",
   raidAttempts: 3,
   roomBorderWidth: 12,
   drilly: Object.freeze({
@@ -33,10 +33,12 @@ export const RULES = Object.freeze({
   tickRate: 60,
   playerWidth: 24,
   playerHeight: 28,
+  playerVisualScale: 1.25,
   runSpeed: 240,
   gravity: 1700,
   jumpSpeed: 680,
   wallSlideSpeed: 110,
+  // Execution budget for AI planning and default headless runs, not a player timer.
   maxTicks: 1800,
   obstacles: Object.freeze({
     maxCount: 20,
@@ -52,15 +54,15 @@ export const RULES = Object.freeze({
     minWarning: 12,
     projectileRadius: 5,
     flameHalfHeight: 12,
-    spikesWidth: 48,
-    spikesHeight: 20,
+    spikesWidth: 64,
+    spikeToothWidth: 16,
+    spikeBaseFraction: 9 / 32,
+    spikesHeight: 28,
     radius: 18,
     pathLength: 96,
     patrolSpeed: 90,
+    droneSpeedMultiplier: 1.6,
     pursuerSpeed: 150,
-    detectionRange: 160,
-    chaseRange: 320,
-    warningTicks: 30,
     intervalTicks: 90,
     flameIntervalTicks: 150,
     warmupTicks: 45,
@@ -97,18 +99,18 @@ export function describeRules() {
       "60 fixed ticks/second. Jump events use the input tick; collision events use the resulting state tick. Legacy saws are stationary; obstacles update on the same fixed ticks. See obstacle behavior below.",
     obstacles: {
       spikes:
-        "Lethal rectangle; x/y are its top-left. All other obstacles use center x/y and radius.",
+        "Exposed teeth kill on contact from any direction. The mounting base is solid and safe (rotation 0 up, 1 right, 2 down, 3 left). x/y are top-left. All other obstacles use center x/y and radius.",
       patrols:
-        "slider/drone: linear ping-pong from x/y to endX/endY at speed pixels/second. Routes pass through platforms.",
+        "drone: straight patrol from x/y to endX/endY, cosine easing to rest at each endpoint. Average travel speed is speed * droneSpeedMultiplier pixels/second. Routes pass through platforms.",
       turret:
-        "Cycle begins at tick 0. Warning until warmupTicks, then one shot (fixed/aimed) or flame for activeTicks. Rest of intervalTicks is cooldown. Aimed shots lock the player's center at firing time within range. Shots continue until a platform or room boundary; range only limits aimed acquisition and flame reach. Default firing interval is 90 ticks (1.5 seconds). Platforms stop shots and flames. Turret bodies are safe to touch; only shots and active flames are lethal.",
+        "Cycle begins at tick 0. Warning until warmupTicks, then one shot (fixed/aimed) or flame for activeTicks. Rest of intervalTicks is cooldown. Aimed shots lock the player's center at firing time within range. Shots continue until a platform or room boundary; range only limits aimed acquisition and flame reach. axis x/y and direction -1/+1 select left/right/up/down. Default firing interval is 90 ticks (1.5 seconds). Platforms stop shots and flames. Turret bodies are safe to touch; only shots and active flames are lethal.",
       pursuer:
-        "Detect within detectionRange of home, warn warningTicks, then chase at speed. Return home if the player leaves chaseRange of home. Cannot reacquire until home. Passes through platforms. Body always lethal.",
+        "Continuously chase the player from any distance at speed. No detection zone or return home. Passes through platforms. Body always lethal.",
       reset:
         "All paths, timers, pursuers, and projectiles reset per attempt. No randomness or wall-clock time.",
     },
     outcome:
-      "Dead and won states are terminal. Lethal contact wins ties with treasure. Attempts stop at maxTicks (at most 1800).",
+      "Dead and won states are terminal. Lethal contact wins ties with treasure. Human attempts have no time limit. AI planning and default headless runs use maxTicks as an execution budget; recorded replays stop at their endTick.",
     replay:
       "version: 2; rulesVersion; full version 2 level snapshot with treasures (each has an id); jumpTicks; endTick. Initial state is derived from level.spawn with zero vertical velocity and no collected treasures. Older versions are rejected. Replay cannot change rules.",
   };

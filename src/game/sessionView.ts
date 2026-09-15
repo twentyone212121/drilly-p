@@ -32,24 +32,17 @@ export function sessionView(view: SessionSnapshot): ViewCopy {
         actionDisabled: !view.canChallenge,
       };
     case "test":
-      return state.status === "won"
-        ? {
-            title: "Room cleared!",
-            hint: view.liveDrilly
-              ? "You’re ready to raid Drilly’s dungeon."
-              : "Connect Convex to challenge Drilly.",
-            action: "Raid Drilly",
-            actionDisabled: !view.canChallenge,
-          }
-        : {
-            title: finished ? "Try again" : "Test your room",
-            hint: "Collect every treasure. Retries are unlimited.",
-            action: finished ? "Retry" : "Start test",
-          };
+      return {
+        title: "Try again",
+        hint: "Collect every treasure. Retries are unlimited.",
+        action: "Retry",
+      };
     case "raid":
       if (!view.canPlay)
         return {
-          title: view.aiError ? "Couldn’t build the room" : "Drilly is building",
+          title: view.aiError
+            ? "Couldn’t build the room"
+            : "Drilly is building",
           hint:
             view.aiError ??
             "Drilly must clear its room before you can enter. This can take a few minutes.",
@@ -67,7 +60,8 @@ export function sessionView(view: SessionSnapshot): ViewCopy {
         return {
           title: view.aiError ? "Drilly couldn’t finish" : "Drilly’s turn",
           hint:
-            view.aiError ?? "Drilly is attempting your dungeon. Its recordings will appear here.",
+            view.aiError ??
+            "Drilly is attempting your dungeon. Its recordings will appear here.",
           action: view.aiError ? "Retry" : "Thinking…",
           actionDisabled: !view.aiError,
         };

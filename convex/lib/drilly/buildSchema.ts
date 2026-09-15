@@ -79,16 +79,18 @@ export function buildSchema(budget: BuildBudget, canFinish: boolean) {
             object({
               ...rectangle,
               kind: { type: "string", enum: ["spikes"] },
+              rotation: { type: "integer", enum: [0, 1, 2, 3] },
             }),
             object({
               ...patrol,
-              kind: { type: "string", enum: ["slider", "drone"] },
+              kind: { type: "string", enum: ["drone"] },
             }),
             object({
               ...center,
               kind: { type: "string", enum: ["turret"] },
               mode: { type: "string", enum: ["fixed", "aimed", "flame"] },
               direction: { type: "number", enum: [-1, 1] },
+              axis: { type: "string", enum: ["x", "y"] },
               intervalTicks: {
                 type: "integer",
                 minimum: RULES.obstacles.minInterval,
@@ -103,9 +105,6 @@ export function buildSchema(budget: BuildBudget, canFinish: boolean) {
               ...center,
               kind: { type: "string", enum: ["pursuer"] },
               speed,
-              detectionRange: range,
-              chaseRange: range,
-              warningTicks: warning,
             }),
           ],
         },

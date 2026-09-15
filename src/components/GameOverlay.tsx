@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import type { Session, SessionSnapshot } from "../game/session";
 import { sessionView } from "../game/sessionView";
 import type { AudioSettings } from "../game/phaser/audio";
@@ -20,12 +20,21 @@ export function GameOverlay({
   onCloseMenu: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const startingTest =
+    view.phase === "test" && !view.finished && view.state.tick === 0;
   const visible =
-    menuOpen || (!view.presentingDeath && view.phase !== "build" && (view.paused || !view.canPlay));
-  const paused = menuOpen || (view.canPlay && view.paused && !view.finished && view.state.tick > 0);
+    menuOpen ||
+    (!startingTest &&
+      !view.waitingToStart &&
+      !view.presentingDeath &&
+      view.phase !== "build" &&
+      (view.paused || !view.canPlay));
+  const paused =
+    menuOpen ||
+    (view.canPlay && view.paused && !view.finished && view.state.tick > 0);
   const copy = sessionView(view);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = dialog.current;
     if (visible && !element?.open) element?.showModal();
     else if (!visible && element?.open) element.close();
@@ -73,14 +82,11 @@ export function GameOverlay({
                 {view.phase === "watch" ? "Replay attempt" : "Restart"}
               </button>
             )}
-            {view.tutorialCompleted && view.phase !== "build" && (
-              <button className="game-button" onClick={() => act(session.editDungeon)}>
-                <GameIcon name="back" />
-                Your dungeon
-              </button>
-            )}
             {view.canReplayTutorial && (
-              <button className="text-button" onClick={() => act(session.replayTutorial)}>
+              <button
+                className="text-button"
+                onClick={() => act(session.replayTutorial)}
+              >
                 Replay tutorial
               </button>
             )}
@@ -110,7 +116,6 @@ export function GameOverlay({
                 />
               </label>
             </div>
-            <p className="input-help">Tap or Space to jump. Jump off a wall to turn around.</p>
           </>
         ) : (
           <>
@@ -123,21 +128,27 @@ export function GameOverlay({
             ) : (
               <GameSprite
                 name={
-                  (view.phase === "raid" && !view.canPlay) || view.phase === "watch"
+                  (view.phase === "raid" && !view.canPlay) ||
+                  view.phase === "watch"
                     ? "drilly"
                     : "esc"
                 }
-                className="overlay-character"
+                className={`overlay-character ${view.phase === "raid" && !view.canPlay && !view.aiError ? "drilly-building" : ""}`}
               />
             )}
             <h2 id="overlay-title">{copy.title}</h2>
             {view.phase === "results" && view.result ? (
               <>
-                <div className="medals" aria-label={`${view.result.total} of 6 medals`}>
+                <div
+                  className="medals"
+                  aria-label={`${view.result.total} of 6 medals`}
+                >
                   {Array.from({ length: 6 }, (_, index) => (
                     <span
                       key={index}
-                      className={index < view.result!.total ? "medal" : "medal empty"}
+                      className={
+                        index < view.result!.total ? "medal" : "medal empty"
+                      }
                     >
                       <GameIcon name="medal" />
                     </span>
@@ -165,13 +176,19 @@ export function GameOverlay({
               <GameIcon name="arrow" />
             </button>
             {view.phase === "results" ? (
-              <button className="text-button" onClick={() => act(() => session.replayDrilly())}>
+              <button
+                className="text-button"
+                onClick={() => act(() => session.replayDrilly())}
+              >
                 Watch Drilly again
               </button>
             ) : (
               view.tutorialCompleted &&
               !(view.phase === "prison" && view.state.status === "won") && (
-                <button className="text-button" onClick={() => act(session.editDungeon)}>
+                <button
+                  className="text-button"
+                  onClick={() => act(session.editDungeon)}
+                >
                   Back to your dungeon
                 </button>
               )

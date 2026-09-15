@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import checkpoint from "./levels/checkpoint.json";
 import { RULES } from "./game/rules";
-import { parseEditorLevel, parseJumpTicks, parseLevel, parseReplay } from "./validation";
+import {
+  parseBuiltDungeon,
+  parseDrillyAttempts,
+  parseEditorLevel,
+  parseJumpTicks,
+  parseLevel,
+  parseReplay,
+} from "./validation";
 
 const level = parseLevel(checkpoint);
 
@@ -14,6 +21,17 @@ const replay = {
 };
 
 describe("schema validation boundaries", () => {
+  it("keeps incoming AI recordings bounded without limiting human recordings", () => {
+    const longReplay = { ...replay, endTick: RULES.maxTicks + 1 };
+    expect(parseReplay(longReplay)).toEqual(longReplay);
+    expect(() => parseBuiltDungeon({ level, proof: longReplay })).toThrow(
+      "execution budget",
+    );
+    expect(() =>
+      parseDrillyAttempts([{ replay: longReplay, outcome: "won" }], level),
+    ).toThrow("execution budget");
+  });
+
   it.each([
     { name: "missing spawn", value: { ...level, spawn: undefined } },
     {
@@ -32,7 +50,9 @@ describe("schema validation boundaries", () => {
       name: "platform outside room",
       value: {
         ...level,
-        platforms: [{ id: "outside", x: level.width, y: 0, width: 8, height: 8 }],
+        platforms: [
+          { id: "outside", x: level.width, y: 0, width: 8, height: 8 },
+        ],
       },
     },
     {
@@ -65,7 +85,9 @@ describe("schema validation boundaries", () => {
       name: "treasure overlapping spawn",
       value: {
         ...level,
-        treasures: [{ ...level.treasures[0], x: level.spawn.x, y: level.spawn.y }],
+        treasures: [
+          { ...level.treasures[0], x: level.spawn.x, y: level.spawn.y },
+        ],
       },
     },
     {
@@ -86,7 +108,8 @@ describe("schema validation boundaries", () => {
       value: {
         ...level,
         platforms: Array.from({ length: 65 }, (_, id) => ({
-          ...level.platforms[0], id: `platform-${id}`,
+          ...level.platforms[0],
+          id: `platform-${id}`,
         })),
       },
     },
@@ -128,7 +151,7 @@ describe("schema validation boundaries", () => {
     expect(() => parseReplay({ ...replay, jumpTicks: [0] })).toThrow();
   });
 
-  it.each([-1, 0.5, NaN, Infinity, RULES.maxTicks + 1])(
+  it.each([-1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
     "rejects invalid tick limit %s even for empty input",
     (endTick) => {
       expect(() => parseJumpTicks([], endTick)).toThrow();

@@ -1,3 +1,5 @@
+import { createEngravedLabel } from "./engravedLabel";
+import { roomBorders } from "../../../shared/game/roomBoundary";
 import { interpolateFrame } from "./interpolateFrame";
 import { OBSTACLE_TEXTURES } from "./obstacleArt";
 import Phaser from "phaser";
@@ -19,22 +21,29 @@ export class GameScene extends Phaser.Scene {
   private draftState?: State;
   private wakeFrame = 0;
   private ready = false;
+  private tutorialHint?: Phaser.GameObjects.Image;
 
   constructor(
     private session: Session,
     private settings: AudioSettings,
     private editorOptions: EditorOptions,
+    private density: number,
   ) {
     super("room");
   }
 
   preload() {
     for (const name of OBSTACLE_TEXTURES) {
-      if (name === "turret") this.load.image("obstacle-turret", "/assets/obstacles/turret.png");
-      else this.load.svg(`obstacle-${name}`, `/assets/obstacles/${name}.svg`);
+      this.load.svg(`obstacle-${name}`, `/assets/obstacles/${name}.svg`, {
+        scale: this.density,
+      });
     }
-    for (const name of ["esc", "esc-run", "esc-wall", "drilly"]) {
-      this.load.atlas(name, `/assets/characters/${name}.png`, `/assets/characters/${name}.json`);
+    for (const name of ["esc", "esc-wall", "drilly"]) {
+      this.load.atlas(
+        name,
+        `/assets/characters/${name}.png`,
+        `/assets/characters/${name}.json`,
+      );
     }
     this.load.atlas(
       "computer-props",
@@ -47,13 +56,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   create() {
+    this.tutorialHint = createEngravedLabel(
+      this,
+      "Tap or Space to jump. Jump off a wall to turn around.",
+      this.density,
+    );
     this.audio = createAudio(this, this.settings);
     this.connectAudio();
     this.editor = createEditorInput(
       this.game.canvas,
       this.session,
       this.editorOptions,
-      (selected, preview, invalid) => this.roomArt?.editor(selected, preview, invalid),
+      (selected, preview, invalid) =>
+        this.roomArt?.editor(selected, preview, invalid),
       () => this.requestRender(),
     );
     this.ready = true;
@@ -66,6 +81,7 @@ export class GameScene extends Phaser.Scene {
     const view = this.session.getSnapshot();
     this.syncLevel(view.level);
     this.editor?.flushPreview();
+    this.tutorialHint?.setVisible(view.phase === "prison");
     const editing = view.phase === "build";
     this.audio?.updateMovement(
       this.session.frameState(),
@@ -75,7 +91,7 @@ export class GameScene extends Phaser.Scene {
       editing ? this.draftState! : interpolateFrame(this.session.renderFrame()),
       !editing && view.mode === "replay",
       delta,
-      editing,
+      editing && this.editorOptions.enabled,
     );
     if ((view.paused || !view.canPlay) && !view.presentingDeath && !animating)
       this.game.loop.sleep();
@@ -107,18 +123,30 @@ export class GameScene extends Phaser.Scene {
     if (this.level === level) return;
     this.level = level;
     this.draftState = initialState(level);
-    if (this.scale.width !== level.width || this.scale.height !== level.height)
-      this.scale.setGameSize(level.width, level.height);
+    const floor = roomBorders(level).find(
+      (border) => border.id === "room-frame-floor",
+    )!;
+    this.tutorialHint?.setPosition(
+      level.width / 2,
+      floor.y + floor.height * 0.75,
+    );
+    const width = level.width * this.density;
+    const height = level.height * this.density;
+    if (this.scale.width !== width || this.scale.height !== height)
+      this.scale.resize(width, height);
+    this.cameras.main
+      .setZoom(this.density)
+      .centerOn(level.width / 2, level.height / 2);
     this.roomArt?.destroy();
-    this.roomArt = createRoomArt(this, level);
+    this.roomArt = createRoomArt(this, level, this.density);
     this.editor?.setLevel(level);
-    this.editor?.setOptions(this.editorOptions);
   }
 
   private stopAudioOnTransition() {
     const view = this.session.getSnapshot();
     const restarted = view.state.tick < this.lastTick;
-    const justPaused = !this.wasPaused && view.paused && view.state.status === "running";
+    const justPaused =
+      !this.wasPaused && view.paused && view.state.status === "running";
 
     if (restarted || justPaused) this.audio?.stop();
 

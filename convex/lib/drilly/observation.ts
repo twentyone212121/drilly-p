@@ -39,10 +39,7 @@ export function observeRoom(level: Level, state: State) {
               height: 2 * o.radius,
             };
       const moving =
-        o.kind === "slider" ||
-        o.kind === "drone" ||
-        (o.kind === "pursuer" &&
-          (live?.phase === "active" || live?.phase === "returning"));
+        o.kind === "slider" || o.kind === "drone" || o.kind === "pursuer";
       const angle =
         state.tick === 0 && (o.kind === "slider" || o.kind === "drone")
           ? Math.atan2(o.endY - o.y, o.endX - o.x)
@@ -68,12 +65,11 @@ export function observeRoom(level: Level, state: State) {
     tick: state.tick,
     player: { ...p, width: RULES.playerWidth, height: RULES.playerHeight },
     canJump: p.grounded || p.wall !== 0,
-    jumpEffect:
-      p.grounded
-        ? "jump forward"
-        : p.wall !== 0
-          ? "reverse direction and jump"
-          : "no effect until landing or wall contact",
+    jumpEffect: p.grounded
+      ? "jump forward"
+      : p.wall !== 0
+        ? "reverse direction and jump"
+        : "no effect until landing or wall contact",
     treasuresRemaining: level.treasures.filter(
       (t) => !state.collectedTreasureIds.includes(t.id),
     ),

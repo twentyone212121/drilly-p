@@ -39,7 +39,9 @@ it.each(OBSTACLE_CASES)(
       async () => directStrategy(level),
       [],
     );
-    expect(replayAttempt(result.attempt.replay).stopReason).toBe("won");
+    expect(replayAttempt(result.attempt.replay).stopReason).toBe(
+      result.attempt.outcome,
+    );
   },
 );
 

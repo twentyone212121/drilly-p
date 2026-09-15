@@ -34,7 +34,11 @@ async function flush() {
 }
 async function review(session: Session) {
   session.primaryAction();
-  for (let i = 0; i < RULES.raidAttempts && !session.getSnapshot().result; i++) {
+  for (
+    let i = 0;
+    i < RULES.raidAttempts && !session.getSnapshot().result;
+    i++
+  ) {
     session.step(RULES.maxTicks);
     session.primaryAction();
   }
@@ -70,13 +74,22 @@ describe("live Drilly rivalry", () => {
     await review(session);
     expect(session.getSnapshot().result?.total).toBe(3);
     const result = session.getSnapshot().result;
+    const scoreboard = session.getSnapshot().scoreboard;
+    expect(scoreboard).toEqual({
+      you: { points: 3, wins: 0 },
+      drilly: { points: 3, wins: 0 },
+      rounds: 1,
+      draws: 1,
+    });
     session.replayDrilly();
     session.step(RULES.maxTicks);
     session.primaryAction();
     expect(session.getSnapshot().result).toEqual(result);
+    expect(session.getSnapshot().scoreboard).toEqual(scoreboard);
     expect(source.raid).toHaveBeenCalledTimes(1);
 
     session.primaryAction();
+    expect(session.getSnapshot().scoreboard).toEqual(scoreboard);
     const draft = session.getSnapshot().level;
     session.challengeDrilly();
     await flush();
@@ -135,7 +148,10 @@ describe("live Drilly rivalry", () => {
 
 it("retries room generation without consuming a human raid attempt", async () => {
   const source = {
-    build: vi.fn().mockRejectedValueOnce(new Error("no proven room")).mockResolvedValue(built()),
+    build: vi
+      .fn()
+      .mockRejectedValueOnce(new Error("no proven room"))
+      .mockResolvedValue(built()),
     raid: vi.fn(),
   };
   const session = ready(source);
@@ -151,7 +167,8 @@ it("retries room generation without consuming a human raid attempt", async () =>
 });
 
 it("ignores an abandoned raid response while a new round is waiting", async () => {
-  const responses: ((value: ReturnType<typeof runDrillyFixture>) => void)[] = [];
+  const responses: ((value: ReturnType<typeof runDrillyFixture>) => void)[] =
+    [];
   const source: DrillySource = {
     build: async () => built(),
     raid: () =>
