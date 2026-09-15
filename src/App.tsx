@@ -8,8 +8,8 @@ import { GameHud } from "./components/GameHud";
 import { GameOverlay } from "./components/GameOverlay";
 import { GameIcon, GameSprite } from "./components/GameArt";
 import type { AudioSettings } from "./game/phaser/audio";
-import { RULES } from "../shared/game/rules";
-import { parseDrillyModel } from "../shared/validation";
+import { DrillyWorkshop } from "./components/DrillyWorkshop";
+import { ModelPicker } from "./components/ModelPicker";
 
 export default function App({ session }: { session: Session }) {
   const view = useSyncExternalStore(session.subscribe, session.getSnapshot);
@@ -74,13 +74,16 @@ export default function App({ session }: { session: Session }) {
         onBack={() => {
           setMenuOpen(false);
           setEditing(false);
-          session.editDungeon();
+          session.requestReturn();
         }}
       />
       <section className="playfield" aria-label="Room">
         <div className="room-viewport">
           <GameView session={session} audio={audio} editor={editorOptions} />
         </div>
+        {view.waitingForDrilly && (
+          <DrillyWorkshop view={view} onRetry={() => session.primaryAction()} />
+        )}
         {view.waitingToStart && !menuOpen && (
           <p className="ready-hint" role="status">
             Click, tap, or press Space to start
@@ -115,22 +118,10 @@ export default function App({ session }: { session: Session }) {
           )}
           <div className="build-actions">
             {view.liveDrilly && (
-              <label className="model-control">
-                Drilly
-                <select
-                  aria-label="Drilly model"
-                  value={view.model}
-                  onChange={(event) =>
-                    session.setModel(parseDrillyModel(event.target.value))
-                  }
-                >
-                  {RULES.drilly.models.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <ModelPicker
+                value={view.model}
+                onChange={(model) => session.setModel(model)}
+              />
             )}
             <button
               className="game-button primary"
@@ -148,19 +139,21 @@ export default function App({ session }: { session: Session }) {
         </footer>
       ) : null}
       {view.phase === "watch" && view.watchIndex !== null && (
-        <footer className="watch-comparison ghost-comparison">
-          <span>
-            You · {((view.playerClearTicks ?? 0) / RULES.tickRate).toFixed(2)}s
-          </span>
-          {view.finished && (
-            <span>
-              Drilly ·{" "}
-              {view.state.status === "won"
-                ? `${(view.state.tick / RULES.tickRate).toFixed(2)}s`
-                : "Failed"}
-            </span>
+        <nav className="replay-controls" aria-label="Drilly attempts">
+          {["First attempt", "Second attempt", "Third attempt"].map(
+            (label, index) => (
+              <button
+                key={index}
+                type="button"
+                aria-pressed={view.watchIndex === index}
+                disabled={!view.round?.drilly[index]}
+                onClick={() => session.selectDrillyAttempt(index)}
+              >
+                {label}
+              </button>
+            ),
           )}
-        </footer>
+        </nav>
       )}
       {view.phase === "prison" && (
         <p className="sr-only">

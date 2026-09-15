@@ -116,6 +116,10 @@ export function createRoomArt(scene: Phaser.Scene, level: Level, density = 1) {
   let lastEditing = false;
 
   return {
+    setWaiting(waiting: boolean) {
+      player.setVisible(!waiting);
+      if (waiting) legs.update(player, 0, false);
+    },
     editor(
       selected: EditorObject | undefined,
       preview: EditorObject | null,

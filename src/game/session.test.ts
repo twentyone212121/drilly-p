@@ -62,8 +62,10 @@ it("allows unlimited prison retries and opens the editor after a real escape", (
     expect(session.frameState()).toBe(dead);
     finishDeathPresentation(session);
     expect(session.getSnapshot().presentingDeath).toBe(false);
-    expect(session.frameState()).toBe(dead);
-    session.reset();
+    expect(session.frameState()).toMatchObject({ status: "running", tick: 0 });
+    expect(session.getSnapshot().waitingToStart).toBe(true);
+    session.update(100);
+    expect(session.frameState().tick).toBe(0);
   }
   finish(session, [44, 199, 200, 234]);
   expect(session.frameState().status).toBe("won");
@@ -142,12 +144,17 @@ it("counts each scored death or restart once, preserves the draft, and stops aft
   session.challengeDrilly();
   for (let i = 0; i < 6; i++) await Promise.resolve();
   expect(session.getSnapshot().level).toEqual(getExampleRoom());
+  expect(session.getSnapshot().livesRemaining).toBe(3);
   finish(session);
+  expect(session.getSnapshot().livesRemaining).toBe(2);
   session.pause();
   session.step();
   finishDeathPresentation(session);
   expect(session.getSnapshot().round?.human).toHaveLength(1);
-  session.reset();
+  expect(session.getSnapshot().waitingToStart).toBe(true);
+  expect(session.frameState()).toMatchObject({ status: "running", tick: 0 });
+  session.update(100);
+  expect(session.frameState().tick).toBe(0);
   session.play();
   session.pause();
   expect(session.getSnapshot().round?.human).toHaveLength(1);
@@ -157,6 +164,7 @@ it("counts each scored death or restart once, preserves the draft, and stops aft
   expect(session.getSnapshot()).toMatchObject({
     phase: "raid",
     presentingDeath: true,
+    livesRemaining: 0,
   });
   for (let elapsed = 0; elapsed < DEATH_ANIMATION_MS - 100; elapsed += 100)
     session.update(100);
@@ -164,7 +172,7 @@ it("counts each scored death or restart once, preserves the draft, and stops aft
   expect(session.frameState()).toBe(dead);
   session.update(100);
   expect(session.getSnapshot()).toMatchObject({
-    phase: "watch",
+    phase: "results",
     presentingDeath: false,
   });
   session.update(100);

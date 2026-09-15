@@ -16,7 +16,19 @@ collection. Remember completion in localStorage; later visits open your dungeon.
 Replay the tutorial from pause or the editor without losing the current draft or
 its clear. This ends the current round; return to the draft after the tutorial.
 
-**Room → Edit → Test → Saved room → Your raid → Drilly’s raid → Results → Room**
+**Room → Edit → Test → Saved room → Your raid → Results → Room**
+
+Show results immediately when both sides finish. Watching Drilly is optional from
+the results screen and starts playback directly. The results panel has a Watch
+Drilly button and an X to return to the dungeon. Playback never awards points again.
+The initial watch plays available attempts consecutively without interstitials.
+After the last attempt, return Drilly to the first recording’s start, paused, with
+attempt buttons and Back visible. Selecting an attempt plays it immediately and
+stops continuous playback; it returns to its own start when finished. Only actual
+recorded attempts can be selected; show all three buttons at the top center, with
+unavailable attempts disabled. Back remains only at the top left.
+Animate both result portraits gently. Show only both totals and each player’s
+“Cleared on try…” outcome, without a points breakdown or scoring explanation.
 
 | Step          | Action                                                            |
 | ------------- | ----------------------------------------------------------------- |
@@ -30,13 +42,25 @@ Challenge Drilly opens Test when a clear is needed, otherwise Your raid.
 Editing opens from Edit in the top-left corner; it becomes Back and Test while
 the tools are open. Back closes editing, and Test closes the tools; winning saves the
 cleared layout and returns directly to the room with a Room saved status and Edit
-button, without a success dialog or automatic raid. The clear is valid for the current tab session; the draft itself persists across reloads.
+button, without a success dialog or automatic raid. The draft and its successful test recording persist across reloads. Restored clears are verified against the exact room and current rules.
 Testing opens directly in the room without a preview dialog.
 Opening either room leaves ESC still with a small start hint. The first click, tap,
 or Space starts movement without jumping; subsequent inputs jump as usual.
 
+Each Challenge Drilly submission starts a fresh round with new attempts and room
+preparation, preserving cumulative scores. Returning from an unfinished human raid
+asks for confirmation. Cancel keeps the current attempt; confirming forfeits the
+remaining human attempts, while Drilly continues the exact submitted room. Wait
+for its verified result, then award points once and show results before returning
+to the dungeon. Giving up earns no attack medals; defence still follows Drilly's
+actual outcome. Technical failures remain retryable and do not award points.
+Waiting uses the empty room with a compact status message. While building, Drilly
+drills into workstations with recoil and sparks. While attempting the player’s room,
+Drilly scans and traces an obstacle route toward a treasure, without construction effects.
+The animation is not a progress estimate or a recording of its real attempt.
+
 Submitting the cleared room starts Drilly's attempts immediately, alongside your
-raid. Show its recordings after your attempts finish; request completion or
+raid. Show results after both sides finish, with optional recordings; request completion or
 failure must not interrupt your play. If it is still thinking, wait at Drilly's
 raid step; if it failed, offer Retry there and retain its completed attempts.
 
@@ -61,14 +85,21 @@ use the same instructions, reasoning setting, physics, and three attempts.
 - Human attempts have no timer or time limit, including scored raids. Prison and
   own-room retries are unlimited. Death and explicit restart spend a scored attempt;
   pause and technical failures do not. AI planning keeps a bounded execution budget.
+  After the death animation, return ESC to the room's start, paused until the next
+  click, tap, or Space, without a retry dialog. Raids show three cyan power cells in metal casings beside the
+  top treasure counter; each death consumes one immediately. The final death moves
+  to Drilly's turn after the animation. Tutorial and test retries remain unlimited
+  and do not show a limited-life counter.
 - Attack medals: three, two, or one for clearing on that try; otherwise zero.
   Defence is three minus Drilly’s attack. Total: four or more wins, three draws,
   fewer loses.
 - Accepted geometry edits require another clear; selection and rejected edits do
   not. Submit the exact cleared layout. Never give Drilly the player’s clear inputs.
 - Save the current dungeon draft in localStorage after committed edits and restore
-  it on reload, including unfinished layouts. Reload resets its clear and the
-  current round. Invalid stored data and storage failure must not block play.
+  it on reload, including unfinished layouts and successful test recordings. Reload
+  resets the current round, but preserves a verified clear. Geometry edits, changed
+  rules, or invalid recordings require another test. Invalid stored data and storage
+  failure must not block play.
   Replay validation stays internal.
 
 ## Look and feel

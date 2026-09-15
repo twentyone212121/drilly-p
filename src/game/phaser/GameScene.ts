@@ -88,12 +88,15 @@ export class GameScene extends Phaser.Scene {
       !editing && view.canPlay && !view.paused && view.mode === "human",
     );
     const animating = this.roomArt?.update(
-      editing ? this.draftState! : interpolateFrame(this.session.renderFrame()),
+      editing || view.waitingForDrilly
+        ? this.draftState!
+        : interpolateFrame(this.session.renderFrame()),
       !editing && view.mode === "replay",
       delta,
       editing && this.editorOptions.enabled,
     );
     this.roomArt?.comparison(this.session.ghostFrame());
+    this.roomArt?.setWaiting(view.waitingForDrilly);
     if ((view.paused || !view.canPlay) && !view.presentingDeath && !animating)
       this.game.loop.sleep();
   }

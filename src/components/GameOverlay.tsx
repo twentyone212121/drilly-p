@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef } from "react";
 import type { Session, SessionSnapshot } from "../game/session";
 import { sessionView } from "../game/sessionView";
 import type { AudioSettings } from "../game/phaser/audio";
+import { RoundScore } from "./RoundScore";
 import { GameIcon, GameSprite } from "./GameArt";
 
 export function GameOverlay({
@@ -23,8 +24,11 @@ export function GameOverlay({
   const startingTest =
     view.phase === "test" && !view.finished && view.state.tick === 0;
   const visible =
+    view.confirmingGiveUp ||
     menuOpen ||
-    (!startingTest &&
+    (!(view.phase === "watch" && view.watchIndex !== null) &&
+      !view.waitingForDrilly &&
+      !startingTest &&
       !view.waitingToStart &&
       !view.presentingDeath &&
       view.phase !== "build" &&
@@ -57,11 +61,54 @@ export function GameOverlay({
       aria-labelledby="overlay-title"
       onCancel={(event) => {
         event.preventDefault();
+        if (view.phase === "results") {
+          session.requestReturn();
+          return;
+        }
+        if (view.confirmingGiveUp) {
+          session.cancelGiveUp();
+          return;
+        }
         if (paused || (view.canPlay && !view.finished)) resume();
       }}
     >
+      {visible && view.phase === "results" && (
+        <button
+          className="result-close"
+          aria-label="Close results and return to your dungeon"
+          onClick={() => act(session.requestReturn)}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="m6 6 12 12M18 6 6 18" />
+          </svg>
+        </button>
+      )}
       {visible &&
-        (paused ? (
+        (view.confirmingGiveUp ? (
+          <>
+            <h2 id="overlay-title">Give up this round?</h2>
+            <p>
+              Your remaining attempts will be forfeited. Drilly will finish your
+              room and earn points from its result.
+            </p>
+            <button
+              className="game-button primary"
+              autoFocus
+              onClick={() => session.cancelGiveUp()}
+            >
+              Keep playing
+            </button>
+            <button
+              className="game-button"
+              onClick={() => {
+                onCloseMenu();
+                session.confirmGiveUp();
+              }}
+            >
+              Give up
+            </button>
+          </>
+        ) : paused ? (
           <>
             <h2 id="overlay-title">Paused</h2>
             <button className="game-button primary" autoFocus onClick={resume}>
@@ -82,7 +129,7 @@ export function GameOverlay({
                 {view.phase === "watch" ? "Replay attempt" : "Restart"}
               </button>
             )}
-            {view.canReplayTutorial && (
+            {view.canReplayTutorial && (!view.round || view.result) && (
               <button
                 className="text-button"
                 onClick={() => act(session.replayTutorial)}
@@ -121,9 +168,9 @@ export function GameOverlay({
           <>
             {view.phase === "results" ? (
               <div className="result-characters">
-                <GameSprite name="esc" />
+                <GameSprite name="esc" className="result-esc" />
                 <span>vs</span>
-                <GameSprite name="drilly" />
+                <GameSprite name="drilly" className="result-drilly" />
               </div>
             ) : (
               <GameSprite
@@ -138,31 +185,7 @@ export function GameOverlay({
             )}
             <h2 id="overlay-title">{copy.title}</h2>
             {view.phase === "results" && view.result ? (
-              <>
-                <div
-                  className="medals"
-                  aria-label={`${view.result.total} of 6 medals`}
-                >
-                  {Array.from({ length: 6 }, (_, index) => (
-                    <span
-                      key={index}
-                      className={
-                        index < view.result!.total ? "medal" : "medal empty"
-                      }
-                    >
-                      <GameIcon name="medal" />
-                    </span>
-                  ))}
-                </div>
-                <div className="result-details">
-                  <div>
-                    Attack<strong>{view.result.attack}/3</strong>
-                  </div>
-                  <div>
-                    Defence<strong>{view.result.defense}/3</strong>
-                  </div>
-                </div>
-              </>
+              <RoundScore view={view} />
             ) : (
               <p role={view.aiError ? "alert" : "status"}>{copy.hint}</p>
             )}
@@ -170,29 +193,27 @@ export function GameOverlay({
               className="game-button primary"
               autoFocus
               disabled={copy.actionDisabled}
-              onClick={() => act(() => session.primaryAction())}
+              onClick={() =>
+                act(() =>
+                  view.phase === "results"
+                    ? session.replayDrilly()
+                    : session.primaryAction(),
+                )
+              }
             >
-              {copy.action}
+              {view.phase === "results" ? "Watch Drilly" : copy.action}
               <GameIcon name="arrow" />
             </button>
-            {view.phase === "results" ? (
-              <button
-                className="text-button"
-                onClick={() => act(() => session.replayDrilly())}
-              >
-                Watch Drilly again
-              </button>
-            ) : (
+            {view.phase !== "results" &&
               view.tutorialCompleted &&
               !(view.phase === "prison" && view.state.status === "won") && (
                 <button
                   className="text-button"
-                  onClick={() => act(session.editDungeon)}
+                  onClick={() => act(session.requestReturn)}
                 >
                   Back to your dungeon
                 </button>
-              )
-            )}
+              )}
           </>
         ))}
       {visible && view.phase === "watch" && view.watchIndex !== null && (

@@ -98,7 +98,35 @@ export function GameHud({
         </table>
       )}
       {view.canPlay && (
-        <div className="counters centered-treasure">
+        <div
+          className={`counters centered-treasure ${phase === "watch" ? "replay-treasure" : ""}`}
+        >
+          {view.livesRemaining !== null && (
+            <span
+              className="raid-cells"
+              role="img"
+              aria-label={`${view.livesRemaining} of 3 attempts remaining`}
+            >
+              {Array.from({ length: 3 }, (_, index) => (
+                <svg
+                  key={index}
+                  className={
+                    index < view.livesRemaining! ? "cell-full" : "cell-empty"
+                  }
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path className="cell-terminal" d="M9 1.5h6v3H9z" />
+                  <path
+                    className="cell-case"
+                    d="M7 4h10l2 2v14l-2 2H7l-2-2V6z"
+                  />
+                  <path className="cell-charge" d="M8 8h8v10H8z" />
+                  <path className="cell-seam" d="M8 11.5h8M8 14.5h8" />
+                </svg>
+              ))}
+            </span>
+          )}
           <span
             className="treasure-count"
             aria-label={`${view.state.collectedTreasureIds.length} of ${totalTreasures} treasures`}

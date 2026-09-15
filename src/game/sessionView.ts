@@ -20,9 +20,9 @@ export function sessionView(view: SessionSnapshot): ViewCopy {
             action: "Build your dungeon",
           }
         : {
-            title: finished ? "Try again" : "Escape the prison",
+            title: "Escape the prison",
             hint: "Collect every treasure. Tap or Space to jump. Wall jumps turn you around.",
-            action: finished ? "Retry" : "Let’s go",
+            action: "Let’s go",
           };
     case "build":
       return {
@@ -33,9 +33,9 @@ export function sessionView(view: SessionSnapshot): ViewCopy {
       };
     case "test":
       return {
-        title: "Try again",
+        title: "Test your room",
         hint: "Collect every treasure. Retries are unlimited.",
-        action: "Retry",
+        action: "Start",
       };
     case "raid":
       if (!view.canPlay)
@@ -50,9 +50,9 @@ export function sessionView(view: SessionSnapshot): ViewCopy {
           actionDisabled: !view.aiError,
         };
       return {
-        title: finished ? "Try again" : "Your raid",
+        title: "Your raid",
         hint: `${RULES.raidAttempts - (view.round?.human.length ?? 0)} tries left. Collect every treasure.`,
-        action: finished ? "Retry" : "Start raid",
+        action: "Start raid",
       };
     case "watch": {
       const index = view.watchIndex;
