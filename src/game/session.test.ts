@@ -2,7 +2,6 @@ import { DEATH_ANIMATION_MS } from "./presentation";
 import { expect, it } from "vitest";
 import { getPrison, newPlayerDungeon } from "../../shared/game/rooms";
 import { getExampleRoom } from "../../shared/testing/rooms";
-import { runAttempt } from "../../shared/game/replay";
 import { RULES } from "../../shared/game/rules";
 import { runDrillyFixture } from "../../shared/testing/drilly";
 import { createSession, type Session } from "./session";
@@ -24,20 +23,10 @@ function finishDeathPresentation(session: Session) {
 
 function editingSession() {
   const level = getExampleRoom();
-  const jumpTicks = [34, 106];
   const session = createSession({
     prisonLevel: newPlayerDungeon(),
     drilly: {
-      build: async () => ({
-        level,
-        proof: {
-          version: 2,
-          rulesVersion: RULES.version,
-          level,
-          jumpTicks,
-          endTick: runAttempt(level, jumpTicks).state.tick,
-        },
-      }),
+      build: async () => level,
       raid: async (room, history) => runDrillyFixture(room)[history.length],
     },
   });
@@ -96,7 +85,10 @@ it("allows incomplete drafts but refuses to test without a treasure", () => {
   const session = editingSession();
   session.edit({
     type: "delete",
-    selection: { kind: "treasure", id: session.getSnapshot().level.treasures[0].id },
+    selection: {
+      kind: "treasure",
+      id: session.getSnapshot().level.treasures[0].id,
+    },
   });
   expect(() => session.testDungeon()).toThrow();
   session.replayTutorial();
@@ -138,12 +130,18 @@ it("counts each scored death or restart once, preserves the draft, and stops aft
   session.reset();
   finish(session);
   const dead = session.frameState();
-  expect(session.getSnapshot()).toMatchObject({ phase: "raid", presentingDeath: true });
+  expect(session.getSnapshot()).toMatchObject({
+    phase: "raid",
+    presentingDeath: true,
+  });
   for (let elapsed = 0; elapsed < DEATH_ANIMATION_MS - 100; elapsed += 100) session.update(100);
   expect(session.getSnapshot().phase).toBe("raid");
   expect(session.frameState()).toBe(dead);
   session.update(100);
-  expect(session.getSnapshot()).toMatchObject({ phase: "watch", presentingDeath: false });
+  expect(session.getSnapshot()).toMatchObject({
+    phase: "watch",
+    presentingDeath: false,
+  });
   session.update(100);
   session.reset();
   expect(session.getSnapshot().round?.human.map((a) => a.outcome)).toEqual([

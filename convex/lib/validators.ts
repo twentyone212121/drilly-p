@@ -1,11 +1,5 @@
 import { v } from "convex/values";
 
-export const drillyModelValidator = v.union(
-  v.literal("gpt-6-astra"),
-  v.literal("gpt-5.6-sol"),
-  v.literal("gpt-5.6-luna"),
-);
-
 const rectangle = {
   id: v.string(),
   x: v.number(),
@@ -84,15 +78,43 @@ export const replayValidator = v.object({
   endTick: v.number(),
 });
 
-export const builtDungeonValidator = v.object({
-  level: levelValidator,
-  proof: replayValidator,
-});
 export const raidAttemptValidator = v.object({
-  outcome: v.union(
-    v.literal("won"),
-    v.literal("dead"),
-    v.literal("tick-limit"),
-  ),
+  outcome: v.union(v.literal("won"), v.literal("dead"), v.literal("tick-limit")),
   replay: replayValidator,
+});
+
+export const attemptRecordingValidator = replayValidator.omit("level");
+
+export const attemptOutcomeValidator = v.union(
+  raidAttemptValidator.fields.outcome,
+  v.literal("restart"),
+);
+
+export const buildStatusValidator = v.union(
+  v.literal("queued"),
+  v.literal("running"),
+  v.literal("ready"),
+  v.literal("failed"),
+);
+
+export const attemptActorValidator = v.union(v.literal("player"), v.literal("drilly"));
+
+export const roundStatusValidator = v.union(
+  v.literal("active"),
+  v.literal("completed"),
+  v.literal("abandoned"),
+);
+
+export const raidStatusValidator = v.union(
+  v.literal("queued"),
+  v.literal("running"),
+  v.literal("completed"),
+  v.literal("failed"),
+);
+
+export const roundResultValidator = v.object({
+  attack: v.number(),
+  defense: v.number(),
+  total: v.number(),
+  outcome: v.union(v.literal("win"), v.literal("draw"), v.literal("loss")),
 });

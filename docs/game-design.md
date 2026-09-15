@@ -107,34 +107,36 @@ and cannot award medals twice.
 For scored raids, the selected model chooses a complete `jumpTicks` sequence in one call per
 attempt. Execute it literally through the shared simulation, including ignored
 jumps; do not search alternate futures or repair the inputs. Later attempts receive
-the room, rules, and actual feedback from Drilly's earlier scored failures, never
+the room, rules, initial player state, and actual feedback from Drilly's earlier scored failures, never
 the player's clear inputs. Keep each completed recording if a later request fails;
 retry continues with the remaining attempts. Replays use no model calls.
 
-The builder keeps its edit loop and tests each valid layout with one call to the
-same `playRaidAttempt` function. Feed the actual outcome back into the next design
-edit. Design and proof calls share the overall build deadline; publish only a
-winning room that cannot be cleared by simply running. A late request failure may
-return the last proven challenge. Remove the old route controller entirely.
+The builder proposes one complete room, then tests it once with the same
+`playRaidAttempt` function used for raids. Both calls share the model and deadline.
+Publish only a verified winning room that cannot be cleared by simply running.
+A failed proposal or playthrough ends that generation run; Retry generates a new
+room. Keep the failed candidate and completed attempt. There are no partial edits,
+repair loops, checkpoints, or fallback rooms. Object limits remain provisional
+and should be tuned through playtesting.
+Generation runs as a scheduled backend job. Entering the editor requests a build;
+the browser observes its status and loads the saved level when ready. Reuse pending
+work, and request a fresh build after consuming a completed room. Save the valid candidate before testing it and retain its completed proof attempt,
+including failures. Save the proof and finish the build in one backend transaction;
+keep proof inputs private. A retry
+retains earlier candidates and attempts; stale workers cannot publish over it.
+Rounds, scored attempts, and medals still live in browser memory. Their persistence
+APIs are defined but are not connected to gameplay yet.
 
-Broader generation improvements remain deferred. Use headless rooms and playtesting
-to evaluate reliability and latency before adding input batches or images.
+Use playtesting to evaluate variety, difficulty, reliability and latency before
+adding generation machinery or input batches.
 
 Cut story/level selection, locked slots, mastery, cloud drafts, save/version UI,
 round history, account screens, adaptive history, novelty scoring, and duplicate
 runtime backends. Remove player-facing fixtures, obstacle lab, and replay imports;
 keep useful headless tests. Add no new hazards or AI framework.
 
-## Work order
-
-1. Ship the Arcade loop and tutorial persistence; delete replaced screens and state.
-2. Evaluate direct model inputs on representative rooms and in the playable loop.
-   Tune from actual failures; add input batches only if the complete-sequence
-   version needs feedback during play. Reuse that completion path for builder proofs.
-
-Keep each step playable and verify simulation, replays, UI, and live integration.
 Starter layout, preset tuning, model strength, and acceptable AI latency remain open
-to playtesting. Follow the [cleanup plan](cleanup-plan.md) for implementation.
+to playtesting.
 
 Engineering: [AGENTS.md](../AGENTS.md). Current setup and architecture:
 [README](../README.md), [backend notes](../convex/README.md).

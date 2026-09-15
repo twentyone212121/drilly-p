@@ -1,10 +1,10 @@
-import type { BuildBudget, DrillyModel } from "./game/drilly";
+import type { DrillyModel } from "./game/drilly";
 import { obstacleBounds } from "./game/obstacles";
 import { segmentRect, sweptCircle } from "./game/sweep";
 import * as v from "valibot";
 import { overlaps, touchesCircle } from "./game/collision";
 import { RULES } from "./game/rules";
-import { collisionPlatforms, roomBorders, isRoomSideWall, roomSideWalls } from "./game/roomBoundary";
+import { collisionPlatforms, roomBorders, isFixedRoomPlatform } from "./game/roomBoundary";
 import type { EditorObject, Level, Rect, Replay } from "./game/types";
 
 const NameSchema = v.pipe(v.string(), v.minLength(1), v.maxLength(100));
@@ -403,11 +403,7 @@ function validObstacles(level: Level): boolean {
   });
 }
 
-export function parseDrillyBuild(
-  value: unknown,
-  room: Level,
-  budget?: BuildBudget,
-) {
+export function parseDrillyBuild(value: unknown, room: Level) {
   const envelope = v.parse(
     v.object({
       level: v.record(v.string(), v.unknown()),
@@ -416,6 +412,7 @@ export function parseDrillyBuild(
   );
   const level = parseEditorLevel(
     v.parse(LevelSchema, {
+      id: room.id,
       version: room.version,
       width: room.width,
       height: room.height,
@@ -426,32 +423,26 @@ export function parseDrillyBuild(
   );
   const hazards = level.traps.length + (level.obstacles?.length ?? 0);
   const interiorPlatforms = level.platforms.filter(
-    (platform) => !isRoomSideWall(platform, room),
+    (platform) => !isFixedRoomPlatform(platform, room),
   );
   if (
     hazards > RULES.drilly.maxGeneratedHazards ||
     level.treasures.length > RULES.drilly.maxGeneratedTreasures ||
-    interiorPlatforms.length > RULES.drilly.maxGeneratedPlatforms ||
-    (budget &&
-      (hazards > budget.hazards ||
-        level.treasures.length > budget.treasures ||
-        interiorPlatforms.length > budget.platforms))
+    interiorPlatforms.length > RULES.drilly.maxGeneratedPlatforms
   )
-    throw new Error(
-      "Generated room exceeds its introductory difficulty budget.",
-    );
-  const walls = roomSideWalls(room);
+    throw new Error("Generated room exceeds its object limits.");
+
   if (
     level.treasures.some((treasure) =>
-      walls.some((wall) => overlaps(treasure, wall)),
+      treasure.x < RULES.roomBorderWidth ||
+      treasure.x + treasure.width > room.width - RULES.roomBorderWidth,
     )
   )
     throw new Error("Keep treasure inside the side walls.");
 
-  // Add boundaries before either proof or LLM practice. Revalidating also catches
-  // reserved-ID collisions; repeated parsing must never duplicate the walls.
+  const floor = room.platforms.filter((platform) => platform.id === "floor" && isFixedRoomPlatform(platform, room));
   return parseEditorLevel(
-    { ...level, platforms: [...interiorPlatforms, ...walls] },
+    { ...level, platforms: [...floor, ...interiorPlatforms] },
     room,
   );
 }
@@ -480,45 +471,4 @@ export function parseDrillyAttempts(value: unknown, level: Level) {
       throw new Error("A timed-out attempt must reach the game tick limit.");
   }
   return attempts;
-}
-
-export function parseDrillyEdit(value: unknown) {
-  return v.parse(
-    v.object({
-      action: v.picklist(["edit", "finish"]),
-      base: v.picklist(["working", "checkpoint"]),
-      name: NameSchema,
-      idea: v.pipe(v.string(), v.minLength(1), v.maxLength(240)),
-      removeIds: v.pipe(v.array(NameSchema), v.maxLength(24)),
-      edit: v.object({
-        platforms: v.pipe(
-          v.array(PlatformSchema),
-          v.maxLength(RULES.drilly.maxGeneratedPlatforms),
-        ),
-        traps: v.pipe(
-          v.array(TrapSchema),
-          v.maxLength(RULES.drilly.maxGeneratedHazards),
-        ),
-        treasures: v.pipe(
-          v.array(TreasureSchema),
-          v.maxLength(RULES.drilly.maxGeneratedTreasures),
-        ),
-        obstacles: v.pipe(
-          v.array(ObstacleSchema),
-          v.maxLength(RULES.drilly.maxGeneratedHazards),
-        ),
-      }),
-    }),
-    value,
-  );
-}
-
-export function parseBuiltDungeon(value: unknown) {
-  const built = v.parse(
-    v.object({ level: LevelSchema, proof: ReplaySchema }),
-    value,
-  );
-  if (JSON.stringify(built.level) !== JSON.stringify(built.proof.level))
-    throw new Error("Room proof belongs to different geometry.");
-  return built;
 }

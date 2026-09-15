@@ -71,6 +71,7 @@ function ConnectedGame() {
   useEffect(() => persistDungeon(session), [session]);
   useEffect(() => {
     session.prepareRoom();
+    return session.cancelRoomPreparation;
   }, [session]);
   return <App session={session} />;
 }

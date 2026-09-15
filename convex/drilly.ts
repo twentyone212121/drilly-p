@@ -3,36 +3,52 @@
 import { drillyErrorMessage, DRILLY_ERRORS } from "../shared/game/drillyErrors";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
-import { action, env } from "./_generated/server";
-import {
-  levelValidator,
-  builtDungeonValidator,
-  raidAttemptValidator,
-  drillyModelValidator,
-} from "./lib/validators";
+import { action, env, internalAction } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { levelValidator, raidAttemptValidator } from "./lib/validators";
 import { buildDungeon } from "./lib/drilly/build";
 import { playRaidAttempt } from "./lib/drilly/raid";
-import { openAIPlanner } from "./lib/drilly/provider";
+import { createModelCall } from "./lib/drilly/model";
 import { RULES } from "../shared/game/rules";
 
-export const build = action({
-  args: {},
-  returns: builtDungeonValidator,
-  handler: async (ctx) => {
-    if (!(await getAuthUserId(ctx))) throw new ConvexError("Sign in as a guest to play Drilly.");
+export const generate = internalAction({
+  args: { buildId: v.id("builds"), runNumber: v.number() },
+  returns: v.null(),
+  handler: async (ctx, args): Promise<null> => {
+    const build = await ctx.runMutation(internal.builds.begin, args);
+    if (!build) return null;
     const started = Date.now();
-    console.info("drilly.build.started", { model: env.DRILLY_MODEL ?? RULES.drilly.defaultModel });
+    console.info("drilly.build.started", { ...args, model: build.model });
+
     try {
-      const room = await buildDungeon(openAIPlanner(env.OPENAI_API_KEY, env.DRILLY_MODEL), (progress) =>
-        console.info("drilly.build", progress),
+      const callModel = createModelCall(
+        env.OPENAI_API_KEY,
+        build.model,
+        RULES.drilly.buildThinkingTimeoutMs,
       );
-      console.info("drilly.build.completed", { elapsedMs: Date.now() - started });
-      return room;
+      const room = await buildDungeon(callModel, {
+        seed: `${build.seed}-${build.runNumber}`,
+        brief: build.brief,
+      });
+      const levelId = await ctx.runMutation(internal.levels.recordCandidate, { ...args, room });
+      const attempt = await playRaidAttempt(room, callModel);
+      await ctx.runMutation(internal.builds.finish, {
+        ...args,
+        levelId,
+        attempt,
+      });
+      console.info("drilly.build.finished", {
+        elapsedMs: Date.now() - started,
+      });
     } catch (error) {
       const message = drillyErrorMessage(error, DRILLY_ERRORS.unavailable);
-      console.warn("drilly.build.failed", { elapsedMs: Date.now() - started, message });
-      throw new ConvexError(message);
+      console.warn("drilly.build.failed", {
+        elapsedMs: Date.now() - started,
+        message,
+      });
+      await ctx.runMutation(internal.builds.fail, { ...args, error: message });
     }
+    return null;
   },
 });
 
@@ -40,7 +56,7 @@ export const raid = action({
   args: {
     level: levelValidator,
     previousAttempts: v.array(raidAttemptValidator),
-    model: v.optional(drillyModelValidator),
+    model: v.optional(v.string()),
   },
   returns: raidAttemptValidator,
   handler: async (ctx, args) => {
@@ -53,12 +69,16 @@ export const raid = action({
       model,
     });
     try {
-      const plan = openAIPlanner(env.OPENAI_API_KEY, model);
+      const callModel = createModelCall(
+        env.OPENAI_API_KEY,
+        model,
+        RULES.drilly.raidThinkingTimeoutMs,
+      );
       const attempt = await playRaidAttempt(
         args.level,
         async (instructions, input, options) => {
           console.info("drilly.raid.input", JSON.stringify({ instructions, input }));
-          const output = await plan(instructions, input, options);
+          const output = await callModel(instructions, input, options);
           console.info("drilly.raid.output", JSON.stringify(output));
           return output;
         },

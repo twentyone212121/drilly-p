@@ -8,18 +8,20 @@
  * @module
  */
 
+import type * as attempts from "../attempts.js";
 import type * as auth from "../auth.js";
+import type * as builds from "../builds.js";
 import type * as drilly from "../drilly.js";
 import type * as http from "../http.js";
+import type * as levels from "../levels.js";
+import type * as lib_auth from "../lib/auth.js";
+import type * as lib_builds from "../lib/builds.js";
 import type * as lib_drilly_build from "../lib/drilly/build.js";
-import type * as lib_drilly_buildSchema from "../lib/drilly/buildSchema.js";
-import type * as lib_drilly_construction from "../lib/drilly/construction.js";
-import type * as lib_drilly_deadline from "../lib/drilly/deadline.js";
-import type * as lib_drilly_observation from "../lib/drilly/observation.js";
-import type * as lib_drilly_protocol from "../lib/drilly/protocol.js";
-import type * as lib_drilly_provider from "../lib/drilly/provider.js";
+import type * as lib_drilly_model from "../lib/drilly/model.js";
 import type * as lib_drilly_raid from "../lib/drilly/raid.js";
+import type * as lib_drilly_roomOutputSchema from "../lib/drilly/roomOutputSchema.js";
 import type * as lib_validators from "../lib/validators.js";
+import type * as rounds from "../rounds.js";
 
 import type {
   ApiFromModules,
@@ -28,18 +30,20 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  attempts: typeof attempts;
   auth: typeof auth;
+  builds: typeof builds;
   drilly: typeof drilly;
   http: typeof http;
+  levels: typeof levels;
+  "lib/auth": typeof lib_auth;
+  "lib/builds": typeof lib_builds;
   "lib/drilly/build": typeof lib_drilly_build;
-  "lib/drilly/buildSchema": typeof lib_drilly_buildSchema;
-  "lib/drilly/construction": typeof lib_drilly_construction;
-  "lib/drilly/deadline": typeof lib_drilly_deadline;
-  "lib/drilly/observation": typeof lib_drilly_observation;
-  "lib/drilly/protocol": typeof lib_drilly_protocol;
-  "lib/drilly/provider": typeof lib_drilly_provider;
+  "lib/drilly/model": typeof lib_drilly_model;
   "lib/drilly/raid": typeof lib_drilly_raid;
+  "lib/drilly/roomOutputSchema": typeof lib_drilly_roomOutputSchema;
   "lib/validators": typeof lib_validators;
+  rounds: typeof rounds;
 }>;
 
 /**
