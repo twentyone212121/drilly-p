@@ -41,7 +41,7 @@ const center = {
 };
 const patrol = { ...center, endX: number, endY: number, speed };
 
-export const buildSchema = object({
+export const roomOutputSchema = object({
   level: object({
     name: id,
     platforms: {

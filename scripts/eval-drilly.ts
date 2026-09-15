@@ -1,15 +1,13 @@
 import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
-import { openAIPlanner } from "../convex/lib/drilly/provider";
+import { createModelCall, type ModelCall } from "../convex/lib/drilly/model";
 import { buildDungeon } from "../convex/lib/drilly/build";
 import { playRaidAttempt } from "../convex/lib/drilly/raid";
-import type { Planner } from "../convex/lib/drilly/protocol";
 import type { RaidAttempt } from "../shared/game/round";
 import { RULES } from "../shared/game/rules";
 import { parseDrillyModel } from "../shared/validation";
 import { replayAttempt, runAttempt } from "../shared/game/replay";
 import { drillyCases } from "./evals/drilly-cases";
-import { withDeadline } from "../convex/lib/drilly/deadline";
 
 // Explicit opt-in: ordinary npm test never calls a paid provider.
 const args = process.argv.slice(2);
@@ -36,7 +34,7 @@ const requestedModel = option("--model");
 const model = requestedModel
   ? parseDrillyModel(requestedModel)
   : (setting("DRILLY_MODEL") ?? RULES.drilly.defaultModel);
-const base = openAIPlanner(setting("OPENAI_API_KEY"), model);
+const apiKey = setting("OPENAI_API_KEY");
 const selected = (option("--cases") ?? "saws,wall,spikes").split(",");
 if (
   selected.length > 6 ||
@@ -70,33 +68,37 @@ for (const name of selected) {
     recordings: attempts,
   };
   reports.push(entry);
-  const planner: Planner = async (instructions, input, options) => {
-    const call: (typeof calls)[number] = { input };
-    const started = Date.now();
-    calls.push(call);
-    try {
-      call.output = await base(instructions, input, options);
-      return call.output;
-    } catch (error) {
-      call.error = error instanceof Error ? error.message : "Unknown failure";
-      throw error;
-    } finally {
-      call.seconds = (Date.now() - started) / 1000;
-      writeReport();
-    }
-  };
+  const logCall =
+    (callModel: ModelCall): ModelCall =>
+    async (instructions, input, output) => {
+      const call: (typeof calls)[number] = { input };
+      const started = Date.now();
+      calls.push(call);
+      try {
+        call.output = await callModel(instructions, input, output);
+        return call.output;
+      } catch (error) {
+        call.error = error instanceof Error ? error.message : "Unknown failure";
+        throw error;
+      } finally {
+        call.seconds = (Date.now() - started) / 1000;
+        writeReport();
+      }
+    };
   const start = Date.now();
   let summary: Record<string, unknown>;
   try {
     if (name === "build") {
-      const request = withDeadline(planner, RULES.drilly.buildThinkingTimeoutMs);
-      const room = await buildDungeon(request, {
+      const callModel = logCall(
+        createModelCall(apiKey, model, RULES.drilly.buildThinkingTimeoutMs),
+      );
+      const room = await buildDungeon(callModel, {
         seed: crypto.randomUUID(),
         brief:
           "Build a readable room with a distinct spatial idea that requires intentional jumps.",
       });
       entry.room = room;
-      const attempt = await playRaidAttempt(room, request);
+      const attempt = await playRaidAttempt(room, callModel);
       attempts.push(attempt);
       summary = {
         case: name,
@@ -107,7 +109,10 @@ for (const name of selected) {
     } else {
       const level = drillyCases[name as keyof typeof drillyCases];
       while (attempts.length < RULES.raidAttempts) {
-        const attempt = await playRaidAttempt(level, planner, attempts);
+        const callModel = logCall(
+          createModelCall(apiKey, model, RULES.drilly.raidThinkingTimeoutMs),
+        );
+        const attempt = await playRaidAttempt(level, callModel, attempts);
         attempts.push(attempt);
         writeReport();
         if (attempt.outcome === "won") break;

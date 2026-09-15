@@ -4,7 +4,7 @@ import { segmentRect, sweptCircle } from "./game/sweep";
 import * as v from "valibot";
 import { overlaps, touchesCircle } from "./game/collision";
 import { RULES } from "./game/rules";
-import { collisionPlatforms, roomBorders, isFixedRoomPlatform, roomSideWalls } from "./game/roomBoundary";
+import { collisionPlatforms, roomBorders, isFixedRoomPlatform } from "./game/roomBoundary";
 import type { EditorObject, Level, Rect, Replay } from "./game/types";
 
 const NameSchema = v.pipe(v.string(), v.minLength(1), v.maxLength(100));
@@ -430,20 +430,19 @@ export function parseDrillyBuild(value: unknown, room: Level) {
     level.treasures.length > RULES.drilly.maxGeneratedTreasures ||
     interiorPlatforms.length > RULES.drilly.maxGeneratedPlatforms
   )
-    throw new Error(
-      "Generated room exceeds its object limits.",
-    );
-  const walls = roomSideWalls(room);
+    throw new Error("Generated room exceeds its object limits.");
+
   if (
     level.treasures.some((treasure) =>
-      walls.some((wall) => overlaps(treasure, wall)),
+      treasure.x < RULES.roomBorderWidth ||
+      treasure.x + treasure.width > room.width - RULES.roomBorderWidth,
     )
   )
     throw new Error("Keep treasure inside the side walls.");
 
   const floor = room.platforms.filter((platform) => platform.id === "floor" && isFixedRoomPlatform(platform, room));
   return parseEditorLevel(
-    { ...level, platforms: [...floor, ...interiorPlatforms, ...walls] },
+    { ...level, platforms: [...floor, ...interiorPlatforms] },
     room,
   );
 }

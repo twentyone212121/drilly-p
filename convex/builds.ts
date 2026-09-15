@@ -12,7 +12,8 @@ import { requireBuildRun } from "./lib/builds";
 import { RULES } from "../shared/game/rules";
 import { DRILLY_ERRORS } from "../shared/game/drillyErrors";
 import { replayAttempt, runAttempt } from "../shared/game/replay";
-import { parseReplay } from "../shared/validation";
+import { parseDrillyAttempts } from "../shared/validation";
+import { raidAttemptValidator } from "./lib/validators";
 import schema from "./schema";
 
 async function schedule(ctx: MutationCtx, buildId: Id<"builds">, runNumber: number) {
@@ -115,43 +116,43 @@ export const begin = internalMutation({
   },
 });
 
-export const complete = internalMutation({
+/** Save the proof and finish its build in the same transaction. */
+export const finish = internalMutation({
   args: {
     buildId: v.id("builds"),
     runNumber: v.number(),
     levelId: v.id("levels"),
-    proofAttemptId: v.id("attempts"),
+    attempt: raidAttemptValidator,
   },
   returns: v.null(),
-  handler: async (ctx, { buildId, runNumber, levelId, proofAttemptId }) => {
+  handler: async (ctx, { buildId, runNumber, levelId, attempt }) => {
     const build = await requireBuildRun(ctx, buildId, runNumber);
     const level = await ctx.db.get("levels", levelId);
-    const proof = await ctx.db.get("attempts", proofAttemptId);
-    if (
-      !level ||
-      level.buildId !== buildId ||
-      level.ownerId !== build.ownerId ||
-      !proof ||
-      proof.levelId !== levelId ||
-      proof.ownerId !== build.ownerId ||
-      proof.actor !== "drilly" ||
-      proof.roundId ||
-      proof.outcome !== "won"
-    )
-      throw new Error(DRILLY_ERRORS.unproven);
+    if (!level || level.buildId !== buildId || level.ownerId !== build.ownerId)
+      throw new Error("Proof belongs to another build.");
 
-    const verified = replayAttempt(parseReplay({ ...proof.recording, level: level.room }));
-    if (
-      verified.stopReason !== "won" ||
-      verified.state.tick !== proof.recording.endTick ||
-      runAttempt(level.room, []).stopReason === "won"
-    )
-      throw new Error(DRILLY_ERRORS.unproven);
+    const [parsed] = parseDrillyAttempts([attempt], level.room);
+    const verified = replayAttempt(parsed.replay);
+    if (verified.stopReason !== parsed.outcome || verified.state.tick !== parsed.replay.endTick)
+      throw new Error("Proof outcome does not match its recording.");
+
+    const { version, rulesVersion, jumpTicks, endTick } = parsed.replay;
+    const proofAttemptId = await ctx.db.insert("attempts", {
+      ownerId: build.ownerId,
+      levelId,
+      actor: "drilly",
+      number: 1,
+      recording: { version, rulesVersion, jumpTicks, endTick },
+      outcome: parsed.outcome,
+    });
+    const accepted =
+      verified.stopReason === "won" && runAttempt(level.room, []).stopReason !== "won";
 
     await ctx.db.patch("builds", buildId, {
-      status: "ready",
-      acceptedLevelId: levelId,
-      proofAttemptId,
+      status: accepted ? "ready" : "failed",
+      acceptedLevelId: accepted ? levelId : undefined,
+      proofAttemptId: accepted ? proofAttemptId : undefined,
+      error: accepted ? undefined : DRILLY_ERRORS.unproven,
       finishedAt: Date.now(),
     });
     return null;

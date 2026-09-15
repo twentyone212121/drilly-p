@@ -107,7 +107,7 @@ and cannot award medals twice.
 For scored raids, the selected model chooses a complete `jumpTicks` sequence in one call per
 attempt. Execute it literally through the shared simulation, including ignored
 jumps; do not search alternate futures or repair the inputs. Later attempts receive
-the room, rules, and actual feedback from Drilly's earlier scored failures, never
+the room, rules, initial player state, and actual feedback from Drilly's earlier scored failures, never
 the player's clear inputs. Keep each completed recording if a later request fails;
 retry continues with the remaining attempts. Replays use no model calls.
 
@@ -121,7 +121,8 @@ and should be tuned through playtesting.
 Generation runs as a scheduled backend job. Entering the editor requests a build;
 the browser observes its status and loads the saved level when ready. Reuse pending
 work, and request a fresh build after consuming a completed room. Save the valid candidate before testing it and retain its completed proof attempt,
-including failures. Verify publication on the backend and keep proof inputs private. A retry
+including failures. Save the proof and finish the build in one backend transaction;
+keep proof inputs private. A retry
 retains earlier candidates and attempts; stale workers cannot publish over it.
 Rounds, scored attempts, and medals still live in browser memory. Their persistence
 APIs are defined but are not connected to gameplay yet.
@@ -134,16 +135,8 @@ round history, account screens, adaptive history, novelty scoring, and duplicate
 runtime backends. Remove player-facing fixtures, obstacle lab, and replay imports;
 keep useful headless tests. Add no new hazards or AI framework.
 
-## Work order
-
-1. Ship the Arcade loop and tutorial persistence; delete replaced screens and state.
-2. Evaluate direct model inputs on representative rooms and in the playable loop.
-   Tune from actual failures; add input batches only if the complete-sequence
-   version needs feedback during play. Reuse that completion path for builder proofs.
-
-Keep each step playable and verify simulation, replays, UI, and live integration.
 Starter layout, preset tuning, model strength, and acceptable AI latency remain open
-to playtesting. Follow the [cleanup plan](cleanup-plan.md) for implementation.
+to playtesting.
 
 Engineering: [AGENTS.md](../AGENTS.md). Current setup and architecture:
 [README](../README.md), [backend notes](../convex/README.md).

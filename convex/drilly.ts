@@ -8,9 +8,8 @@ import { internal } from "./_generated/api";
 import { levelValidator, raidAttemptValidator } from "./lib/validators";
 import { buildDungeon } from "./lib/drilly/build";
 import { playRaidAttempt } from "./lib/drilly/raid";
-import { openAIPlanner } from "./lib/drilly/provider";
+import { createModelCall } from "./lib/drilly/model";
 import { RULES } from "../shared/game/rules";
-import { withDeadline } from "./lib/drilly/deadline";
 
 export const generate = internalAction({
   args: { buildId: v.id("builds"), runNumber: v.number() },
@@ -22,23 +21,23 @@ export const generate = internalAction({
     console.info("drilly.build.started", { ...args, model: build.model });
 
     try {
-      const plan = withDeadline(
-        openAIPlanner(env.OPENAI_API_KEY, build.model),
+      const callModel = createModelCall(
+        env.OPENAI_API_KEY,
+        build.model,
         RULES.drilly.buildThinkingTimeoutMs,
       );
-      const room = await buildDungeon(plan, {
+      const room = await buildDungeon(callModel, {
         seed: `${build.seed}-${build.runNumber}`,
         brief: build.brief,
       });
       const levelId = await ctx.runMutation(internal.levels.recordCandidate, { ...args, room });
-      const attempt = await playRaidAttempt(room, plan);
-      const proofAttemptId = await ctx.runMutation(internal.attempts.recordProof, {
+      const attempt = await playRaidAttempt(room, callModel);
+      await ctx.runMutation(internal.builds.finish, {
         ...args,
         levelId,
         attempt,
       });
-      await ctx.runMutation(internal.builds.complete, { ...args, levelId, proofAttemptId });
-      console.info("drilly.build.completed", {
+      console.info("drilly.build.finished", {
         elapsedMs: Date.now() - started,
       });
     } catch (error) {
@@ -70,12 +69,16 @@ export const raid = action({
       model,
     });
     try {
-      const plan = openAIPlanner(env.OPENAI_API_KEY, model);
+      const callModel = createModelCall(
+        env.OPENAI_API_KEY,
+        model,
+        RULES.drilly.raidThinkingTimeoutMs,
+      );
       const attempt = await playRaidAttempt(
         args.level,
         async (instructions, input, options) => {
           console.info("drilly.raid.input", JSON.stringify({ instructions, input }));
-          const output = await plan(instructions, input, options);
+          const output = await callModel(instructions, input, options);
           console.info("drilly.raid.output", JSON.stringify(output));
           return output;
         },

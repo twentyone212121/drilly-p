@@ -18,7 +18,6 @@ export const RULES = Object.freeze({
     maxGeneratedHazards: 4,
     maxGeneratedTreasures: 3,
     maxGeneratedPlatforms: 6,
-    sideWallWidth: 12,
   }),
   tickRate: 60,
   playerWidth: 24,

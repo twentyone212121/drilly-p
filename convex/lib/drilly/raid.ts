@@ -4,9 +4,7 @@ import { describeRules, RULES } from "../../../shared/game/rules";
 import type { RaidAttempt } from "../../../shared/game/round";
 import { initialState } from "../../../shared/game/simulation";
 import { parseDrillyAttempts, parseDrillyInputs, parseLevel } from "../../../shared/validation";
-import { withDeadline } from "./deadline";
-import { observeRoom } from "./observation";
-import type { Planner } from "./protocol";
+import type { ModelCall } from "./model";
 
 const INSTRUCTIONS = `You control Drilly in an auto-running platformer. Collect every treasure without dying.
 Choose the complete jumpTicks sequence for ONE attempt. Each tick is an absolute input time from the start of this attempt, not a delay. An empty sequence means no jumps. The game executes these exact inputs once; it will not search, correct timing, or automatically avoid hazards. After a failed attempt you receive what actually happened and may choose a different sequence for the next scored attempt.
@@ -26,11 +24,9 @@ const inputSchema = {
   },
 };
 
-// Ordinary TypeScript: the browser action and headless evaluator inject the same
-// model adapter. Only the submitted inputs are executed; there is no search here.
 export async function playRaidAttempt(
   value: unknown,
-  plan: Planner,
+  callModel: ModelCall,
   previousAttempts: unknown = [],
 ) {
   const level = parseLevel(value);
@@ -40,12 +36,15 @@ export async function playRaidAttempt(
 
   const feedback = history.map(attemptFeedback);
   const { coordinates, input, timing, obstacles } = describeRules();
-  const request = withDeadline(plan, RULES.drilly.raidThinkingTimeoutMs);
-  const output = await request(
+  const output = await callModel(
     INSTRUCTIONS,
     {
       room: { ...level, platforms: collisionPlatforms(level) },
-      observation: observeRoom(level, initialState(level)),
+      player: {
+        ...initialState(level).player,
+        width: RULES.playerWidth,
+        height: RULES.playerHeight,
+      },
       rules: {
         coordinates,
         input,
@@ -62,7 +61,7 @@ export async function playRaidAttempt(
       attemptsRemaining: RULES.raidAttempts - history.length,
       previousAttempts: feedback,
     },
-    { schema: inputSchema, schemaName: "drilly_inputs", reasoning: "low" },
+    { schema: inputSchema, schemaName: "drilly_inputs" },
   );
 
   const jumpTicks = parseDrillyInputs(output);
