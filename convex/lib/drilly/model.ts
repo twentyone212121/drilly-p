@@ -31,6 +31,7 @@ export function createModelCall(
       const response = await client.responses.create(
         {
           model,
+          service_tier: "fast",
           instructions,
           input: `Return JSON for this game data:\n${JSON.stringify(input)}`,
           store: false,
@@ -47,6 +48,11 @@ export function createModelCall(
         },
         { timeout: remaining },
       );
+
+      console.info("drilly.model.processing", {
+        model,
+        serviceTier: response.service_tier ?? null,
+      });
 
       if (response.status !== "completed" || !response.output_text)
         throw new Error(DRILLY_ERRORS.incomplete);

@@ -17,6 +17,7 @@ import type * as levels from "../levels.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_builds from "../lib/builds.js";
 import type * as lib_drilly_build from "../lib/drilly/build.js";
+import type * as lib_drilly_designs from "../lib/drilly/designs.js";
 import type * as lib_drilly_model from "../lib/drilly/model.js";
 import type * as lib_drilly_raid from "../lib/drilly/raid.js";
 import type * as lib_drilly_roomOutputSchema from "../lib/drilly/roomOutputSchema.js";
@@ -39,6 +40,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/builds": typeof lib_builds;
   "lib/drilly/build": typeof lib_drilly_build;
+  "lib/drilly/designs": typeof lib_drilly_designs;
   "lib/drilly/model": typeof lib_drilly_model;
   "lib/drilly/raid": typeof lib_drilly_raid;
   "lib/drilly/roomOutputSchema": typeof lib_drilly_roomOutputSchema;

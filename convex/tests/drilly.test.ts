@@ -63,10 +63,13 @@ it("persists scheduled generation for its owner and forwards the requested raid 
   vi.stubEnv("DRILLY_MODEL", "gpt-6-astra");
   let expectedModel = "gpt-6-astra";
   let failProof = false;
+  const buildRequests: { seed: string; brief: string }[] = [];
   const fetch = vi.fn(async (_url: unknown, init: RequestInit) => {
     const { body, data, output } = modelInput(init);
     expect(body.model).toBe(expectedModel);
     expect(body.reasoning).toEqual({ effort: "low" });
+    if (output.schemaName === "drilly_room")
+      buildRequests.push({ seed: data.seed, brief: data.brief });
     if (failProof && output.schemaName === "drilly_inputs") return response({ jumpTicks: [] });
     return response(await fakeModel("", data, output));
   });
@@ -81,6 +84,10 @@ it("persists scheduled generation for its owner and forwards the requested raid 
 
   const build = (await guest.query(api.builds.get, { buildId }))!;
   expect(build).toMatchObject({ status: "ready", runNumber: 1 });
+  expect(buildRequests.at(-1)).toEqual({
+    seed: `${build.seed}-1`,
+    brief: build.brief,
+  });
   const level = (await guest.query(api.levels.get, {
     levelId: build.acceptedLevelId!,
   }))!;
@@ -113,7 +120,9 @@ it("persists scheduled generation for its owner and forwards the requested raid 
   expect(next).not.toBe(buildId);
   await vi.advanceTimersByTimeAsync(0);
   await t.finishInProgressScheduledFunctions();
-  expect(await guest.query(api.builds.get, { buildId: next })).toMatchObject({ status: "failed" });
+  const failedBuild = (await guest.query(api.builds.get, { buildId: next }))!;
+  expect(failedBuild).toMatchObject({ status: "failed" });
+  expect(failedBuild.designId).not.toBe(build.designId);
   const failedProof = await t.run(async (ctx) => {
     const candidate = await ctx.db
       .query("levels")
@@ -126,6 +135,22 @@ it("persists scheduled generation for its owner and forwards the requested raid 
   });
   expect(failedProof).toMatchObject({ outcome: "dead", number: 1 });
   failProof = false;
+  await guest.mutation(api.builds.retry, { buildId: next });
+  await vi.advanceTimersByTimeAsync(0);
+  await t.finishInProgressScheduledFunctions();
+  expect(await guest.query(api.builds.get, { buildId: next })).toMatchObject({
+    status: "ready",
+    runNumber: 2,
+    seed: failedBuild.seed,
+    brief: failedBuild.brief,
+    designId: failedBuild.designId,
+  });
+  expect(buildRequests.at(-1)).toEqual({
+    seed: `${failedBuild.seed}-2`,
+    brief: failedBuild.brief,
+  });
+  expect(await t.run((ctx) => ctx.db.get("attempts", failedProof!._id))).toEqual(failedProof);
+
   expectedModel = "gpt-5.6-sol";
   const attempt = await guest.action(api.drilly.raid, {
     level: newPlayerDungeon(),

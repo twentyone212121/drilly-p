@@ -7,6 +7,7 @@ Shared AI functions live in `convex/lib/drilly/` and also run in headless evalua
 | Module                            | Responsibility                                                |
 | --------------------------------- | ------------------------------------------------------------- |
 | `build.ts`, `roomOutputSchema.ts` | One complete room proposal and its JSON output schema         |
+| `designs.ts`                     | Seeded design cards and saved route briefs                    |
 | `raid.ts`                         | One input sequence and recording for raids and builder proofs |
 | `model.ts`                        | Model call type, OpenAI SDK and shared deadline               |
 
@@ -17,6 +18,8 @@ Gameplay validation stays in `shared/validation.ts`; wire validators live in
 
 1. Entering the editor calls `builds.request`. It reuses the latest pending,
    unassigned build or creates a new one and schedules `drilly.generate`.
+   New builds select a design card from their seed, exclude the owner's previous
+   card, and save the card ID and full brief.
 2. The worker marks the build running and uses its saved model, seed, and brief.
    Astra proposes one complete room. The worker saves it, calls `playRaidAttempt`
    once, and passes the recording to `builds.finish`.
@@ -91,6 +94,9 @@ Convex and the headless evaluator.
 `buildDungeon(callModel, { seed, brief })` asks for a complete layout without showing a
 starter layout. `roomOutputSchema` describes the required JSON reply; shared validation
 checks the geometry and object limits and retains the template floor height.
+`designs.ts` selects an authored route brief from the seed, excluding the owner's
+previous card. The saved brief stays fixed across retries; the layout seed includes
+the run number. See the [game design](../docs/game-design.md) for the route ideas.
 The simulation supplies the room's permanent boundaries. The worker saves the
 candidate before its single proof attempt. Generation and proof share one model
 adapter and deadline; each scored raid attempt gets its own.
@@ -133,3 +139,15 @@ The optional `build` case evaluates generation and its direct-input proof calls.
 Live evaluations spend model calls and are separate from ordinary tests. Playtest
 room readability, difficulty and latency as well as checking successful clears.
 See the [game design](../docs/game-design.md).
+
+To sample every design card with a matching generic-brief comparison:
+
+```sh
+npm run eval:drilly -- --live --deployment YOUR_DEV_DEPLOYMENT --cases build --design all --compare --seed playtest-1 --report /tmp/drilly-builds.json
+```
+
+This makes at most sixteen paid calls. Omit `--compare` for four proposals, or use
+`--design <card-id>` for one. The comparison uses the same builder instructions and
+proof code. Reports include rooms, recordings, and route events, and stay outside
+the browser's rounds. Seeds reproduce card selection, not exact model output.
+`npm run eval:drilly -- --help` lists all options without calling a provider.

@@ -21,6 +21,7 @@ export default defineSchema({
     roundId: v.optional(v.id("rounds")),
     seed: v.string(),
     brief: v.string(),
+    designId: v.optional(v.string()),
     model: v.string(),
     status: buildStatusValidator,
     // Rejects results from an earlier worker run.
