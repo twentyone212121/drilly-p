@@ -18,7 +18,12 @@ export const generate = internalAction({
     const build = await ctx.runMutation(internal.builds.begin, args);
     if (!build) return null;
     const started = Date.now();
-    console.info("drilly.build.started", { ...args, model: build.model });
+    console.info("drilly.build.started", {
+      ...args,
+      model: build.model,
+      seed: `${build.seed}-${build.runNumber}`,
+      designId: build.designId,
+    });
 
     try {
       const callModel = createModelCall(
@@ -38,7 +43,10 @@ export const generate = internalAction({
         attempt,
       });
       console.info("drilly.build.finished", {
+        ...args,
         elapsedMs: Date.now() - started,
+        room: room.name,
+        proofOutcome: attempt.outcome,
       });
     } catch (error) {
       const message = drillyErrorMessage(error, DRILLY_ERRORS.unavailable);

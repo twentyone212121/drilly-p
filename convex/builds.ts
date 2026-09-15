@@ -15,6 +15,7 @@ import { replayAttempt, runAttempt } from "../shared/game/replay";
 import { parseDrillyAttempts } from "../shared/validation";
 import { raidAttemptValidator } from "./lib/validators";
 import schema from "./schema";
+import { dungeonDesignBrief, selectDungeonDesign } from "./lib/drilly/designs";
 
 async function schedule(ctx: MutationCtx, buildId: Id<"builds">, runNumber: number) {
   await ctx.scheduler.runAfter(0, internal.drilly.generate, {
@@ -35,19 +36,21 @@ export const request = mutation({
   returns: v.id("builds"),
   handler: async (ctx): Promise<Id<"builds">> => {
     const ownerId = await requireUserId(ctx);
-    const pending = await ctx.db
+    const latestBuild = await ctx.db
       .query("builds")
       .withIndex("by_ownerId_and_roundId", (q) => q.eq("ownerId", ownerId).eq("roundId", undefined))
       .order("desc")
       .first();
-    if (pending && (pending.status === "queued" || pending.status === "running"))
-      return pending._id;
+    if (latestBuild && (latestBuild.status === "queued" || latestBuild.status === "running"))
+      return latestBuild._id;
 
+    const seed = Math.random().toString(36).slice(2);
+    const design = selectDungeonDesign(seed, latestBuild?.designId);
     const buildId = await ctx.db.insert("builds", {
       ownerId,
-      seed: Math.random().toString(36).slice(2),
-      brief:
-        "Build a readable room with a distinct spatial idea that requires an intentional jump.",
+      seed,
+      brief: dungeonDesignBrief(design),
+      designId: design.id,
       model: env.DRILLY_MODEL ?? RULES.drilly.defaultModel,
       status: "queued",
       runNumber: 1,

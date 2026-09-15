@@ -207,7 +207,17 @@ the room, rules, initial player state, and actual feedback from Drilly's earlier
 the player's clear inputs. Keep each completed recording if a later request fails;
 retry continues with the remaining attempts. Replays use no model calls.
 
-The builder proposes one complete room, then tests it once with the same
+The build seed selects an authored design card: Up and back, Stepping stones,
+Crossfire, or Climb and drop, excluding the owner's previous build's card.
+Each card describes a main mechanic, an intended route, treasure placement, and
+fairness constraints. Save its full brief on the
+build; Retry retains that idea and varies the layout seed. Cards specify design
+intent, not fixed geometry or enforced treasure order. The card selection is
+reproducible given the seed and previous card, while exact model output is not.
+Routes emphasize changing takeoff timing, controlled landings, wall reversals,
+and hazards on the traversed route. Tune card content through playtesting.
+
+The builder uses that brief to propose one complete room, then tests it once with the same
 `playRaidAttempt` function used for raids. Both calls share the model and deadline.
 Publish only a verified winning room that cannot be cleared by simply running.
 A failed proposal or playthrough ends that generation run; Retry generates a new
@@ -224,7 +234,8 @@ Rounds, scored attempts, and medals still live in browser memory. Their persiste
 APIs are defined but are not connected to gameplay yet.
 
 Use playtesting to evaluate variety, difficulty, reliability and latency before
-adding generation machinery or input batches.
+adding generation machinery or input batches. Headless comparisons retain rooms
+and route events to help inspect the proof; jump counts do not establish difficulty.
 
 Cut story/level selection, locked slots, mastery, cloud drafts, save/version UI,
 round history, account screens, adaptive history, novelty scoring, and duplicate
