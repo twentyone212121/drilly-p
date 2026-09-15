@@ -1,14 +1,6 @@
-import esc from "../../public/assets/characters/esc.json";
-import drilly from "../../public/assets/characters/drilly.json";
 import props from "../../public/assets/environment/computer-props.json";
 
 const sprites = {
-  esc: { atlas: "characters/esc", data: esc, frame: esc.frames.idle.frame },
-  drilly: {
-    atlas: "characters/drilly",
-    data: drilly,
-    frame: drilly.frames.hover.frame,
-  },
   treasure: {
     atlas: "environment/computer-props",
     data: props,
@@ -25,9 +17,19 @@ export function GameSprite({
   name,
   className = "",
 }: {
-  name: keyof typeof sprites;
+  name: keyof typeof sprites | "esc" | "drilly";
   className?: string;
 }) {
+  if (name === "esc" || name === "drilly") {
+    return (
+      <img
+        className={`game-sprite ${className}`}
+        src={`/assets/characters/${name}-portrait.svg`}
+        alt=""
+        aria-hidden="true"
+      />
+    );
+  }
   const { atlas, data, frame } = sprites[name];
   return (
     <svg

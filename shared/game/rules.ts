@@ -1,6 +1,6 @@
 // Provisional mechanics and editor tuning. Bump the rules version when mechanics change.
 export const RULES = Object.freeze({
-  version: "obstacles-15",
+  version: "obstacles-16",
   raidAttempts: 3,
   roomBorderWidth: 12,
   drilly: Object.freeze({
@@ -54,6 +54,7 @@ export const RULES = Object.freeze({
     patrolSpeed: 90,
     droneSpeed: 144,
     pursuerSpeed: 150,
+    pursuerDelayTicks: 18,
     intervalTicks: 90,
     flameIntervalTicks: 150,
     warmupTicks: 45,
@@ -96,7 +97,7 @@ export function describeRules() {
       turret:
         "Cycle begins at tick 0. Warning until warmupTicks, then one shot (fixed/aimed) or flame for activeTicks. Rest of intervalTicks is cooldown. Aimed shots lock the player's center at firing time within range. Shots continue until a platform or room boundary; range only limits aimed acquisition and flame reach. axis x/y and direction -1/+1 select left/right/up/down. Default firing interval is 90 ticks (1.5 seconds). Platforms stop shots and flames. Turret bodies are safe to touch; only shots and active flames are lethal.",
       pursuer:
-        "Continuously chase the player from any distance at speed. No detection zone or return home. Passes through platforms. Body always lethal.",
+        "Continuously chase the player’s position from 18 ticks (0.3 seconds) ago at speed, using spawn until enough history exists. No detection zone or return home. Passes through platforms. Body always lethal.",
       reset:
         "All paths, timers, pursuers, and projectiles reset per attempt. No randomness or wall-clock time.",
     },

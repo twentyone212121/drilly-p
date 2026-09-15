@@ -9,7 +9,10 @@ type Player = State["player"];
 export function initialState(level: Level): State {
   const { x, y, direction } = level.spawn;
   const grounded = collisionPlatforms(level).some(
-    (p) => y + RULES.playerHeight === p.y && x < p.x + p.width && x + RULES.playerWidth > p.x,
+    (p) =>
+      y + RULES.playerHeight === p.y &&
+      x < p.x + p.width &&
+      x + RULES.playerWidth > p.x,
   );
 
   return {
@@ -36,7 +39,8 @@ export function step(
   state: State,
   input: Input,
 ): { state: State; events: GameEvent[] } {
-  if (state.status === "dead" || state.status === "won") return { state, events: [] };
+  if (state.status === "dead" || state.status === "won")
+    return { state, events: [] };
 
   // Helpers update this tick's private copy, never the caller's state.
   const player = { ...state.player };
@@ -49,7 +53,14 @@ export function step(
   movePlayer(player, collisionPlatforms(level), tick, events);
   const hazards = advanceObstacles(level, state, playerBounds(player), tick);
   events.push(...hazards.events);
-  const status = resolveOutcome(player, level, collectedTreasureIds, tick, events, hazards.hitId);
+  const status = resolveOutcome(
+    player,
+    level,
+    collectedTreasureIds,
+    tick,
+    events,
+    hazards.hitId,
+  );
 
   return {
     state: {
@@ -59,6 +70,7 @@ export function step(
       collectedTreasureIds,
       obstacles: hazards.obstacles,
       projectiles: hazards.projectiles,
+      ...(hazards.pursuitTrail ? { pursuitTrail: hazards.pursuitTrail } : {}),
     },
     events,
   };
@@ -127,22 +139,32 @@ function resolveOutcome(
   const body = playerBounds(player);
   const hit = level.traps.find((trap) => touchesCircle(body, trap));
   const outOfBounds =
-    player.y > level.height || player.x < -RULES.playerWidth || player.x > level.width;
+    player.y > level.height ||
+    player.x < -RULES.playerWidth ||
+    player.x > level.width;
 
   // Lethal collision has priority over treasure contact on the same tick.
   if (hit || hazardId || outOfBounds) {
-    events.push({ type: "died", tick, trapId: hit?.id ?? hazardId ?? "out-of-bounds" });
+    events.push({
+      type: "died",
+      tick,
+      trapId: hit?.id ?? hazardId ?? "out-of-bounds",
+    });
     return "dead";
   }
 
   for (const treasure of level.treasures) {
-    if (collectedTreasureIds.includes(treasure.id) || !overlaps(body, treasure)) continue;
+    if (collectedTreasureIds.includes(treasure.id) || !overlaps(body, treasure))
+      continue;
 
     collectedTreasureIds.push(treasure.id);
     events.push({ type: "treasure-collected", tick, treasureId: treasure.id });
   }
 
-  if (level.treasures.length > 0 && collectedTreasureIds.length === level.treasures.length) {
+  if (
+    level.treasures.length > 0 &&
+    collectedTreasureIds.length === level.treasures.length
+  ) {
     events.push({ type: "won", tick });
     return "won";
   }

@@ -522,3 +522,101 @@ export function parseDrillyAttempts(value: unknown, level: Level) {
   }
   return attempts;
 }
+
+const SavedCountSchema = v.pipe(
+  v.number(),
+  v.integer(),
+  v.minValue(0),
+  v.maxValue(Number.MAX_SAFE_INTEGER),
+);
+const SavedScoreSchema = v.object({
+  points: SavedCountSchema,
+  wins: SavedCountSchema,
+});
+
+export function parseBrowserSession(value: unknown) {
+  return v.parse(
+    v.object({
+      version: v.literal(1),
+      scoreboard: v.object({
+        you: SavedScoreSchema,
+        drilly: SavedScoreSchema,
+        rounds: SavedCountSchema,
+        draws: SavedCountSchema,
+      }),
+      showGhost: v.boolean(),
+      play: v.unknown(),
+    }),
+    value,
+  );
+}
+
+export function parseBrowserPlay(value: unknown) {
+  const restoredReplay = v.pipe(
+    ReplaySchema,
+    v.check(
+      (r) => r.endTick <= RULES.maxRestoredClearTicks,
+      "Saved recording is too long.",
+    ),
+  );
+  const status = v.picklist(["idle", "pending", "error"]);
+  return v.parse(
+    v.object({
+      phase: v.picklist([
+        "prison",
+        "build",
+        "test",
+        "raid",
+        "watch",
+        "results",
+      ]),
+      opponent: v.nullable(LevelSchema),
+      preparedLevel: v.nullable(LevelSchema),
+      round: v.nullable(
+        v.object({
+          playerClear: restoredReplay,
+          model: v.string(),
+          human: v.pipe(
+            v.array(
+              v.object({
+                replay: restoredReplay,
+                outcome: v.picklist(["won", "dead", "tick-limit", "restart"]),
+              }),
+            ),
+            v.maxLength(RULES.raidAttempts),
+          ),
+          drilly: v.unknown(),
+          drillyStatus: status,
+          drillyError: v.nullable(v.string()),
+        }),
+      ),
+      scored: v.boolean(),
+      attempt: restoredReplay,
+      mode: v.picklist(["human", "replay"]),
+      watchIndex: v.nullable(
+        v.pipe(SavedCountSchema, v.maxValue(RULES.raidAttempts - 1)),
+      ),
+      watchAutoplay: v.boolean(),
+      watchIdle: v.boolean(),
+      recordedAttempt: v.boolean(),
+      deathRemainingMs: v.pipe(
+        v.number(),
+        v.finite(),
+        v.minValue(0),
+        v.maxValue(10000),
+      ),
+      respawned: v.boolean(),
+    }),
+    value,
+  );
+}
+
+export function parseAudioSettings(value: unknown) {
+  return v.parse(
+    v.object({
+      muted: v.boolean(),
+      volume: v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(1)),
+    }),
+    value,
+  );
+}

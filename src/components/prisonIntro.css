@@ -1,0 +1,241 @@
+.arcade-game:has(.prison-intro) .game-hud {
+  display: none;
+}
+.arcade-game:has(.prison-intro) .playfield {
+  filter: blur(3px) brightness(0.65);
+  transition: filter 0.6s ease;
+}
+.prison-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow: hidden;
+  cursor: pointer;
+  outline: none;
+  background: linear-gradient(0deg, #020b16a6, transparent 65%);
+  animation: prison-enter 0.6s ease-out both;
+}
+.prison-intro .prison-skip {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 3;
+  font-size: 14px;
+  height: 42px;
+  box-sizing: border-box;
+  color: #e2f0e9;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1px solid #759fae;
+  border-radius: 8px;
+  background: linear-gradient(#203e4c, #132d3a);
+  box-shadow:
+    inset 0 1px #c0e8ec26,
+    0 3px 0 #06141e;
+  font-weight: 800;
+  cursor: pointer;
+  transition:
+    filter 160ms ease-out,
+    border-color 160ms ease-out;
+}
+.prison-intro .prison-skip:hover {
+  filter: brightness(1.15);
+  border-color: #b8e3e6;
+  transform: none;
+}
+.prison-intro .prison-skip:focus-visible {
+  outline: 2px solid #cef3eb;
+  outline-offset: 4px;
+}
+.prison-portrait {
+  position: absolute;
+  top: 52%;
+  width: 14.5%;
+  height: 24.5%;
+  opacity: 0.55;
+  transform: translateY(15px) scale(0.92);
+  transition:
+    opacity 0.45s,
+    transform 0.45s;
+}
+.portrait-esc {
+  left: 12%;
+}
+.portrait-drilly {
+  right: 12%;
+}
+.prison-portrait .game-sprite {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 12px #0007);
+}
+.speaking-esc .portrait-esc,
+.speaking-drilly .portrait-drilly {
+  opacity: 1;
+  transform: none;
+}
+.portrait-drilly .game-sprite {
+  animation: prison-hover 3.4s ease-in-out infinite;
+}
+.portrait-esc .game-sprite {
+  animation: prison-ready 4s ease-in-out infinite;
+  transform-origin: 50% 95%;
+}
+.prison-speech {
+  position: absolute;
+  bottom: 54%;
+  width: min(390px, 76vw);
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  box-sizing: border-box;
+  padding: 44px 52px 64px;
+  text-align: center;
+  color: #17313d;
+  isolation: isolate;
+  animation: speech-enter 0.4s ease-out both;
+}
+.prison-cloud-shape {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  overflow: visible;
+  fill: #f1f3dc;
+  stroke: #fffdea;
+  stroke-width: 2;
+  filter: drop-shadow(0 5px 0 #071a2580);
+}
+.speaking-esc .prison-cloud-shape {
+  transform: scaleX(-1);
+}
+.prison-speaker {
+  display: block;
+  color: #276c77;
+  font-size: clamp(15px, 1.2vw, 18px);
+  font-weight: 900;
+}
+.speaking-drilly .prison-speaker {
+  color: #97476f;
+}
+.prison-speech p {
+  margin: 8px 0 0;
+  font-size: clamp(17px, 1.5vw, 23px);
+  line-height: 1.4;
+  font-weight: 800;
+  text-wrap: balance;
+}
+.word-hidden {
+  visibility: hidden;
+}
+.word-revealed {
+  animation: prison-enter 0.16s ease-out;
+}
+.prison-continue {
+  position: absolute;
+  bottom: 4%;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: clamp(13px, 1.1vw, 17px);
+  color: #e0eeeb;
+  text-shadow: 0 2px 5px #000;
+}
+@keyframes prison-hover {
+  50% {
+    transform: translateY(-16px) rotate(3deg);
+  }
+}
+@keyframes prison-ready {
+  40% {
+    transform: rotate(-3deg);
+  }
+  65% {
+    transform: rotate(2deg) translateY(-5px);
+  }
+}
+@keyframes speech-enter {
+  from {
+    opacity: 0;
+    transform: translateY(15px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes prison-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (max-width: 650px) {
+  .prison-speech {
+    width: min(360px, 88vw);
+    bottom: 49%;
+    padding: 38px 44px 58px;
+  }
+  .prison-portrait {
+    width: 20%;
+    height: 19%;
+    top: 56%;
+  }
+}
+@media (max-height: 500px) and (min-width: 651px) {
+  .prison-speech {
+    bottom: 48%;
+    width: 350px;
+    padding: 28px 40px 46px;
+  }
+  .prison-speech p {
+    font-size: 17px;
+  }
+  .prison-portrait {
+    height: 25%;
+    top: 60%;
+    width: 12%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .prison-intro,
+  .prison-intro *,
+  .prison-intro *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.prison-speech > .prison-speaker,
+.prison-speech > p {
+  position: relative;
+  left: -6px;
+  top: -7px;
+}
+
+.prison-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  cursor: pointer;
+}
+.prison-entry > .game-sprite {
+  width: clamp(160px, 20vw, 230px);
+  height: clamp(160px, 20vw, 230px);
+}
+.prison-entry-prompt {
+  color: #e9f3e6;
+  font-size: clamp(18px, 2vw, 26px);
+  font-weight: 800;
+  text-align: center;
+  padding: 0 20px;
+  text-shadow: 0 2px 8px #06141e;
+}

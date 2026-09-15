@@ -1,3 +1,4 @@
+import { createPrisonArt } from "./prisonArt";
 import { createRunLegs } from "./runLegs";
 import { drawRoomFrame } from "./roomFrame";
 import { isFixedRoomPlatform } from "../../../shared/game/roomBoundary";
@@ -18,6 +19,7 @@ import { flameBounds } from "../../../shared/game/obstacles";
 
 export function createRoomArt(scene: Phaser.Scene, level: Level, density = 1) {
   const objects: Phaser.GameObjects.Image[] = [];
+  const prison = createPrisonArt(scene, level, density);
   const props = (
     frame: string,
     x: number,
@@ -210,6 +212,7 @@ export function createRoomArt(scene: Phaser.Scene, level: Level, density = 1) {
       lastEditing = editing;
       grid.setVisible(editing);
       obstacleArt.update(state);
+      prison?.update(state);
       if (state.tick === 0 || state.tick < lastTick) {
         landingTick = jumpTick = wallJumpTick = wallContactTick = -100;
         deathMs = 0;
@@ -332,7 +335,9 @@ export function createRoomArt(scene: Phaser.Scene, level: Level, density = 1) {
       saws.forEach((image) => image.setRotation(state.tick / 10));
       treasures.forEach((image, index) =>
         image.setVisible(
-          !state.collectedTreasureIds.includes(level.treasures[index].id),
+          !(
+            level.id === "prison" && level.treasures[index].id === "escape-door"
+          ) && !state.collectedTreasureIds.includes(level.treasures[index].id),
         ),
       );
       return (
@@ -343,6 +348,7 @@ export function createRoomArt(scene: Phaser.Scene, level: Level, density = 1) {
       );
     },
     destroy() {
+      prison?.destroy();
       legs.destroy();
       grid.destroy();
       guides.destroy();

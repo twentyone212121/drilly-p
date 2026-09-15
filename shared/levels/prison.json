@@ -37,6 +37,20 @@
       "y": 298,
       "width": 260,
       "height": 18
+    },
+    {
+      "id": "upper-walkway",
+      "x": 200,
+      "y": 184,
+      "width": 330,
+      "height": 18
+    },
+    {
+      "id": "exit-walkway",
+      "x": 12,
+      "y": 90,
+      "width": 240,
+      "height": 18
     }
   ],
   "traps": [
@@ -51,22 +65,21 @@
       "x": 600,
       "y": 276,
       "radius": 22
+    },
+    {
+      "id": "upper-saw",
+      "x": 365,
+      "y": 166,
+      "radius": 18
     }
   ],
   "treasures": [
     {
-      "id": "cell-key",
-      "x": 448,
-      "y": 392,
-      "width": 32,
-      "height": 28
-    },
-    {
-      "id": "exit-key",
-      "x": 500,
-      "y": 270,
-      "width": 32,
-      "height": 28
+      "id": "escape-door",
+      "x": 64,
+      "y": 34,
+      "width": 40,
+      "height": 56
     }
   ]
 }

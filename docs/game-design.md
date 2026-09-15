@@ -26,7 +26,9 @@ After the last attempt, return Drilly to the first recording’s start, paused, 
 attempt buttons and Back visible. Selecting an attempt plays it immediately and
 stops continuous playback; it returns to its own start when finished. Only actual
 recorded attempts can be selected; show all three buttons at the top center, with
-unavailable attempts disabled. Back remains only at the top left.
+unavailable attempts disabled. Back remains only at the top left. Hide the treasure
+counter during Drilly’s replay. Its pause menu omits Replay attempt and the ghost
+toggle; use the attempt buttons to select recordings.
 Animate both result portraits gently. Show only both totals and each player’s
 “Cleared on try…” outcome, without a points breakdown or scoring explanation.
 
@@ -39,8 +41,9 @@ Animate both result portraits gently. Show only both totals and each player’s
 | Results       | Show outcome and medals; return to your existing draft.           |
 
 Challenge Drilly opens Test when a clear is needed, otherwise Your raid.
-Editing opens from Edit in the top-left corner; it becomes Back and Test while
-the tools are open. Back closes editing, and Test closes the tools; winning saves the
+Editing opens from Edit in the top-left corner; it becomes Back while
+the tools are open. Test and save replaces Challenge Drilly on the bottom wall
+during editing. Back closes editing, and Test and save closes the tools; winning saves the
 cleared layout and returns directly to the room with a Room saved status and Edit
 button, without a success dialog or automatic raid. The draft and its successful test recording persist across reloads. Restored clears are verified against the exact room and current rules.
 Testing opens directly in the room without a preview dialog.
@@ -97,7 +100,7 @@ use the same instructions, reasoning setting, physics, and three attempts.
   not. Submit the exact cleared layout. Never give Drilly the player’s clear inputs.
 - Save the current dungeon draft in localStorage after committed edits and restore
   it on reload, including unfinished layouts and successful test recordings. Reload
-  resets the current round, but preserves a verified clear. Geometry edits, changed
+  restores the current round and verified clear. Geometry edits, changed
   rules, or invalid recordings require another test. Restoring a clear has a bounded
   tick budget; longer recordings require another test after reload. Verification
   keeps only the final simulation result. The restoration budget remains provisional
@@ -119,12 +122,12 @@ metal lettering below the vents, with clean pale cyan lettering and a subtle rec
 Remove the regular jump hint, on-screen Jump button, and “Your dungeon” heading;
 keyboard and tap controls still work.
 Remove the five-step progress strip. A compact You / Drilly table shows cumulative
-points and rounds won in the current session while building or viewing results.
+points and rounds won while building or viewing results.
 During play, hide that table and show only the treasure count centered at the top,
 alongside the existing sound/fullscreen/pause controls. Add scores once per completed round;
 watching replays never adds points. Each side earns its attack points plus defence
 points; draws add points to both sides without a win. Totals survive returning to
-the editor but reset on reload. Tutorial examples, action buttons, and result
+the editor and reloads in the same browser. Tutorial examples, action buttons, and result
 messages explain the next step.
 The computer background has local flickering status lights, cyan/violet/amber
 light pulses at different speeds, and a broken wire with occasional sparks. Keep
@@ -152,8 +155,11 @@ along the current direction; it cannot turn or reverse the route. Only Rotate ch
 direction, cycling through right, down, left, and up. A drone's speed directly sets
 its average travel speed, with smooth acceleration and slowing to a stop at each
 endpoint before reversing.
-Pursuers immediately and continuously follow the player from any distance, with no
-acquisition zone, waiting period, or return-to-base behavior.
+Pursuers continuously chase the player’s position from 0.3 seconds earlier, so
+they briefly follow the old trajectory after jumps or reversals. Until enough
+history exists, target the spawn position. This delay is provisional tuning.
+There is no acquisition zone or return-to-base behavior; tracking works across
+the room and resets on each attempt.
 Hazards share graphite metal casings, cyan circuitry, and magenta energy cores.
 Use rotating saw teeth and drone fans, turret charging/firing effects, subtle spike
 status pulses, and a pursuer tracking eye. Keep artwork fitted to its collision bounds.
@@ -230,7 +236,7 @@ work, and request a fresh build after consuming a completed room. Save the valid
 including failures. Save the proof and finish the build in one backend transaction;
 keep proof inputs private. A retry
 retains earlier candidates and attempts; stale workers cannot publish over it.
-Rounds, scored attempts, and medals still live in browser memory. Their persistence
+Rounds, scored attempts, and medals persist in browser storage. Their backend persistence
 APIs are defined but are not connected to gameplay yet.
 
 Use playtesting to evaluate variety, difficulty, reliability and latency before
@@ -247,3 +253,66 @@ to playtesting.
 
 Engineering: [AGENTS.md](../AGENTS.md). Current setup and architecture:
 [README](../README.md), [backend notes](../convex/README.md).
+
+## Browser session recovery
+
+Persist the current round, verified human and Drilly recordings, remaining attempts,
+score totals and wins, replay selection and position, ghost visibility, and audio
+settings in browser storage. Reload restores active play paused at its recorded
+position. Results already counted must never count again. Completed background
+rooms and pending build IDs are retained; unfinished Drilly work resumes using its
+completed attempt history. In-flight raid responses cannot survive a page reload,
+so only that unfinished request may run again.
+
+Save on meaningful transitions and page exit, with periodic checkpoints during play.
+Blocked/full storage must not interrupt the current session. Validate saved data and
+recordings under current rules; incompatible or oversized play recordings fall back
+to the saved draft while preserving valid scores and preferences. Saves are local to
+this browser/site, not shared across devices. Browser-controlled fullscreen and
+transient open menus are not restored.
+
+## Playable prison opening
+
+The first escape opens with a short, skippable conversation: Drilly has imprisoned
+the computer’s keys, ESC asks the player for help, and Drilly challenges ESC to
+escape and build a room of their own. Large animated portraits and speech bubbles
+reveal dialogue word by word directly over the softly blurred room, without an
+enclosing modal panel. ESC and Drilly occupy opposite sides at half the initial portrait size; the
+active speaker has a compact pale oval speech cloud centered above the portraits, with its tail pointing
+toward the portrait. Hide the ordinary HUD during dialogue; the only control is
+a 42px-high “Skip intro →” button in the top-right corner. Clicking anywhere or
+pressing Space advances to the next line, even during its reveal.
+Finishing or skipping the intro reveals the tutorial with ESC still at spawn.
+The next click, tap, or Space starts movement. No floating start message appears
+in the prison; the wall instructions remain. Death retries do not replay the conversation.
+Reduced motion shows whole lines without animated entrances.
+
+Continuous bars without individual cell doors or locks and warning lamps sit behind the playable route. Climb three
+ledges past saws to a hole in the cage at the top. The tutorial’s sole collectible
+is the opening’s contact area, presented as an exit instead of treasure; reaching it
+uses the existing deterministic win rule. Ordinary dungeon objectives and movement
+are unchanged. The exit is an open gap with torn bars bent outward and faint light beyond, without
+an Escape label in the HUD. Hide the floor guidance during the dialogue. Once
+the tutorial starts, show it on a small recessed metal plate centered on the floor.
+The prison uses the fuller, louder intro synth track with a slow bass pulse and moving minor chords, with
+quiet ventilation and electrical ambience underneath. Regular music returns outside the prison.
+
+Use scalable vector portraits for ESC and Drilly in interface screens, preserving
+their cream/cyan and magenta character designs. Gameplay keeps its existing sprite
+animations. Keep intro portraits small and dialogue clouds compact.
+
+Dialogue uses a quiet minor synth loop, soft speaker-specific word ticks, and a
+short switch sound. All follow game mute/volume; dialogue effects stop on leaving the intro, while
+the music continues into the playable tutorial;
+hidden tabs pause the music. Browser audio unlock may delay sound until the first
+interaction. The speech text is centered within the cloud with balanced line wrapping.
+
+Before each intro, including a reload, show a larger ESC portrait and “Press or tap or click to start.” Clicking or
+tapping anywhere, or pressing a non-modifier key (other than Tab/Escape), unlocks audio and begins the music and word reveal together; do not
+start either behind the entry screen. Mute preferences still apply.
+
+Back from editing asks whether to Test and save, Discard changes, or Keep editing
+when the layout differs from its state on entering edit mode. Discard restores
+that layout and its previous verified clear. Unchanged layouts leave immediately.
+Test and save still requires a successful playthrough; empty-treasure drafts must
+be completed before testing. Browser draft autosave continues while editing.

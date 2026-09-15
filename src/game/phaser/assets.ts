@@ -1,4 +1,8 @@
 export const AUDIO = {
+  intro: "/assets/audio/intro.wav",
+  dialogueWord: "/assets/audio/dialogue-word.wav",
+  dialogueSwitch: "/assets/audio/dialogue-switch.wav",
+  prison: "/assets/audio/prison.wav",
   shot: "/assets/audio/shot.wav",
   music: "/assets/audio/ambient.wav",
   jump: "/assets/audio/jump.wav",

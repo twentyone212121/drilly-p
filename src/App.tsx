@@ -1,3 +1,5 @@
+import { UnsavedRoomDialog } from "./components/UnsavedRoomDialog";
+import { loadAudio, saveAudio } from "./persistence/session";
 import { ComputerBackground } from "./components/ComputerBackground";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { Session } from "./game/session";
@@ -13,22 +15,21 @@ import { ModelPicker } from "./components/ModelPicker";
 
 export default function App({ session }: { session: Session }) {
   const view = useSyncExternalStore(session.subscribe, session.getSnapshot);
-  const [audio, setAudio] = useState<AudioSettings>({
-    muted: false,
-    volume: 0.6,
-  });
+  const [audio, setAudio] = useState<AudioSettings>(loadAudio);
+  useEffect(() => saveAudio(audio), [audio]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [confirmingEdits, setConfirmingEdits] = useState(false);
   const [editor, setEditor] = useState(INITIAL_EDITOR);
   const level = view.level;
   const building = view.phase === "build";
   const editorOptions = useMemo(
     () => ({
-      enabled: building && editing && !menuOpen,
+      enabled: building && editing && !menuOpen && !confirmingEdits,
       state: editor,
       onChange: setEditor,
     }),
-    [building, editing, menuOpen, editor],
+    [building, editing, menuOpen, confirmingEdits, editor],
   );
 
   function openMenu() {
@@ -54,7 +55,20 @@ export default function App({ session }: { session: Session }) {
   }, [session]);
 
   return (
-    <main className="arcade-game">
+    <main
+      className="arcade-game"
+      onClick={(event) => {
+        // Plain actions release pointer focus; menu triggers own their focus lifecycle.
+        if (
+          event.detail > 0 &&
+          document.activeElement instanceof HTMLButtonElement &&
+          !document.activeElement.hasAttribute("aria-haspopup") &&
+          event.currentTarget.contains(document.activeElement)
+        ) {
+          document.activeElement.blur();
+        }
+      }}
+    >
       <ComputerBackground />
       <GameHud
         view={view}
@@ -64,14 +78,15 @@ export default function App({ session }: { session: Session }) {
         onMenu={openMenu}
         editing={editing}
         onEdit={() => {
+          session.beginEditing();
           setEditor({ ...INITIAL_EDITOR });
           setEditing(true);
         }}
-        onTest={() => {
-          session.testDungeon();
-          setEditing(false);
-        }}
         onBack={() => {
+          if (editing && view.hasEditorChanges) {
+            setConfirmingEdits(true);
+            return;
+          }
           setMenuOpen(false);
           setEditing(false);
           session.requestReturn();
@@ -84,7 +99,7 @@ export default function App({ session }: { session: Session }) {
         {view.waitingForDrilly && (
           <DrillyWorkshop view={view} onRetry={() => session.primaryAction()} />
         )}
-        {view.waitingToStart && !menuOpen && (
+        {view.waitingToStart && view.phase !== "prison" && !menuOpen && (
           <p className="ready-hint" role="status">
             Click, tap, or press Space to start
           </p>
@@ -117,23 +132,36 @@ export default function App({ session }: { session: Session }) {
             </span>
           )}
           <div className="build-actions">
-            {view.liveDrilly && (
+            {view.liveDrilly && !editing && (
               <ModelPicker
                 value={view.model}
                 onChange={(model) => session.setModel(model)}
               />
             )}
             <button
-              className="game-button primary"
-              disabled={!view.canChallenge}
+              className="game-button primary room-primary-action"
+              disabled={editing ? !level.treasures.length : !view.canChallenge}
               onClick={() => {
-                session.challengeDrilly();
+                if (editing) session.testDungeon();
+                else session.challengeDrilly();
                 setEditing(false);
               }}
             >
-              <GameSprite name="drilly" />
-              Challenge Drilly
-              <GameIcon name="arrow" />
+              <span
+                className="room-action-label"
+                aria-hidden={!editing}
+                style={{ visibility: editing ? "visible" : "hidden" }}
+              >
+                <GameIcon name="play" /> Test and save
+              </span>
+              <span
+                className="room-action-label"
+                aria-hidden={editing}
+                style={{ visibility: editing ? "hidden" : "visible" }}
+              >
+                <GameSprite name="drilly" /> Challenge Drilly{" "}
+                <GameIcon name="arrow" />
+              </span>
             </button>
           </div>
         </footer>
@@ -164,6 +192,23 @@ export default function App({ session }: { session: Session }) {
         <p className="connection-note" role="status">
           Connect Convex to challenge Drilly.
         </p>
+      )}
+      {confirmingEdits && (
+        <UnsavedRoomDialog
+          canTest={level.treasures.length > 0}
+          onSave={() => {
+            session.testDungeon();
+            setConfirmingEdits(false);
+            setEditing(false);
+          }}
+          onDiscard={() => {
+            session.discardEdits();
+            setConfirmingEdits(false);
+            setEditing(false);
+            setEditor({ ...INITIAL_EDITOR });
+          }}
+          onCancel={() => setConfirmingEdits(false)}
+        />
       )}
       <GameOverlay
         session={session}
