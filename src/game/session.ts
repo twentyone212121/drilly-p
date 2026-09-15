@@ -6,16 +6,11 @@ import type { Level, Replay, State } from "../../shared/game/types";
 import {
   parseDrillyAttempts,
   parseDrillyModel,
-  parseBuiltDungeon,
   parseEditorLevel,
   parseLevel,
   parseReplay,
 } from "../../shared/validation";
-import type {
-  BuiltDungeon,
-  DrillySource,
-  DrillyModel,
-} from "../../shared/game/drilly";
+import type { DrillySource, DrillyModel } from "../../shared/game/drilly";
 import { replayAttempt } from "../../shared/game/replay";
 import { scoreRound, type RaidAttempt } from "../../shared/game/round";
 import { createAttempt } from "./attempt";
@@ -99,7 +94,8 @@ export function createSession(
   };
   let opponentStatus: RequestStatus = "idle";
   let opponentError: string | null = null;
-  let preparedRoom: Promise<BuiltDungeon> | null = null;
+  let preparedRoom: Promise<Level> | null = null;
+  let preparationController: AbortController | null = null;
   let roomPreparation: "idle" | "building" | "ready" | "error" = "idle";
   const listeners = new Set<() => void>();
   let snapshot = makeSnapshot();
@@ -195,6 +191,8 @@ export function createSession(
 
   function leaveRound() {
     confirmingGiveUp = false;
+    preparationController?.abort();
+    preparationController = null;
     preparedRoom = null;
     roomPreparation = "idle";
     deathRemainingMs = 0;
@@ -273,20 +271,25 @@ export function createSession(
     opponentStatus = "pending";
     opponentError = null;
     notify();
+    prepareRoom();
+    const preparation = preparedRoom!;
     try {
-      prepareRoom();
-      const generated = await preparedRoom!;
-      if (round !== current || phase !== "raid") return;
+      const generated = await preparation;
+      if (round !== current || preparedRoom !== preparation || phase !== "raid")
+        return;
 
       preparedRoom = null;
+      preparationController = null;
       roomPreparation = "idle";
-      opponent = generated.level;
+      opponent = generated;
       opponentStatus = "idle";
       loadAttempt(opponent);
     } catch (error) {
-      if (round !== current || phase !== "raid") return;
+      if (round !== current || preparedRoom !== preparation || phase !== "raid")
+        return;
 
       preparedRoom = null;
+      preparationController = null;
       roomPreparation = "idle";
       opponentStatus = "error";
       opponentError = drillyErrorMessage(
@@ -306,33 +309,35 @@ export function createSession(
       return;
 
     roomPreparation = "building";
-    const request = options.drilly
-      .build()
+    const controller = new AbortController();
+    preparationController = controller;
+    preparedRoom = options.drilly
+      .build(controller.signal)
       .then((value) => {
-        const built = parseBuiltDungeon(value);
-        const verified = replayAttempt(built.proof);
-        if (
-          verified.stopReason !== "won" ||
-          verified.state.tick !== built.proof.endTick
-        )
-          throw new Error("Drilly did not clear the generated room.");
+        controller.signal.throwIfAborted();
+        const level = parseLevel(value);
 
-        if (preparedRoom === request) {
-          roomPreparation = "ready";
-          notify();
-        }
-        return built;
+        roomPreparation = "ready";
+        notify();
+        return level;
       })
       .catch((error: unknown) => {
-        if (preparedRoom === request) {
+        if (!controller.signal.aborted) {
           roomPreparation = "error";
           notify();
         }
         throw error;
       });
-    preparedRoom = request;
     // Background preparation is reused on challenge; errors surface there.
     void preparedRoom.catch(() => {});
+    notify();
+  }
+
+  function cancelRoomPreparation() {
+    preparationController?.abort();
+    preparationController = null;
+    preparedRoom = null;
+    roomPreparation = "idle";
     notify();
   }
 
@@ -636,6 +641,7 @@ export function createSession(
     testDungeon,
     challengeDrilly,
     prepareRoom,
+    cancelRoomPreparation,
     reset,
     primaryAction() {
       if (deathRemainingMs > 0) return;

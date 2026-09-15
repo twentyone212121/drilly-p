@@ -1,49 +1,17 @@
 import { spikeParts } from "./spikes";
 import { RULES } from "./rules";
-import type { Level, Platform, Rect } from "./types";
+import type { Level, Platform } from "./types";
 
-// Ordinary collision platforms, included in the room before proof or playback.
-export function roomSideWalls(
-  room: Pick<Level, "width" | "height">,
-): Platform[] {
-  const width = RULES.drilly.sideWallWidth;
-  return [
-    { id: "boundary-left", x: 0, y: 0, width, height: room.height },
-    {
-      id: "boundary-right",
-      x: room.width - width,
-      y: 0,
-      width,
-      height: room.height,
-    },
-  ];
-}
-
-export function isRoomSideWall(
-  platform: Rect,
-  room: Pick<Level, "width" | "height">,
-): boolean {
-  return roomSideWalls(room).some(
-    (wall) =>
-      platform.x === wall.x &&
-      platform.y === wall.y &&
-      platform.width === wall.width &&
-      platform.height === wall.height,
-  );
-}
-
-// Recognize the original template's perimeter as well as normalized side walls.
-// Interior platforms remain editable, even when named similarly.
+// Recognize perimeter platforms in saved rooms; interior platforms remain editable.
 export function isFixedRoomPlatform(
   platform: Platform,
   room: Pick<Level, "width" | "height">,
 ) {
-  if (isRoomSideWall(platform, room)) return true;
   const legacySide =
     platform.y === 0 &&
     platform.height === room.height &&
-    platform.width === 24 &&
-    (platform.x === 0 || platform.x === room.width - 24);
+    (platform.width === RULES.roomBorderWidth || platform.width === 24) &&
+    (platform.x === 0 || platform.x === room.width - platform.width);
   if (legacySide) return true;
   const floor =
     platform.id === "floor" &&
@@ -69,7 +37,6 @@ export function roomBorders(room: Level): Platform[] {
     if (platform.id === "floor") bottom = room.height - platform.y;
   }
   return [
-    // Keep the side-wall IDs exposed by the builder valid in routes and observations.
     { id: "boundary-left", x: 0, y: 0, width: left, height: room.height },
     {
       id: "boundary-right",

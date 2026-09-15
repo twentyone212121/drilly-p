@@ -2,7 +2,6 @@ import { DEATH_ANIMATION_MS } from "./presentation";
 import { expect, it } from "vitest";
 import { getPrison, newPlayerDungeon } from "../../shared/game/rooms";
 import { getExampleRoom } from "../../shared/testing/rooms";
-import { runAttempt } from "../../shared/game/replay";
 import { RULES } from "../../shared/game/rules";
 import { runDrillyFixture } from "../../shared/testing/drilly";
 import { createSession, type Session } from "./session";
@@ -25,20 +24,10 @@ function finishDeathPresentation(session: Session) {
 
 function editingSession() {
   const level = getExampleRoom();
-  const jumpTicks = [34, 106];
   const session = createSession({
     prisonLevel: newPlayerDungeon(),
     drilly: {
-      build: async () => ({
-        level,
-        proof: {
-          version: 2,
-          rulesVersion: RULES.version,
-          level,
-          jumpTicks,
-          endTick: runAttempt(level, jumpTicks).state.tick,
-        },
-      }),
+      build: async () => level,
       raid: async (room, history) => runDrillyFixture(room)[history.length],
     },
   });

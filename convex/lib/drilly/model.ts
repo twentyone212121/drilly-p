@@ -1,29 +1,32 @@
 import OpenAI from "openai";
-import type { Planner } from "./protocol";
 import { RULES } from "../../../shared/game/rules";
-import {
-  DRILLY_ERRORS,
-  drillyErrorMessage,
-} from "../../../shared/game/drillyErrors";
+import { DRILLY_ERRORS, drillyErrorMessage } from "../../../shared/game/drillyErrors";
 
-export function openAIPlanner(
+export type ModelCall = (
+  instructions: string,
+  input: unknown,
+  output: { schema: Record<string, unknown>; schemaName: string },
+) => Promise<unknown>;
+
+/** Calls made through this adapter share one deadline. */
+export function createModelCall(
   apiKey: string | undefined,
-  model: string = RULES.drilly.defaultModel,
-): Planner {
+  model: string,
+  timeoutMs: number,
+): ModelCall {
   if (!apiKey) throw new Error(DRILLY_ERRORS.configuration);
 
   const client = new OpenAI({
     apiKey,
     maxRetries: 0,
-    // The caller's deadline cancels each operation; don't cut thinking short here.
-    timeout: Math.max(
-      RULES.drilly.buildThinkingTimeoutMs,
-      RULES.drilly.raidThinkingTimeoutMs,
-    ),
     logLevel: "off",
   });
+  const deadline = Date.now() + timeoutMs;
 
-  return async (instructions, input, options) => {
+  return async (instructions, input, output) => {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error(DRILLY_ERRORS.timeout);
+
     try {
       const response = await client.responses.create(
         {
@@ -32,27 +35,22 @@ export function openAIPlanner(
           input: `Return JSON for this game data:\n${JSON.stringify(input)}`,
           store: false,
           max_output_tokens: RULES.drilly.providerOutputTokens,
-          reasoning: options?.reasoning
-            ? { effort: options.reasoning }
-            : undefined,
+          reasoning: { effort: "low" },
           text: {
-            format: options?.schema
-              ? {
-                  type: "json_schema",
-                  name: options.schemaName ?? "drilly_output",
-                  strict: true,
-                  schema: options.schema,
-                }
-              : { type: "json_object" },
+            format: {
+              type: "json_schema",
+              name: output.schemaName,
+              strict: true,
+              schema: output.schema,
+            },
           },
         },
-        { signal: options?.signal },
+        { timeout: remaining },
       );
 
       if (response.status !== "completed" || !response.output_text)
         throw new Error(DRILLY_ERRORS.incomplete);
-      if (response.output_text.length > 64_000)
-        throw new Error(DRILLY_ERRORS.incomplete);
+      if (response.output_text.length > 64_000) throw new Error(DRILLY_ERRORS.incomplete);
 
       return JSON.parse(response.output_text) as unknown;
     } catch (error) {
@@ -76,9 +74,7 @@ function providerErrorMessage(error: unknown): string {
       case 401:
         return DRILLY_ERRORS.credentials;
       case 429:
-        return error.code === "insufficient_quota"
-          ? DRILLY_ERRORS.quota
-          : DRILLY_ERRORS.rateLimit;
+        return error.code === "insufficient_quota" ? DRILLY_ERRORS.quota : DRILLY_ERRORS.rateLimit;
       case 400:
       case 403:
       case 404:

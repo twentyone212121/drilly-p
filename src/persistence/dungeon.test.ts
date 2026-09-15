@@ -33,7 +33,7 @@ it("restores edited and unfinished rooms, saving only when the draft changes", (
       tutorialCompleted: true,
       editorLevel: loadDungeon(),
       playerClear: loadDungeonClear(),
-      drilly: { build: vi.fn(), raid: vi.fn() },
+      drilly: { build: async () => room, raid: () => new Promise<never>(() => {}) },
     });
   const cleared = reload();
   expect(cleared.getSnapshot().cleared).toBe(true);

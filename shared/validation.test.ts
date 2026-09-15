@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import checkpoint from "./levels/checkpoint.json";
 import { RULES } from "./game/rules";
 import {
-  parseBuiltDungeon,
   parseDrillyAttempts,
   parseEditorLevel,
   parseJumpTicks,
@@ -24,9 +23,6 @@ describe("schema validation boundaries", () => {
   it("keeps incoming AI recordings bounded without limiting human recordings", () => {
     const longReplay = { ...replay, endTick: RULES.maxTicks + 1 };
     expect(parseReplay(longReplay)).toEqual(longReplay);
-    expect(() => parseBuiltDungeon({ level, proof: longReplay })).toThrow(
-      "execution budget",
-    );
     expect(() =>
       parseDrillyAttempts([{ replay: longReplay, outcome: "won" }], level),
     ).toThrow("execution budget");
