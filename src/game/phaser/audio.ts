@@ -1,3 +1,8 @@
+import {
+  DIALOGUE_SOUND_EVENT,
+  hasStartedIntroAudio,
+  type DialogueSound,
+} from "../dialogueAudio";
 import { isWallSliding, RUN_STRIDE_TICKS } from "../presentation";
 import type Phaser from "phaser";
 import type { GameEvent, State } from "../../../shared/game/types";
@@ -14,8 +19,15 @@ const EVENT_SOUNDS: Partial<Record<GameEvent["type"], keyof typeof AUDIO>> = {
   won: "win",
 };
 
-export function createAudio(scene: Phaser.Scene, settings: AudioSettings) {
+export function createAudio(
+  scene: Phaser.Scene,
+  settings: AudioSettings,
+  prison = false,
+  intro = false,
+) {
   let current = settings;
+  let inPrison = prison;
+  let inIntro = intro;
   let lastFootstep = -1;
   const footstep = scene.cache.audio.exists("footstep")
     ? scene.sound.add("footstep")
@@ -27,22 +39,47 @@ export function createAudio(scene: Phaser.Scene, settings: AudioSettings) {
     ? scene.sound.add("music", { loop: true, volume: 0.38 })
     : null;
 
+  const ambience = scene.cache.audio.exists("prison")
+    ? scene.sound.add("prison", { loop: true, volume: 0.18 })
+    : null;
+
+  const introMusic = scene.cache.audio.exists("intro")
+    ? scene.sound.add("intro", { loop: true, volume: 0.58 })
+    : null;
+
   function startMusic() {
-    if (
-      !music ||
-      scene.sound.locked ||
-      document.hidden ||
-      current.muted ||
-      current.volume <= 0
-    )
-      return;
-    if (music.isPaused) music.resume();
-    else if (!music.isPlaying) music.play();
+    const waitingForEntry = inIntro && !hasStartedIntroAudio();
+    const background = waitingForEntry
+      ? null
+      : inIntro || inPrison
+        ? introMusic
+        : music;
+    for (const track of [introMusic, ambience, music]) {
+      const active =
+        track === background ||
+        (track === ambience && inPrison && !waitingForEntry);
+      if (!active) {
+        track?.stop();
+        continue;
+      }
+      if (
+        !track ||
+        scene.sound.locked ||
+        document.hidden ||
+        current.muted ||
+        current.volume <= 0
+      )
+        continue;
+      if (track.isPaused) track.resume();
+      else if (!track.isPlaying) track.play();
+    }
   }
 
   function onVisibility() {
     if (document.hidden) {
+      introMusic?.pause();
       music?.pause();
+      ambience?.pause();
       scrape?.stop();
     } else startMusic();
   }
@@ -86,7 +123,8 @@ export function createAudio(scene: Phaser.Scene, settings: AudioSettings) {
   function stopEffects() {
     lastFootstep = -1;
     for (const key of Object.keys(AUDIO)) {
-      if (key !== "music") scene.sound.stopByKey(key);
+      if (key !== "music" && key !== "prison" && key !== "intro")
+        scene.sound.stopByKey(key);
     }
   }
 
@@ -125,20 +163,79 @@ export function createAudio(scene: Phaser.Scene, settings: AudioSettings) {
     events.forEach(playEvent);
   }
 
+  let disposed = false;
+  let wordTone = 0;
+  function onDialogue(event: Event) {
+    const { kind, speaker } = (event as CustomEvent<DialogueSound>).detail;
+    if (kind === "reset") {
+      startMusic();
+      return;
+    }
+    if (kind === "start") {
+      // Resume directly in the gesture: the scene may be sleeping on the entry screen.
+      if ("context" in scene.sound) {
+        void scene.sound.context
+          .resume()
+          .then(() => {
+            if (disposed) return;
+            scene.game.loop.wake();
+            startMusic();
+          })
+          .catch(() => {});
+      } else startMusic();
+      return;
+    }
+    if (
+      !inIntro ||
+      scene.sound.locked ||
+      document.hidden ||
+      current.muted ||
+      current.volume <= 0
+    )
+      return;
+    const key = kind === "word" ? "dialogueWord" : "dialogueSwitch";
+    if (scene.cache.audio.exists(key))
+      scene.sound.play(key, {
+        volume: kind === "word" ? 0.6 : 0.65,
+        rate:
+          (speaker === "esc" ? 1.07 : 0.96) +
+          (kind === "word" ? ((wordTone++ % 3) - 1) * 0.025 : 0),
+      });
+  }
+
+  window.addEventListener(DIALOGUE_SOUND_EVENT, onDialogue);
   scene.sound.on("unlocked", startMusic);
   document.addEventListener("visibilitychange", onVisibility);
   apply(settings);
 
   return {
+    setIntro(value: boolean) {
+      if (inIntro === value) return;
+      inIntro = value;
+      if (!value) {
+        scene.sound.stopByKey("dialogueWord");
+        scene.sound.stopByKey("dialogueSwitch");
+      }
+      startMusic();
+    },
+    setPrison(value: boolean) {
+      if (inPrison === value) return;
+      inPrison = value;
+      startMusic();
+    },
     apply,
     consume,
     updateMovement,
     stop: stopEffects,
     destroy() {
+      disposed = true;
+      window.removeEventListener(DIALOGUE_SOUND_EVENT, onDialogue);
+      introMusic?.destroy();
       scene.sound.off("unlocked", startMusic);
       document.removeEventListener("visibilitychange", onVisibility);
       stopEffects();
       music?.destroy();
+      ambience?.destroy();
       footstep?.destroy();
       scrape?.destroy();
     },

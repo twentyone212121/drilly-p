@@ -1,3 +1,4 @@
+import { PrisonIntro } from "./PrisonIntro";
 import { useLayoutEffect, useRef } from "react";
 import type { Session, SessionSnapshot } from "../game/session";
 import { sessionView } from "../game/sessionView";
@@ -33,6 +34,11 @@ export function GameOverlay({
       !view.presentingDeath &&
       view.phase !== "build" &&
       (view.paused || !view.canPlay));
+  const opening =
+    view.phase === "prison" &&
+    view.state.tick === 0 &&
+    !view.waitingToStart &&
+    !menuOpen;
   const paused =
     menuOpen ||
     (view.canPlay && view.paused && !view.finished && view.state.tick > 0);
@@ -40,9 +46,13 @@ export function GameOverlay({
 
   useLayoutEffect(() => {
     const element = dialog.current;
-    if (visible && !element?.open) element?.showModal();
-    else if (!visible && element?.open) element.close();
-  }, [visible]);
+    if (visible && !opening && element && !element.open) {
+      element.showModal();
+      element
+        .querySelector<HTMLElement>("#overlay-title")
+        ?.focus({ preventScroll: true });
+    } else if ((!visible || opening) && element?.open) element.close();
+  }, [visible, opening]);
 
   function act(action: () => void) {
     onCloseMenu();
@@ -53,6 +63,9 @@ export function GameOverlay({
     onCloseMenu();
     if (view.canPlay && !view.finished) session.play();
   }
+
+  if (visible && opening)
+    return <PrisonIntro onStart={() => act(() => session.completeIntro())} />;
 
   return (
     <dialog
@@ -86,14 +99,15 @@ export function GameOverlay({
       {visible &&
         (view.confirmingGiveUp ? (
           <>
-            <h2 id="overlay-title">Give up this round?</h2>
+            <h2 id="overlay-title" tabIndex={-1}>
+              Give up this round?
+            </h2>
             <p>
               Your remaining attempts will be forfeited. Drilly will finish your
               room and earn points from its result.
             </p>
             <button
               className="game-button primary"
-              autoFocus
               onClick={() => session.cancelGiveUp()}
             >
               Keep playing
@@ -110,12 +124,14 @@ export function GameOverlay({
           </>
         ) : paused ? (
           <>
-            <h2 id="overlay-title">Paused</h2>
-            <button className="game-button primary" autoFocus onClick={resume}>
+            <h2 id="overlay-title" tabIndex={-1}>
+              Paused
+            </h2>
+            <button className="game-button primary" onClick={resume}>
               <GameIcon name="play" />
               Continue
             </button>
-            {view.canRestart && (
+            {view.canRestart && view.phase !== "watch" && (
               <button
                 className="game-button"
                 onClick={() =>
@@ -126,7 +142,7 @@ export function GameOverlay({
                 }
               >
                 <GameIcon name="replay" />
-                {view.phase === "watch" ? "Replay attempt" : "Restart"}
+                Restart
               </button>
             )}
             {view.canReplayTutorial && (!view.round || view.result) && (
@@ -183,7 +199,9 @@ export function GameOverlay({
                 className={`overlay-character ${view.phase === "raid" && !view.canPlay && !view.aiError ? "drilly-building" : ""}`}
               />
             )}
-            <h2 id="overlay-title">{copy.title}</h2>
+            <h2 id="overlay-title" tabIndex={-1}>
+              {copy.title}
+            </h2>
             {view.phase === "results" && view.result ? (
               <RoundScore view={view} />
             ) : (
@@ -191,7 +209,6 @@ export function GameOverlay({
             )}
             <button
               className="game-button primary"
-              autoFocus
               disabled={copy.actionDisabled}
               onClick={() =>
                 act(() =>
@@ -216,16 +233,6 @@ export function GameOverlay({
               )}
           </>
         ))}
-      {visible && view.phase === "watch" && view.watchIndex !== null && (
-        <label className="ghost-toggle">
-          <input
-            type="checkbox"
-            checked={view.showGhost}
-            onChange={(event) => session.setGhostVisible(event.target.checked)}
-          />
-          Show your ghost
-        </label>
-      )}
     </dialog>
   );
 }

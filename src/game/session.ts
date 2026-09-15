@@ -9,6 +9,8 @@ import {
   parseEditorLevel,
   parseLevel,
   parseReplay,
+  parseBrowserSession,
+  parseBrowserPlay,
 } from "../../shared/validation";
 import type { DrillySource, DrillyModel } from "../../shared/game/drilly";
 import { replayAttempt } from "../../shared/game/replay";
@@ -33,6 +35,7 @@ export function createSession(
     prisonLevel?: Level;
     editorLevel?: Level;
     playerClear?: unknown;
+    savedSession?: unknown;
     tutorialCompleted?: boolean;
     onTutorialCompleted?: () => void;
     drilly?: DrillySource;
@@ -50,6 +53,7 @@ export function createSession(
   let attemptLevel = prison;
   // Edits replace the draft and invalidate its clear; no revision bookkeeping needed.
   let playerClear: Replay | null = null;
+  let editStart: { level: Level; clear: Replay | null } | null = null;
   if (options.playerClear) {
     try {
       const restored = parseReplay(
@@ -98,6 +102,8 @@ export function createSession(
   let opponentStatus: RequestStatus = "idle";
   let opponentError: string | null = null;
   let preparedRoom: Promise<Level> | null = null;
+  let preparedLevel: Level | null = null;
+  let restoring = false;
   let preparationController: AbortController | null = null;
   let roomPreparation: "idle" | "building" | "ready" | "error" = "idle";
   const listeners = new Set<() => void>();
@@ -138,6 +144,9 @@ export function createSession(
           ? editorLevel
           : attemptLevel,
       editorLevel,
+      hasEditorChanges:
+        editStart !== null &&
+        JSON.stringify(editorLevel) !== JSON.stringify(editStart.level),
       tutorialCompleted,
       cleared: playerClear !== null,
       playerClear,
@@ -197,6 +206,7 @@ export function createSession(
     preparationController?.abort();
     preparationController = null;
     preparedRoom = null;
+    preparedLevel = null;
     roomPreparation = "idle";
     deathRemainingMs = 0;
     round = null;
@@ -282,6 +292,7 @@ export function createSession(
         return;
 
       preparedRoom = null;
+      preparedLevel = null;
       preparationController = null;
       roomPreparation = "idle";
       opponent = generated;
@@ -292,6 +303,7 @@ export function createSession(
         return;
 
       preparedRoom = null;
+      preparedLevel = null;
       preparationController = null;
       roomPreparation = "idle";
       opponentStatus = "error";
@@ -320,6 +332,7 @@ export function createSession(
         controller.signal.throwIfAborted();
         const level = parseLevel(value);
 
+        preparedLevel = level;
         roomPreparation = "ready";
         notify();
         return level;
@@ -337,9 +350,11 @@ export function createSession(
   }
 
   function cancelRoomPreparation() {
+    if (opponentStatus === "pending") opponentStatus = "idle";
     preparationController?.abort();
     preparationController = null;
     preparedRoom = null;
+    preparedLevel = null;
     roomPreparation = "idle";
     notify();
   }
@@ -375,7 +390,9 @@ export function createSession(
           level,
         );
         const recording = recordings[recordings.length - 1];
-        const verified = replayAttempt(recording.replay, { recordTrace: false });
+        const verified = replayAttempt(recording.replay, {
+          recordTrace: false,
+        });
         if (
           verified.stopReason !== recording.outcome ||
           verified.state.tick !== recording.replay.endTick
@@ -514,6 +531,7 @@ export function createSession(
   });
 
   attempt.subscribe(() => {
+    if (restoring) return;
     const view = attempt.getSnapshot();
     if (
       phase === "watch" &&
@@ -541,6 +559,7 @@ export function createSession(
         options.onTutorialCompleted?.();
       } else if (phase === "test" && !recordedAttempt) {
         playerClear = attempt.exportReplay();
+        editStart = null;
         recordedAttempt = true;
         phase = "build";
       }
@@ -562,7 +581,157 @@ export function createSession(
     notify();
   });
 
+  if (options.savedSession) {
+    try {
+      const saved = parseBrowserSession(options.savedSession);
+      scoreboard = saved.scoreboard;
+      showGhost = saved.showGhost;
+      try {
+        const play = parseBrowserPlay(saved.play);
+        const sameRoom = (a: Level, b: Level) =>
+          JSON.stringify(a) === JSON.stringify(b);
+        const verify = (replay: Replay, outcome?: string) => {
+          const checked = replayAttempt(replay, { recordTrace: false });
+          if (
+            checked.state.tick !== replay.endTick ||
+            (outcome && outcome !== "restart" && checked.stopReason !== outcome)
+          )
+            throw new Error("Saved outcome does not match recording.");
+          return checked;
+        };
+        let restoredRound: Round | null = null;
+        if (play.round) {
+          verify(play.round.playerClear, "won");
+          const drilly = parseDrillyAttempts(
+            play.round.drilly,
+            play.round.playerClear.level,
+          );
+          drilly.forEach((a) => verify(a.replay, a.outcome));
+          play.round.human.forEach((a) => {
+            if (!play.opponent || !sameRoom(a.replay.level, play.opponent))
+              throw new Error("Different raid room.");
+            verify(a.replay, a.outcome);
+          });
+          restoredRound = {
+            ...play.round,
+            model: parseDrillyModel(play.round.model),
+            drilly,
+            drillyStatus:
+              play.round.drillyStatus === "pending"
+                ? "idle"
+                : play.round.drillyStatus,
+          };
+        }
+        if (["raid", "watch", "results"].includes(play.phase) && !restoredRound)
+          throw new Error("Missing round.");
+        if (
+          play.scored &&
+          (!restoredRound ||
+            !(
+              restoredRound.drilly.some((a) => a.outcome === "won") ||
+              restoredRound.drilly.length === RULES.raidAttempts
+            ))
+        )
+          throw new Error("Incomplete result.");
+        const recording =
+          play.mode === "replay" && play.watchIndex !== null
+            ? restoredRound?.drilly[play.watchIndex]?.replay
+            : undefined;
+        if (
+          play.mode === "replay" &&
+          (!recording ||
+            !sameRoom(recording.level, play.attempt.level) ||
+            play.attempt.endTick > recording.endTick ||
+            JSON.stringify(play.attempt.jumpTicks) !==
+              JSON.stringify(
+                recording.jumpTicks.filter(
+                  (tick) => tick < play.attempt.endTick,
+                ),
+              ))
+        )
+          throw new Error("Invalid replay position.");
+        if (play.phase === "test" && !sameRoom(play.attempt.level, editorLevel))
+          throw new Error("Draft changed.");
+        if (
+          play.phase === "raid" &&
+          play.opponent &&
+          !sameRoom(play.attempt.level, play.opponent)
+        )
+          throw new Error("Raid changed.");
+        verify(play.attempt);
+        restoring = true;
+        attempt.restore(play.attempt, recording);
+        attemptLevel = play.attempt.level;
+        phase = play.phase;
+        opponent = play.opponent;
+        round = restoredRound;
+        result =
+          play.scored && round ? scoreRound(round.human, round.drilly) : null;
+        watchIndex = play.watchIndex;
+        watchAutoplay = play.watchAutoplay;
+        watchIdle = play.watchIdle;
+        recordedAttempt = play.recordedAttempt;
+        deathRemainingMs = play.deathRemainingMs;
+        respawned = play.respawned;
+        if (round && recording)
+          ghostTrajectory = replayAttempt(round.playerClear).trajectory.map(
+            (state) => state.player,
+          );
+        preparedLevel = play.preparedLevel;
+        if (preparedLevel) {
+          preparedRoom = Promise.resolve(preparedLevel);
+          roomPreparation = "ready";
+        }
+      } catch {
+        // Keep scores and preferences when old rules or a damaged round prevent resuming.
+      } finally {
+        restoring = false;
+      }
+      snapshot = makeSnapshot();
+    } catch {
+      /* Invalid storage must not prevent opening the game. */
+    }
+  }
+
   return {
+    exportSession() {
+      return {
+        version: 1,
+        scoreboard,
+        showGhost,
+        play: {
+          phase,
+          opponent,
+          preparedLevel,
+          round,
+          scored: result !== null,
+          attempt: attempt.exportReplay(),
+          mode: attempt.getSnapshot().mode,
+          watchIndex,
+          watchAutoplay,
+          watchIdle,
+          recordedAttempt,
+          deathRemainingMs,
+          respawned,
+        },
+      };
+    },
+    resumeSavedWork() {
+      if (phase === "raid" && !opponent) void prepareOpponent();
+      if (
+        round &&
+        !result &&
+        (phase === "raid" || phase === "watch") &&
+        round.drillyStatus !== "error"
+      ) {
+        if (
+          round.drilly.some((a) => a.outcome === "won") ||
+          round.drilly.length === RULES.raidAttempts
+        ) {
+          if (phase === "watch") showResults();
+        } else void requestDrilly();
+      }
+    },
     frameState: attempt.frameState,
     renderFrame: attempt.renderFrame,
     ghostFrame() {
@@ -604,6 +773,18 @@ export function createSession(
         listeners.delete(fn);
       };
     },
+    beginEditing() {
+      if (phase !== "build") return;
+      editStart = { level: editorLevel, clear: playerClear };
+      notify();
+    },
+    discardEdits() {
+      if (phase !== "build" || !editStart) return;
+      editorLevel = editStart.level;
+      playerClear = editStart.clear;
+      editStart = null;
+      notify();
+    },
     edit(change: Edit) {
       if (phase !== "build")
         throw new Error("Return to editing before changing the dungeon.");
@@ -623,6 +804,13 @@ export function createSession(
       notify();
     },
     replayTutorial,
+    completeIntro() {
+      if (phase !== "prison" || attempt.getSnapshot().state.tick !== 0) return;
+      // Reuse the paused spawn state so reload and retries keep the same start behavior.
+      respawned = true;
+      attempt.pause();
+      notify();
+    },
     replayDrilly() {
       if (phase === "results") {
         watchAutoplay = true;

@@ -39,6 +39,13 @@ function editingSession() {
 it("allows unlimited prison retries and opens the editor after a real escape", () => {
   const session = createSession();
   expect(() => session.editDungeon()).toThrow();
+  session.completeIntro();
+  expect(session.getSnapshot().waitingToStart).toBe(true);
+  session.update(100);
+  expect(session.frameState().tick).toBe(0);
+  session.play();
+  session.update(20);
+  expect(session.frameState().tick).toBeGreaterThan(0);
   for (let i = 0; i < RULES.raidAttempts + 1; i++) {
     finish(session);
     expect(session.getSnapshot().tutorialCompleted).toBe(false);
@@ -56,8 +63,10 @@ it("allows unlimited prison retries and opens the editor after a real escape", (
     session.update(100);
     expect(session.frameState().tick).toBe(0);
   }
-  finish(session, [44, 199, 200, 234]);
+  finish(session, [48, 197, 198, 256, 316]);
   expect(session.frameState().status).toBe("won");
+  expect(session.frameState().player.y).toBeLessThan(90);
+  expect(session.frameState().collectedTreasureIds).toEqual(["escape-door"]);
   session.primaryAction();
   expect(session.getSnapshot().editorLevel).toEqual(newPlayerDungeon());
 });
@@ -80,6 +89,9 @@ it("requires a clear and only invalidates it for accepted geometry changes", () 
     session.getSnapshot().editorLevel,
   );
   session.editDungeon();
+  session.beginEditing();
+  expect(session.getSnapshot().hasEditorChanges).toBe(false);
+  const clearBeforeEditing = session.getSnapshot().playerClear;
   const level = session.getSnapshot().level;
   session.edit({
     type: "put",
@@ -94,6 +106,11 @@ it("requires a clear and only invalidates it for accepted geometry changes", () 
     object: newObject(level, "saw", { x: 200, y: 96 }),
   });
   expect(session.getSnapshot().cleared).toBe(false);
+  expect(session.getSnapshot().hasEditorChanges).toBe(true);
+  session.discardEdits();
+  expect(session.getSnapshot().editorLevel).toEqual(level);
+  expect(session.getSnapshot().playerClear).toEqual(clearBeforeEditing);
+  expect(session.getSnapshot().hasEditorChanges).toBe(false);
 });
 
 it("allows incomplete drafts but refuses to test without a treasure", () => {

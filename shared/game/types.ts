@@ -24,6 +24,7 @@ export type State = {
   collectedTreasureIds: string[];
   obstacles: ObstacleState[];
   projectiles: Projectile[];
+  pursuitTrail?: { x: number; y: number }[];
   player: {
     x: number;
     y: number;

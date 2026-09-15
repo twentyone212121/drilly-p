@@ -323,17 +323,43 @@ describe("obstacle simulation", () => {
     expect(flameBounds(o, level).x).toBe(408);
     expect(advanceObstacles(level, state, body(300), 30).hitId).toBeNull();
   });
-  it("pursuers immediately track the player across the room and never return home", () => {
+  it("pursuers track old positions before reacting to a reversal, with bounded immutable history", () => {
     const level = room([pursuer]);
-    const state = initialState(level);
+    let state = initialState(level);
+    state.player.x = 800;
+    state.player.y = 100;
+    const original = structuredClone(state);
     const far = advanceObstacles(level, state, body(800, 100), 1);
     expect(far.obstacles[0].phase).toBe("active");
     expect(far.obstacles[0].x).toBeGreaterThan(pursuer.x);
-    state.obstacles = far.obstacles;
-    state.tick = 1;
-    const reversed = advanceObstacles(level, state, body(40, 100), 2);
-    expect(reversed.obstacles[0].phase).toBe("active");
-    expect(reversed.obstacles[0].x).toBeLessThan(far.obstacles[0].x);
+    expect(state).toEqual(original);
+    state = {
+      ...state,
+      obstacles: far.obstacles,
+      pursuitTrail: far.pursuitTrail,
+      tick: 1,
+    };
+    for (let tick = 2; tick <= RULES.obstacles.pursuerDelayTicks + 1; tick++) {
+      const next = advanceObstacles(level, state, body(40, 100), tick);
+      expect(next.obstacles[0].x).toBeGreaterThan(state.obstacles[0].x);
+      state = {
+        ...state,
+        obstacles: next.obstacles,
+        pursuitTrail: next.pursuitTrail,
+        tick,
+      };
+    }
+    const reversed = advanceObstacles(
+      level,
+      state,
+      body(40, 100),
+      state.tick + 1,
+    );
+    expect(reversed.obstacles[0].x).toBeLessThan(state.obstacles[0].x);
+    expect(reversed.pursuitTrail).toHaveLength(
+      RULES.obstacles.pursuerDelayTicks + 1,
+    );
+    expect(initialState(level).pursuitTrail).toBeUndefined();
   });
   it("fires vertically and stops vertical flames at the first platform", () => {
     const vertical = { ...turret, axis: "y" as const, direction: -1 as const };

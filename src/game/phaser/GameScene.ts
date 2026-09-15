@@ -33,6 +33,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload() {
+    this.load.svg("prison-exit", "/assets/environment/prison-exit.svg", {
+      scale: this.density * 2,
+    });
     for (const name of OBSTACLE_TEXTURES) {
       this.load.svg(`obstacle-${name}`, `/assets/obstacles/${name}.svg`, {
         scale: this.density,
@@ -61,7 +64,12 @@ export class GameScene extends Phaser.Scene {
       "Tap or Space to jump. Jump off a wall to turn around.",
       this.density,
     );
-    this.audio = createAudio(this, this.settings);
+    this.audio = createAudio(
+      this,
+      this.settings,
+      this.session.getSnapshot().phase === "prison",
+      this.isIntro(),
+    );
     this.connectAudio();
     this.editor = createEditorInput(
       this.game.canvas,
@@ -81,7 +89,10 @@ export class GameScene extends Phaser.Scene {
     const view = this.session.getSnapshot();
     this.syncLevel(view.level);
     this.editor?.flushPreview();
-    this.tutorialHint?.setVisible(view.phase === "prison");
+    this.tutorialHint?.setVisible(
+      view.phase === "prison" &&
+        (view.state.tick > 0 || !view.paused || view.waitingToStart),
+    );
     const editing = view.phase === "build";
     this.audio?.updateMovement(
       this.session.frameState(),
@@ -132,7 +143,7 @@ export class GameScene extends Phaser.Scene {
     )!;
     this.tutorialHint?.setPosition(
       level.width / 2,
-      floor.y + floor.height * 0.75,
+      floor.y + floor.height * 0.5,
     );
     const width = level.width * this.density;
     const height = level.height * this.density;
@@ -146,8 +157,20 @@ export class GameScene extends Phaser.Scene {
     this.editor?.setLevel(level);
   }
 
+  private isIntro() {
+    const view = this.session.getSnapshot();
+    return (
+      view.phase === "prison" &&
+      view.state.tick === 0 &&
+      view.paused &&
+      !view.waitingToStart
+    );
+  }
+
   private stopAudioOnTransition() {
     const view = this.session.getSnapshot();
+    this.audio?.setIntro(this.isIntro());
+    this.audio?.setPrison(view.phase === "prison");
     const restarted = view.state.tick < this.lastTick;
     const justPaused =
       !this.wasPaused && view.paused && view.state.status === "running";

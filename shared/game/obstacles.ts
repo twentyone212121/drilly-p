@@ -119,6 +119,20 @@ export function advanceObstacles(
     height: RULES.playerHeight,
   };
   const target = { x: body.x + body.width / 2, y: body.y + body.height / 2 };
+  const pursuitTrail = level.obstacles?.some(
+    (obstacle) => obstacle.kind === "pursuer",
+  )
+    ? [
+        ...(state.pursuitTrail ?? [
+          {
+            x: oldBody.x + oldBody.width / 2,
+            y: oldBody.y + oldBody.height / 2,
+          },
+        ]),
+        target,
+      ].slice(-(RULES.obstacles.pursuerDelayTicks + 1))
+    : undefined;
+  const pursuitTarget = pursuitTrail?.[0] ?? target;
   let hitId: string | null = null;
   const events: GameEvent[] = [];
   const emitted: Projectile[] = [];
@@ -131,8 +145,11 @@ export function advanceObstacles(
       next.angle = Math.atan2(next.y - previous.y, next.x - previous.x);
     } else if (o.kind === "pursuer") {
       next.phase = "active";
-      Object.assign(next, approach(previous, target, o.speed));
-      next.angle = Math.atan2(target.y - previous.y, target.x - previous.x);
+      Object.assign(next, approach(previous, pursuitTarget, o.speed));
+      next.angle = Math.atan2(
+        pursuitTarget.y - previous.y,
+        pursuitTarget.x - previous.x,
+      );
     } else if (o.kind === "turret") {
       next.phase = turretPhase(o, tick);
       // Track during warning; the projectile keeps the direction captured when fired.
@@ -221,7 +238,7 @@ export function advanceObstacles(
     )
       projectiles.push(next);
   }
-  return { obstacles, projectiles, hitId, events };
+  return { obstacles, projectiles, hitId, events, pursuitTrail };
 }
 
 // Split at every reversal, using the same travel timing as the visible patrol.

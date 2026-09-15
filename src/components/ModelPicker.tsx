@@ -11,6 +11,7 @@ export function ModelPicker({
   onChange: (value: DrillyModel) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const openedWithKeyboard = useRef(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const options = useRef<(HTMLButtonElement | null)[]>([]);
@@ -19,7 +20,7 @@ export function ModelPicker({
 
   useEffect(() => {
     if (!open) return;
-    options.current[selected]?.focus();
+    if (openedWithKeyboard.current) options.current[selected]?.focus();
     function outside(event: PointerEvent) {
       if (event.target instanceof Node && !root.current?.contains(event.target))
         setOpen(false);
@@ -52,10 +53,14 @@ export function ModelPicker({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        onClick={() => setOpen(!open)}
+        onClick={(event) => {
+          openedWithKeyboard.current = event.detail === 0;
+          setOpen(!open);
+        }}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
+            openedWithKeyboard.current = true;
             setOpen(true);
           }
         }}
@@ -107,14 +112,14 @@ export function ModelPicker({
               className="model-option"
               role="menuitemradio"
               aria-checked={model.id === value}
-              tabIndex={-1}
+              tabIndex={index === selected ? 0 : -1}
               ref={(element) => {
                 options.current[index] = element;
               }}
-              onClick={() => {
+              onClick={(event) => {
                 onChange(model.id);
                 setOpen(false);
-                trigger.current?.focus();
+                if (event.detail === 0) trigger.current?.focus();
               }}
             >
               {model.label}

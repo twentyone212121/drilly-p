@@ -1,4 +1,5 @@
 import { RULES } from "../../shared/game/rules";
+import { replayAttempt } from "../../shared/game/replay";
 import { initialState, step } from "../../shared/game/simulation";
 import { parseLevel, parseReplay } from "../../shared/validation";
 import type { GameEvent, Level, Replay } from "../../shared/game/types";
@@ -175,6 +176,23 @@ export function createAttempt(initialLevel: Level) {
       endTick = replay.endTick;
       schedule = new Set(replay.jumpTicks);
       resetAttempt();
+      notify();
+    },
+
+    restore(value: Replay, recording?: Replay) {
+      const replay = parseReplay(value, RULES.maxRestoredClearTicks);
+      const restored = replayAttempt(replay, { recordTrace: false });
+      if (restored.state.tick !== replay.endTick)
+        throw new Error("Invalid saved attempt.");
+      level = replay.level;
+      resetToHuman();
+      state = previousState = restored.state;
+      jumps = [...replay.jumpTicks];
+      if (recording) {
+        mode = "replay";
+        endTick = recording.endTick;
+        schedule = new Set(recording.jumpTicks);
+      }
       notify();
     },
 

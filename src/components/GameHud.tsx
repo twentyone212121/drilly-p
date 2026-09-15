@@ -12,7 +12,6 @@ export function GameHud({
   onBack,
   editing,
   onEdit,
-  onTest,
 }: {
   view: SessionSnapshot;
   totalTreasures: number;
@@ -22,7 +21,6 @@ export function GameHud({
   onBack: () => void;
   editing: boolean;
   onEdit: () => void;
-  onTest: () => void;
 }) {
   const { phase } = view;
   return (
@@ -34,14 +32,6 @@ export function GameHud({
               <button className="game-button" onClick={onBack}>
                 <GameIcon name="back" />
                 Back
-              </button>
-              <button
-                className="game-button"
-                onClick={onTest}
-                disabled={!totalTreasures}
-              >
-                <GameIcon name="play" />
-                Test
               </button>
             </>
           ) : (
@@ -97,10 +87,8 @@ export function GameHud({
           </tbody>
         </table>
       )}
-      {view.canPlay && (
-        <div
-          className={`counters centered-treasure ${phase === "watch" ? "replay-treasure" : ""}`}
-        >
+      {view.canPlay && phase !== "prison" && phase !== "watch" && (
+        <div className="counters centered-treasure">
           {view.livesRemaining !== null && (
             <span
               className="raid-cells"
@@ -131,7 +119,7 @@ export function GameHud({
             className="treasure-count"
             aria-label={`${view.state.collectedTreasureIds.length} of ${totalTreasures} treasures`}
           >
-            <GameSprite name="treasure" />{" "}
+            <GameSprite name="treasure" />
             {view.state.collectedTreasureIds.length}/{totalTreasures}
           </span>
         </div>

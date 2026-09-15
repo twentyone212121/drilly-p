@@ -75,6 +75,7 @@ h2 {
   flex-shrink: 0;
 }
 .game-sprite {
+  object-fit: contain;
   display: block;
   width: 32px;
   height: 35px;
@@ -1058,7 +1059,8 @@ kbd {
   left: var(--wall-controls-left, 8px);
   right: auto;
   width: var(--wall-controls-width, calc(100% - 16px));
-  height: 106px;
+  height: 112px;
+  grid-template-rows: 112px;
   transform: translateY(-50%) scale(var(--wall-controls-scale, 1));
   transform-origin: left center;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2044,12 +2046,6 @@ kbd {
   cursor: default;
   opacity: 0.65;
 }
-.arcade-game .game-hud .replay-treasure {
-  top: 52px;
-  left: auto;
-  right: 0;
-  transform: none;
-}
 @media (max-width: 800px) {
   .replay-controls {
     top: 58px;
@@ -2058,9 +2054,6 @@ kbd {
   .replay-controls button {
     font-size: 18px;
     padding: 7px 10px;
-  }
-  .arcade-game .game-hud .replay-treasure {
-    top: 104px;
   }
 }
 
@@ -2196,4 +2189,22 @@ kbd {
     left: 37.5%;
     top: 44%;
   }
+}
+
+/* Dialog titles receive focus for announcements, not as interactive controls. */
+.arcade-game .game-overlay h2:focus {
+  outline: none;
+}
+
+/* Both labels contribute their natural size, keeping the primary action stable. */
+.arcade-game .build-footer .build-actions .room-primary-action {
+  display: grid;
+}
+.room-action-label {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  white-space: nowrap;
 }

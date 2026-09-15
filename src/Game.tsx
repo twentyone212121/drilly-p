@@ -2,6 +2,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvex, useConvexAuth } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import App from "./App";
+import { loadSession, persistSession } from "./persistence/session";
 import { GameSprite } from "./components/GameArt";
 import { createDrillySource } from "./ai/drillySource";
 import { createSession } from "./game/session";
@@ -19,6 +20,7 @@ import {
 export function LocalGame() {
   const [session] = useState(() =>
     createSession({
+      savedSession: loadSession(),
       editorLevel: loadDungeon(),
       playerClear: loadDungeonClear(),
       model: loadModel(),
@@ -27,6 +29,7 @@ export function LocalGame() {
     }),
   );
   useEffect(() => persistDungeon(session), [session]);
+  useEffect(() => persistSession(session), [session]);
   return <App session={session} />;
 }
 
@@ -73,6 +76,7 @@ function ConnectedGame() {
   const [session] = useState(() =>
     createSession({
       drilly: createDrillySource(client),
+      savedSession: loadSession(),
       editorLevel: loadDungeon(),
       playerClear: loadDungeonClear(),
       model: loadModel(),
@@ -81,7 +85,9 @@ function ConnectedGame() {
     }),
   );
   useEffect(() => persistDungeon(session), [session]);
+  useEffect(() => persistSession(session), [session]);
   useEffect(() => {
+    session.resumeSavedWork();
     session.prepareRoom();
     return session.cancelRoomPreparation;
   }, [session]);

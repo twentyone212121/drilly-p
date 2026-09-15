@@ -16,12 +16,12 @@ export function sessionView(view: SessionSnapshot): ViewCopy {
       return state.status === "won"
         ? {
             title: "You’re out!",
-            hint: "Build your dungeon next.",
+            hint: "You broke out. Now build a room Drilly can’t beat.",
             action: "Build your dungeon",
           }
         : {
             title: "Escape the prison",
-            hint: "Collect every treasure. Tap or Space to jump. Wall jumps turn you around.",
+            hint: "Reach the gap in the cage at the top. Tap or Space to jump. Wall jumps turn you around.",
             action: "Let’s go",
           };
     case "build":
