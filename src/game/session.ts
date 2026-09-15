@@ -6,11 +6,10 @@ import type { Level, Replay, State } from "../../shared/game/types";
 import {
   parseDrillyAttempts,
   parseDrillyModel,
-  parseBuiltDungeon,
   parseEditorLevel,
   parseLevel,
 } from "../../shared/validation";
-import type { BuiltDungeon, DrillySource, DrillyModel } from "../../shared/game/drilly";
+import type { DrillySource, DrillyModel } from "../../shared/game/drilly";
 import { replayAttempt } from "../../shared/game/replay";
 import { scoreRound, type RaidAttempt } from "../../shared/game/round";
 import { createAttempt } from "./attempt";
@@ -57,7 +56,8 @@ export function createSession(
   let deathRemainingMs = 0;
   let opponentStatus: RequestStatus = "idle";
   let opponentError: string | null = null;
-  let preparedRoom: Promise<BuiltDungeon> | null = null;
+  let preparedRoom: Promise<Level> | null = null;
+  let preparationController: AbortController | null = null;
   let roomPreparation: "idle" | "building" | "ready" | "error" = "idle";
   const listeners = new Set<() => void>();
   let snapshot = makeSnapshot();
@@ -186,20 +186,23 @@ export function createSession(
     opponentStatus = "pending";
     opponentError = null;
     notify();
+    prepareRoom();
+    const preparation = preparedRoom!;
     try {
-      prepareRoom();
-      const generated = await preparedRoom!;
-      if (round !== current) return;
+      const generated = await preparation;
+      if (round !== current || preparedRoom !== preparation) return;
 
       preparedRoom = null;
+      preparationController = null;
       roomPreparation = "idle";
-      opponent = generated.level;
+      opponent = generated;
       opponentStatus = "idle";
       loadAttempt(opponent);
     } catch (error) {
-      if (round !== current) return;
+      if (round !== current || preparedRoom !== preparation) return;
 
       preparedRoom = null;
+      preparationController = null;
       roomPreparation = "idle";
       opponentStatus = "error";
       opponentError = drillyErrorMessage(
@@ -214,25 +217,35 @@ export function createSession(
     if (!options.drilly || preparedRoom || !["build", "test", "raid"].includes(phase)) return;
 
     roomPreparation = "building";
+    const controller = new AbortController();
+    preparationController = controller;
     preparedRoom = options.drilly
-      .build()
+      .build(controller.signal)
       .then((value) => {
-        const built = parseBuiltDungeon(value);
-        const verified = replayAttempt(built.proof);
-        if (verified.stopReason !== "won" || verified.state.tick !== built.proof.endTick)
-          throw new Error("Drilly did not clear the generated room.");
+        controller.signal.throwIfAborted();
+        const level = parseLevel(value);
 
         roomPreparation = "ready";
         notify();
-        return built;
+        return level;
       })
       .catch((error: unknown) => {
-        roomPreparation = "error";
-        notify();
+        if (!controller.signal.aborted) {
+          roomPreparation = "error";
+          notify();
+        }
         throw error;
       });
     // Background preparation is reused on challenge; errors surface there.
     void preparedRoom.catch(() => {});
+    notify();
+  }
+
+  function cancelRoomPreparation() {
+    preparationController?.abort();
+    preparationController = null;
+    preparedRoom = null;
+    roomPreparation = "idle";
     notify();
   }
 
@@ -419,6 +432,7 @@ export function createSession(
     testDungeon,
     challengeDrilly,
     prepareRoom,
+    cancelRoomPreparation,
     reset,
     primaryAction() {
       if (deathRemainingMs > 0) return;

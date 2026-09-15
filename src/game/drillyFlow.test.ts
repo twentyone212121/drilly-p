@@ -4,22 +4,9 @@ import type { RaidAttempt } from "../../shared/game/round";
 import type { Level } from "../../shared/game/types";
 import { newPlayerDungeon } from "../../shared/game/rooms";
 import { RULES } from "../../shared/game/rules";
-import type { DrillySource, BuiltDungeon, DrillyModel } from "../../shared/game/drilly";
+import type { DrillySource, DrillyModel } from "../../shared/game/drilly";
 import { createSession, type Session } from "./session";
 import { runDrillyFixture } from "../../shared/testing/drilly";
-
-function built(level = newPlayerDungeon()): BuiltDungeon {
-  return {
-    level,
-    proof: {
-      version: 2,
-      rulesVersion: RULES.version,
-      level,
-      jumpTicks: [],
-      endTick: runAttempt(level, []).state.tick,
-    },
-  };
-}
 
 function ready(drilly: DrillySource, model: DrillyModel = RULES.drilly.defaultModel) {
   const room = newPlayerDungeon();
@@ -51,7 +38,7 @@ describe("live Drilly rivalry", () => {
       finishDrilly = resolve;
     });
     const source = {
-      build: vi.fn(async () => built(level)),
+      build: vi.fn(async () => level),
       raid: vi.fn(async (room: Level, history: RaidAttempt[]) => {
         await thinking;
         return runDrillyFixture(room)[history.length];
@@ -136,7 +123,7 @@ describe("live Drilly rivalry", () => {
       },
     };
     const source = {
-      build: vi.fn(async () => built()),
+      build: vi.fn(async () => newPlayerDungeon()),
       raid: vi
         .fn()
         .mockResolvedValueOnce(loss)
@@ -187,7 +174,7 @@ describe("live Drilly rivalry", () => {
         }))[0],
     ]) {
       const session = ready({
-        build: async () => built(),
+        build: async () => newPlayerDungeon(),
         raid: vi.fn(async (level) => forge(level)),
       });
       await flush();
@@ -201,7 +188,10 @@ describe("live Drilly rivalry", () => {
 
 it("retries room generation without consuming a human raid attempt", async () => {
   const source = {
-    build: vi.fn().mockRejectedValueOnce(new Error("no proven room")).mockResolvedValue(built()),
+    build: vi
+      .fn()
+      .mockRejectedValueOnce(new Error("no proven room"))
+      .mockResolvedValue(newPlayerDungeon()),
     raid: vi.fn(async () => runDrillyFixture(newPlayerDungeon())[0]),
   };
   const session = ready(source);
@@ -220,7 +210,7 @@ it("retries room generation without consuming a human raid attempt", async () =>
 it("ignores an abandoned raid response while a new round is waiting", async () => {
   const responses: ((value: ReturnType<typeof runDrillyFixture>[number]) => void)[] = [];
   const source: DrillySource = {
-    build: async () => built(),
+    build: async () => newPlayerDungeon(),
     raid: () =>
       new Promise((resolve) => {
         responses.push(resolve);
@@ -254,7 +244,7 @@ it("ignores an abandoned raid response while a new round is waiting", async () =
 });
 
 it("returns to the draft after tutorial replay and ignores the abandoned room request", async () => {
-  let resolve!: (value: BuiltDungeon) => void;
+  let resolve!: (value: Level) => void;
   const session = ready({
     build: () =>
       new Promise((done) => {
@@ -264,7 +254,7 @@ it("returns to the draft after tutorial replay and ignores the abandoned room re
   });
   const draft = session.getSnapshot().editorLevel;
   session.replayTutorial();
-  resolve(built());
+  resolve(newPlayerDungeon());
   await flush();
   expect(session.getSnapshot()).toMatchObject({
     canPlay: true,
@@ -275,24 +265,4 @@ it("returns to the draft after tutorial replay and ignores the abandoned room re
   session.primaryAction();
   expect(session.getSnapshot().level).toEqual(draft);
   expect(session.getSnapshot().cleared).toBe(true);
-});
-
-it("does not accept a forged room proof or mismatched geometry", async () => {
-  for (const invalid of [
-    { ...built(), proof: { ...built().proof, endTick: 1 } },
-    {
-      ...built(),
-      proof: {
-        ...built().proof,
-        level: { ...newPlayerDungeon(), name: "Different room" },
-      },
-    },
-  ]) {
-    const session = ready({ build: async () => invalid, raid: vi.fn() });
-    await flush();
-    expect(session.getSnapshot().canPlay).toBe(false);
-    expect(session.getSnapshot().aiStatus).toBe("error");
-    expect(session.getSnapshot().round?.human).toHaveLength(0);
-    expect(session.getSnapshot().result).toBeNull();
-  }
 });

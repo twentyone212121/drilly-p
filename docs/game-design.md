@@ -117,6 +117,15 @@ edit. Design and proof calls share the overall build deadline; publish only a
 winning room that cannot be cleared by simply running. A late request failure may
 return the last proven challenge. Remove the old route controller entirely.
 
+Generation runs as a scheduled backend job. Entering the editor requests a build;
+the browser observes its status and loads the saved level when ready. Reuse pending
+work, and request a fresh build after consuming a completed room. Save each valid
+candidate before testing it and retain every completed proof attempt, including
+failures. Verify publication on the backend and keep proof inputs private. A retry
+retains earlier candidates and attempts; stale workers cannot publish over it.
+Rounds, scored attempts, and medals still live in browser memory. Their persistence
+APIs are defined but are not connected to gameplay yet.
+
 Broader generation improvements remain deferred. Use headless rooms and playtesting
 to evaluate reliability and latency before adding input batches or images.
 

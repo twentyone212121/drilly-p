@@ -3,6 +3,7 @@ import { describeRules, RULES } from "../../../shared/game/rules";
 import { DRILLY_ERRORS } from "../../../shared/game/drillyErrors";
 import { parseDrillyEdit } from "../../../shared/validation";
 import type { BuiltDungeon } from "../../../shared/game/drilly";
+import type { Level } from "../../../shared/game/types";
 import { withDeadline } from "./deadline";
 import { playRaidAttempt, attemptFeedback } from "./raid";
 import { runAttempt } from "../../../shared/game/replay";
@@ -25,9 +26,23 @@ export type BuildProgress = {
   outcome?: string;
 };
 
+type BuildOptions = {
+  seed?: string;
+  brief?: string;
+  onCandidate?: (level: Level) => Promise<void>;
+  onAttempt?: (attempt: Awaited<ReturnType<typeof playRaidAttempt>>) => Promise<void>;
+};
+
+class BuildPersistenceError extends Error {
+  constructor(readonly cause: unknown) {
+    super("Could not save build progress.");
+  }
+}
+
 export async function buildDungeon(
   plan: Planner,
   onProgress: (progress: BuildProgress) => void = () => {},
+  options: BuildOptions = {},
 ): Promise<BuiltDungeon> {
   const boundedPlan = withDeadline(plan, RULES.drilly.buildThinkingTimeoutMs);
   const budget = {
@@ -46,6 +61,8 @@ export async function buildDungeon(
       const output = await boundedPlan(
         DESIGNER_INSTRUCTIONS,
         {
+          seed: options.seed,
+          brief: options.brief,
           rules: describeRules(),
           budget,
           workspace: working,
@@ -113,7 +130,13 @@ export async function buildDungeon(
         continue;
       }
 
+      await options.onCandidate?.(working).catch((cause) => {
+        throw new BuildPersistenceError(cause);
+      });
       const attempt = await playRaidAttempt(working, boundedPlan);
+      await options.onAttempt?.(attempt).catch((cause) => {
+        throw new BuildPersistenceError(cause);
+      });
       const cleared = attempt.outcome === "won";
       const meaningful = cleared && runAttempt(working, []).stopReason !== "won";
       onProgress({
@@ -140,6 +163,7 @@ export async function buildDungeon(
           : "Repair the failing crossing shown by the attempt. You can also return to checkpoint before trying a different edit.",
       };
     } catch (error) {
+      if (error instanceof BuildPersistenceError) throw error;
       // A late provider failure must not erase a room already built and cleared.
       if (!provenChallenge) throw error;
       onProgress({

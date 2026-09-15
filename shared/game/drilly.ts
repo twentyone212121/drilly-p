@@ -14,6 +14,6 @@ export type BuiltDungeon = { level: Level; proof: Replay };
 
 // Neither builder nor attacker receives the player's own-dungeon clear proof.
 export type DrillySource = {
-  build(): Promise<BuiltDungeon>;
+  build(signal?: AbortSignal): Promise<Level>;
   raid(level: Level, previousAttempts: RaidAttempt[], model: DrillyModel): Promise<RaidAttempt>;
 };
